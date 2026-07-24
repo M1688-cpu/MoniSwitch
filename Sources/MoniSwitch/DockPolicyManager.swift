@@ -41,7 +41,9 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
             let hosting = NSHostingController(rootView: rootView)
 
             let window = NSWindow(contentViewController: hosting)
-            window.title = l10n.t(.settingsTitle)
+            // 注意：不设置 window.title，避免 NavigationSplitView 继承窗口标题
+            // 并在边栏/内容区重复显示——标题统一由下方 NSToolbar 的居中项承担。
+            window.title = ""
             // 固定尺寸窗口；用 fullSizeContentView 让内容延伸到标题栏下方
             window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
             window.titlebarAppearsTransparent = false
@@ -131,7 +133,11 @@ extension DockPolicyManager {
 
         let group = NSToolbarItem(itemIdentifier: itemIdentifier)
         group.view = container
-        group.label = toolbarTitle
+        // label 留空：displayMode=.labelOnly 时若 label 非空会额外渲染文字，
+        // 导致标题重复。居中标题完全由上面的 container 承载。
+        group.label = ""
+        group.paletteLabel = ""
+        group.toolTip = nil
         return group
     }
 }

@@ -48,6 +48,9 @@ struct SettingsView: View {
             case .none:     GeneralTab()
             }
         }
+        // 显式置空导航标题，避免 NavigationSplitView 继承窗口标题
+        // 并在边栏/内容区重复显示"设置"（标题统一由窗口工具栏的居中项承担）。
+        .navigationTitle("")
     }
 }
 
