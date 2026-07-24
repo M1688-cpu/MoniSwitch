@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 纯菜单栏 App：无 Dock 图标、无主窗口、不出现在应用切换器 -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <key>CFBundleName</key>
+    <string>MoniSwitch</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>MoniSwitch</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.moniswitch.app</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+
+    <key>CFBundleExecutable</key>
+    <string>MoniSwitch</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <!-- 最低系统版本 -->
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+
+    <key>NSHumanReadableCopyright</key>
+    <string>MoniSwitch. Bundled displayplacer © Jake Hilborn (MIT License).</string>
+</dict>
+</plist>

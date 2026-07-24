@@ -1,0 +1,44 @@
+import Foundation
+
+/// 一个显示器的完整状态信息（解析自 `displayplacer list` 的输出）。
+struct DisplayInfo: Identifiable, Equatable {
+    /// displayplacer 的持久化屏幕 ID（通常跨插拔保持稳定）
+    let id: String
+    /// 显示器的人类可读名称，例如 "34 inch external screen" 或 "MacBook built in screen"
+    let typeName: String
+    /// 当前分辨率（像素），例如 (3440, 1440)
+    let resolution: (width: Int, height: Int)
+    /// 屏幕左上角的逻辑坐标 (x, y)。origin 为 (0,0) 的屏即为主显示器。
+    var origin: (x: Int, y: Int)
+    /// 是否为当前主显示器（白条所在屏）
+    let isMain: Bool
+    /// scaling 状态：on 表示开启 HiDPI 缩放
+    let scalingOn: Bool
+    /// 刷新率（Hz）
+    let hertz: Int
+    /// 色深
+    let colorDepth: Int
+    /// 旋转角度（0/90/180/270）
+    let degree: Int
+    /// 是否启用
+    let enabled: Bool
+
+    /// 是否为笔记本内置屏（displayplacer 的 Type 里包含 "built in"）
+    var isBuiltIn: Bool {
+        typeName.localizedCaseInsensitiveContains("built in")
+    }
+
+    /// 是否处于镜像状态（通过观察 id 是否被加号拼接判断；这里保留扩展字段）
+    var mirroredPeerID: String? = nil
+
+    /// 简短显示文本，用于菜单项：名称 (宽x高)
+    var menuLabel: String {
+        "\(typeName) (\(resolution.width)x\(resolution.height))"
+    }
+
+    // MARK: - Equatable（基于 id 即可，结构体含元组需手写）
+
+    static func == (lhs: DisplayInfo, rhs: DisplayInfo) -> Bool {
+        lhs.id == rhs.id
+    }
+}
