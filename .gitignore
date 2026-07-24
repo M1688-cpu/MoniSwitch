@@ -13,6 +13,7 @@ DerivedData/
 *.zip
 /dmg-staging/
 /build/
+/dist/
 /Support/MoniSwitch.app
 
 # ===== macOS 系统文件 =====
