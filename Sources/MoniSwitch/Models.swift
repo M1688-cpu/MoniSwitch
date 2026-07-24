@@ -31,9 +31,31 @@ struct DisplayInfo: Identifiable, Equatable {
     /// 是否处于镜像状态（通过观察 id 是否被加号拼接判断；这里保留扩展字段）
     var mirroredPeerID: String? = nil
 
-    /// 简短显示文本，用于菜单项：名称 (宽x高)
+    /// 简短显示文本，用于菜单项：名称 (宽x高)。
+    /// 注意：菜单层请优先用 localizedTypeName 做本地化显示。
     var menuLabel: String {
         "\(typeName) (\(resolution.width)x\(resolution.height))"
+    }
+
+    /// 把 displayplacer 给出的原始 Type 名称（如 "34 inch external screen"）
+    /// 翻译成当前界面语言的友好名称。
+    /// - 内置屏 → "MacBook 内置屏" / "MacBook built-in display"
+    /// - 外接屏 → "34 英寸外接显示器" / "34-inch external display"
+    ///   （保留具体尺寸数字；无法解析时退回原始英文名）
+    func localizedTypeName(l10n: L10n) -> String {
+        if isBuiltIn {
+            return l10n.t(.builtInDisplay)
+        }
+        // 尝试提取 "34 inch" → "34英寸外接显示器"（中文）/ "34-inch external display"（英文）
+        let inchPattern = #"(\d+)\s*inch"#
+        if let regex = try? NSRegularExpression(pattern: inchPattern, options: .caseInsensitive),
+           let match = regex.firstMatch(in: typeName, range: NSRange(typeName.startIndex..., in: typeName)),
+           let range = Range(match.range(at: 1), in: typeName) {
+            let size = String(typeName[range])
+            return "\(size)\(l10n.t(.inch))\(l10n.t(.externalDisplay))"
+        }
+        // 无法识别格式：外接显示器（原始名）
+        return "\(l10n.t(.externalDisplay)) (\(typeName))"
     }
 
     // MARK: - Equatable（基于 id 即可，结构体含元组需手写）

@@ -14,6 +14,11 @@ final class DisplayManager {
 
     private init() {}
 
+    /// 最近一次解析时记录的镜像对（id 对）。
+    /// 当 displayplacer list 输出形如 "Persistent screen id: A+B" 时，
+    /// 表示 A、B 处于镜像组，记为 (A, B)。供 isMirroring() 查询。
+    private(set) var mirroredPairs: [(String, String)] = []
+
     // MARK: - 解析
 
     /// 运行 `displayplacer list` 并解析出当前所有屏幕。
@@ -32,6 +37,7 @@ final class DisplayManager {
     /// 解析 `displayplacer list` 的纯文本输出。
     func parseList(_ text: String) -> [DisplayInfo] {
         var displays: [DisplayInfo] = []
+        mirroredPairs = []  // 每次解析重置
 
         // 用 "Persistent screen id:" 切分成多个屏块
         let blocks = text.components(separatedBy: "Persistent screen id:")
@@ -39,14 +45,27 @@ final class DisplayManager {
         for block in blocks {
             // 第一个 block 是 list 末尾的提示文本（在第一个 "Persistent" 之前），跳过
             let trimmed = block.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.hasPrefix(trimmed.first.map(String.init) ?? "") ,
-                  !trimmed.isEmpty,
+            guard !trimmed.isEmpty,
                   trimmed.contains("Resolution:") else { continue }
 
             // 把块第一行（ID 本身）拼回来
             let fullBlock = "Persistent screen id:" + block
             if let info = parseBlock(fullBlock) {
                 displays.append(info)
+            }
+
+            // 检测镜像：原始 id 行若含 "+"（如 "A+B+C"），记录所有两两组合
+            if let idLine = value(of: "Persistent screen id:", in: fullBlock)?
+                .trimmingCharacters(in: .whitespaces) {
+                let ids = idLine.components(separatedBy: "+")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+                if ids.count >= 2 {
+                    // 基准屏是 ids[0]，其余都是被镜像的
+                    for other in ids.dropFirst() {
+                        mirroredPairs.append((ids[0], other))
+                    }
+                }
             }
         }
         return displays
@@ -150,6 +169,11 @@ final class DisplayManager {
     }
 
     /// 把外接屏放到主屏的左侧或右侧（扩展模式，非镜像）。
+    ///
+    /// 处理两种主屏情况：
+    /// - 主屏是内置屏：常规情况，把外接屏挪到主屏左/右
+    /// - 主屏是外接屏本身（即 external 就是主屏）：此时"移动"等价于把另一块屏
+    ///   （通常是内置屏）整体平移到外接屏的对侧，外接屏保持 (0,0) 不变
     /// - Parameter side: .left 或 .right
     @discardableResult
     func moveExternal(_ external: DisplayInfo,
@@ -157,6 +181,12 @@ final class DisplayManager {
                       in displays: [DisplayInfo]) -> Bool {
         guard let main = displays.first(where: { $0.isMain }) else { return false }
 
+        // 情况 A：外接屏本身就是主屏 → 移动它无意义，应改为平移所有"其他屏"
+        if external.isMain {
+            return moveOthersRelative(to: external, side: side, in: displays)
+        }
+
+        // 情况 B：常规——外接是非主屏，挪到主屏左/右
         let newOriginX: Int
         switch side {
         case .left:
@@ -195,8 +225,43 @@ final class DisplayManager {
         return runConfig(args)
     }
 
-    /// 镜像：把 external 镜像到 main（id:main+external）。
-    /// 镜像时无法独立设分辨率，采用主屏分辨率。
+    /// 外接屏为主屏时：把它当作锚点，把所有其他屏移到它的左/右侧。
+    /// 外接屏自身保持 (0,0)，其他屏放到 (外接宽, 0)（右侧）或 (-其他宽, 0)（左侧）。
+    private func moveOthersRelative(to mainExternal: DisplayInfo,
+                                    side: HorizontalSide,
+                                    in displays: [DisplayInfo]) -> Bool {
+        let args = displays.map { d -> String in
+            if d.id == mainExternal.id {
+                // 主屏外接保持 (0,0)
+                return makeScreenArg(
+                    id: d.id, res: d.resolution, hz: d.hertz,
+                    colorDepth: d.colorDepth, scaling: d.scalingOn,
+                    origin: (0, 0), degree: d.degree
+                )
+            }
+            // 其他屏根据 side 放到主屏外接的左/右
+            let x: Int
+            switch side {
+            case .left:  x = -d.resolution.width              // 在主屏左侧
+            case .right: x = mainExternal.resolution.width    // 在主屏右侧
+            }
+            return makeScreenArg(
+                id: d.id, res: d.resolution, hz: d.hertz,
+                colorDepth: d.colorDepth, scaling: d.scalingOn,
+                origin: (x, 0), degree: d.degree
+            )
+        }
+        return runConfig(args)
+    }
+
+    /// 镜像：以当前主屏为基准，把 external 镜像成与主屏相同的内容。
+    ///
+    /// displayplacer 语法 `id:基准+被镜像`：
+    /// - 基准屏放第一个，作为"优化对象"，并固定 origin (0,0)
+    /// - 被镜像屏（external）跟在 + 号后
+    /// - 镜像时共用基准屏的分辨率
+    ///
+    /// 这样无论内置还是外接是主屏，点"镜像主屏"都能让外接显示与主屏一致的内容。
     @discardableResult
     func mirror(_ external: DisplayInfo, to main: DisplayInfo) -> Bool {
         let arg = "id:\(main.id)+\(external.id) " +
@@ -204,6 +269,15 @@ final class DisplayManager {
                   "scaling:\(main.scalingOn ? "on" : "off") " +
                   "origin:(0,0) degree:0"
         return runConfig([arg])
+    }
+
+    /// 判断两块屏当前是否处于镜像状态。
+    /// 用最近一次解析时记录的镜像分组集合判定（见 parseList）。
+    func isMirroring(_ a: DisplayInfo, _ b: DisplayInfo) -> Bool {
+        mirroredPairs.contains { pair in
+            (pair.0 == a.id && pair.1 == b.id) ||
+            (pair.0 == b.id && pair.1 == a.id)
+        }
     }
 
     /// 取消镜像，恢复为扩展（并排）布局：主屏在左 (0,0)，外接屏在右。
