@@ -59,19 +59,18 @@ struct SettingsView: View {
 struct GeneralTab: View {
 
     @EnvironmentObject private var l10n: L10n
+    @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // —— 语言 ——
                 Text(l10n.t(.groupLanguage))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20)
+                    icon("globe")
                     Text(l10n.t(.languageLabel))
                         .font(.system(size: 13))
                     Spacer()
@@ -87,10 +86,97 @@ struct GeneralTab: View {
                 .padding(.vertical, 4)
 
                 Divider()
+
+                // —— 启动 ——
+                Text(l10n.t(.groupStartup))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    icon("power")
+                    Text(l10n.t(.launchAtLogin))
+                        .font(.system(size: 13))
+                    Spacer()
+                    Toggle("", isOn: $settings.launchAtLogin)
+                        .labelsHidden()
+                }
+                .padding(.vertical, 4)
+
+                Divider()
+
+                // —— 显示器 ——
+                Text(l10n.t(.groupDisplays))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    icon("arrow.triangle.2.circlepath")
+                    Text(l10n.t(.autoRefresh))
+                        .font(.system(size: 13))
+                    Spacer()
+                    Toggle("", isOn: $settings.autoRefreshEnabled)
+                        .labelsHidden()
+                }
+                .padding(.vertical, 4)
+
+                // 刷新间隔：仅当自动刷新开启时显示
+                if settings.autoRefreshEnabled {
+                    HStack(spacing: 12) {
+                        icon("clock")
+                        Text(l10n.t(.refreshInterval))
+                            .font(.system(size: 13))
+                        Spacer()
+                        Picker("", selection: $settings.autoRefreshInterval) {
+                            ForEach(AppSettings.refreshIntervalOptions, id: \.self) { sec in
+                                Text(l10n.t(.intervalSeconds, sec)).tag(sec)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .frame(width: 160)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                HStack(spacing: 12) {
+                    icon("rectangle.on.rectangle.angled")
+                    Text(l10n.t(.detailedMenuInfo))
+                        .font(.system(size: 13))
+                    Spacer()
+                    Toggle("", isOn: $settings.detailedMenuInfo)
+                        .labelsHidden()
+                }
+                .padding(.vertical, 4)
+
+                Divider()
+
+                // —— 通知 ——
+                Text(l10n.t(.groupNotifications))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    icon("bell")
+                    Text(l10n.t(.notifyOnSwitch))
+                        .font(.system(size: 13))
+                    Spacer()
+                    Toggle("", isOn: $settings.notificationsEnabled)
+                        .labelsHidden()
+                }
+                .padding(.vertical, 4)
+
                 Spacer()
             }
             .padding(24)
         }
+    }
+
+    /// 统一的对齐图标列（与"语言"行保持一致的尺寸与配色）。
+    private func icon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 14))
+            .foregroundStyle(.secondary)
+            .frame(width: 20)
     }
 }
 
@@ -125,6 +211,16 @@ struct AboutTab: View {
             Text("\(l10n.t(.versionLabel)) \(version)")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
+
+            // 测试版本徽标：胶囊样式，提示当前非正式发布版
+            Text(l10n.t(.testBuildLabel))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule().strokeBorder(.orange.opacity(0.5), lineWidth: 1)
+                )
 
             Spacer()
         }

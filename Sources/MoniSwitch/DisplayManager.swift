@@ -14,10 +14,10 @@ final class DisplayManager {
 
     private init() {}
 
-    /// 最近一次解析时记录的镜像对（id 对）。
-    /// 当 displayplacer list 输出形如 "Persistent screen id: A+B" 时，
-    /// 表示 A、B 处于镜像组，记为 (A, B)。供 isMirroring() 查询。
-    private(set) var mirroredPairs: [(String, String)] = []
+    /// 最近一次解析时记录的镜像组。
+    /// 判定依据：origin 完全相同的屏视为同一镜像组（见 detectMirrorGroups）。
+    /// 每个元素是一组共享 origin 的屏幕 id，供 isMirroring / unmirror 查询。
+    private(set) var mirrorGroups: [[String]] = []
 
     // MARK: - 解析
 
@@ -35,9 +35,16 @@ final class DisplayManager {
     }
 
     /// 解析 `displayplacer list` 的纯文本输出。
+    ///
+    /// 关于镜像态的输出格式（经 displayplacer 源码 DisplayPlacer.c 核实）：
+    ///   - 每块屏（含被镜像的副屏）都会独立打印一个完整 block；
+    ///   - `Persistent screen id:` 行永远只有一个 UUID，**不会**带加号；
+    ///   - 镜像组的主副屏**共享完全相同的 origin**（源码用 CGDisplayBounds 取值，
+    ///     镜像态下主副屏 bounds 一致）。
+    /// 因此镜像检测的正确依据是：多块屏 origin 相同 → 属于同一镜像组。
     func parseList(_ text: String) -> [DisplayInfo] {
         var displays: [DisplayInfo] = []
-        mirroredPairs = []  // 每次解析重置
+        mirrorGroups.removeAll()        // 每次解析重置
 
         // 用 "Persistent screen id:" 切分成多个屏块
         let blocks = text.components(separatedBy: "Persistent screen id:")
@@ -48,27 +55,32 @@ final class DisplayManager {
             guard !trimmed.isEmpty,
                   trimmed.contains("Resolution:") else { continue }
 
-            // 把块第一行（ID 本身）拼回来
+            // 把块第一行（ID 本身）拼回来，解析为单块屏
             let fullBlock = "Persistent screen id:" + block
             if let info = parseBlock(fullBlock) {
                 displays.append(info)
             }
-
-            // 检测镜像：原始 id 行若含 "+"（如 "A+B+C"），记录所有两两组合
-            if let idLine = value(of: "Persistent screen id:", in: fullBlock)?
-                .trimmingCharacters(in: .whitespaces) {
-                let ids = idLine.components(separatedBy: "+")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
-                if ids.count >= 2 {
-                    // 基准屏是 ids[0]，其余都是被镜像的
-                    for other in ids.dropFirst() {
-                        mirroredPairs.append((ids[0], other))
-                    }
-                }
-            }
         }
+
+        // —— 镜像组检测：origin 完全相同的屏归为一组 ——
+        // 扩展模式下每块屏 origin 各不相同；镜像模式下主副屏 origin 一致。
+        detectMirrorGroups(in: displays)
+
         return displays
+    }
+
+    /// 按 origin 对屏幕分组：同一 origin 上有多块屏即视为镜像组。
+    /// 只记录 size >= 2 的组，写入 mirrorGroups 供 isMirroring / unmirror 使用。
+    private func detectMirrorGroups(in displays: [DisplayInfo]) {
+        // 用 "x,y" 字符串作字典 key（元组不能直接做 Dictionary key）
+        var byOrigin: [String: [String]] = [:]
+        for d in displays {
+            let key = "\(d.origin.x),\(d.origin.y)"
+            byOrigin[key, default: []].append(d.id)
+        }
+        for (_, ids) in byOrigin where ids.count >= 2 {
+            mirrorGroups.append(ids)
+        }
     }
 
     /// 解析单个屏块。
@@ -271,37 +283,52 @@ final class DisplayManager {
         return runConfig([arg])
     }
 
-    /// 判断两块屏当前是否处于镜像状态。
-    /// 用最近一次解析时记录的镜像分组集合判定（见 parseList）。
-    func isMirroring(_ a: DisplayInfo, _ b: DisplayInfo) -> Bool {
-        mirroredPairs.contains { pair in
-            (pair.0 == a.id && pair.1 == b.id) ||
-            (pair.0 == b.id && pair.1 == a.id)
+    /// 判断某块屏当前是否处于镜像组中。
+    /// - Parameter display: 要查询的屏；与主屏一并用于检测，任一在镜像组即视为镜像态。
+    /// - Parameter main: 当前主屏（可省略，内部会查 mirrorGroups 是否同时包含两者）。
+    ///
+    /// 实现：只要 display.id 出现在任意一个 mirrorGroup 里，就认为处于镜像态。
+    /// 这样无论 display 是基准屏还是被镜像屏都能正确判定。
+    func isMirroring(_ display: DisplayInfo, _ main: DisplayInfo) -> Bool {
+        // 两块屏同时落在同一个镜像组 → 确定镜像关系
+        if mirrorGroups.contains(where: { $0.contains(display.id) && $0.contains(main.id) }) {
+            return true
         }
+        // display 单独在某个镜像组里 → 也算镜像态（main 可能是补造的占位屏）
+        return mirrorGroups.contains { $0.contains(display.id) }
     }
 
-    /// 取消镜像，恢复为扩展（并排）布局：主屏在左 (0,0)，外接屏在右。
+    /// 取消镜像，恢复为扩展（并排）布局：主屏在左 (0,0)，其余屏依次排在右侧。
+    ///
+    /// - Parameter main: 当前主屏（镜像态下的基准屏）。
+    /// - Parameter external: 触发取消镜像的外接屏（保留入参兼容旧调用，实际遍历全表）。
+    /// - Parameter displays: 当前完整屏幕列表；会遍历它生成每块屏的独立 arg，
+    ///   避免"只发两块屏 arg、漏掉第三块"导致 displayplacer 把漏掉的屏禁用。
     @discardableResult
-    func unmirror(main: DisplayInfo, external: DisplayInfo) -> Bool {
-        let mainArg = makeScreenArg(
-            id: main.id,
-            res: main.resolution,
-            hz: main.hertz,
-            colorDepth: main.colorDepth,
-            scaling: main.scalingOn,
-            origin: (0, 0),
-            degree: main.degree
-        )
-        let extArg = makeScreenArg(
-            id: external.id,
-            res: external.resolution,
-            hz: external.hertz,
-            colorDepth: external.colorDepth,
-            scaling: external.scalingOn,
-            origin: (main.resolution.width, 0),
-            degree: external.degree
-        )
-        return runConfig([mainArg, extArg])
+    func unmirror(main: DisplayInfo, external: DisplayInfo, in displays: [DisplayInfo]) -> Bool {
+        var cursorX = 0   // 下一块屏的 origin.x，主屏右侧开始累加
+        let args = displays.map { d -> String in
+            let origin: (Int, Int)
+            if d.id == main.id {
+                // 主屏固定 (0,0)
+                origin = (0, 0)
+                cursorX = d.resolution.width
+            } else {
+                // 其余屏依次排在右侧，y 与主屏顶对齐
+                origin = (cursorX, 0)
+                cursorX += d.resolution.width
+            }
+            return makeScreenArg(
+                id: d.id,
+                res: d.resolution,
+                hz: d.hertz,
+                colorDepth: d.colorDepth,
+                scaling: d.scalingOn,
+                origin: origin,
+                degree: d.degree
+            )
+        }
+        return runConfig(args)
     }
 
     // MARK: - 底层

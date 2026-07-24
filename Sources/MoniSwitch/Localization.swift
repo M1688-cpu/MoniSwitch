@@ -42,6 +42,29 @@ enum TextKey: String {
     case languageLabel          = "languageLabel"          // 界面语言
     case appDescription         = "appDescription"         // 一句话简介
     case versionLabel           = "versionLabel"           // 版本
+    case testBuildLabel         = "testBuildLabel"         // 测试版本
+
+    // 设置 - 启动
+    case groupStartup           = "groupStartup"           // 启动
+    case launchAtLogin          = "launchAtLogin"          // 登录时启动 MoniSwitch
+
+    // 设置 - 显示器
+    case groupDisplays          = "groupDisplays"          // 显示器
+    case autoRefresh            = "autoRefresh"            // 自动刷新显示器列表
+    case refreshInterval        = "refreshInterval"        // 刷新间隔
+    case intervalSeconds        = "intervalSeconds"        // N 秒
+    case detailedMenuInfo       = "detailedMenuInfo"       // 菜单显示刷新率与 HiDPI
+
+    // 设置 - 通知
+    case groupNotifications     = "groupNotifications"     // 通知
+    case notifyOnSwitch         = "notifyOnSwitch"         // 切换完成后发送通知
+
+    // 通知正文（按操作类型）
+    case notifPrimary           = "notifPrimary"           // 已切换主屏
+    case notifMirror            = "notifMirror"            // 已镜像主屏
+    case notifExtend            = "notifExtend"            // 已切换为扩展显示
+    case notifMoveLeft          = "notifMoveLeft"          // 已移到主屏左侧
+    case notifMoveRight         = "notifMoveRight"         // 已移到主屏右侧
 }
 
 /// 轻量国际化中心：持有当前语言（@Published），切换时所有 UI 自动刷新。
@@ -62,6 +85,12 @@ final class L10n: ObservableObject {
     /// 取某条文案的当前语言版本。
     func t(_ key: TextKey) -> String {
         (table[key]?[lang]) ?? key.rawValue
+    }
+
+    /// 取文案并用一个整数替换其中的 %d 占位符（如"N 秒"）。
+    func t(_ key: TextKey, _ value: Int) -> String {
+        let raw = (table[key]?[lang]) ?? key.rawValue
+        return raw.replacingOccurrences(of: "%d", with: "\(value)")
     }
 
     /// 翻译表。
@@ -88,5 +117,24 @@ final class L10n: ObservableObject {
         .languageLabel:    [.zh: "界面语言",                      .en: "Interface language"],
         .appDescription:   [.zh: "菜单栏里的显示器快捷切换小工具", .en: "A menu bar tool to switch displays quickly"],
         .versionLabel:     [.zh: "版本",                          .en: "Version"],
+        .testBuildLabel:   [.zh: "测试版本",                      .en: "Test Build"],
+
+        .groupStartup:     [.zh: "启动",                          .en: "Startup"],
+        .launchAtLogin:    [.zh: "登录时启动 MoniSwitch",         .en: "Launch MoniSwitch at login"],
+
+        .groupDisplays:    [.zh: "显示器",                        .en: "Displays"],
+        .autoRefresh:      [.zh: "自动刷新显示器列表",            .en: "Auto-refresh display list"],
+        .refreshInterval:  [.zh: "刷新间隔",                      .en: "Refresh interval"],
+        .intervalSeconds:  [.zh: "%d 秒",                         .en: "Every %ds"],
+        .detailedMenuInfo: [.zh: "菜单显示刷新率与 HiDPI",        .en: "Show refresh rate & HiDPI in menu"],
+
+        .groupNotifications:[.zh: "通知",                         .en: "Notifications"],
+        .notifyOnSwitch:   [.zh: "切换完成后发送通知",            .en: "Notify after switching"],
+
+        .notifPrimary:     [.zh: "已切换主屏",                    .en: "Primary display switched"],
+        .notifMirror:      [.zh: "已镜像主屏",                    .en: "Mirrored to main display"],
+        .notifExtend:      [.zh: "已切换为扩展显示",              .en: "Switched to extended display"],
+        .notifMoveLeft:    [.zh: "已移到主屏左侧",                .en: "Moved to the left of main"],
+        .notifMoveRight:   [.zh: "已移到主屏右侧",                .en: "Moved to the right of main"],
     ]
 }

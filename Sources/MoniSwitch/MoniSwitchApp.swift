@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 /// MoniSwitch 入口：一个纯菜单栏 App（无 Dock 图标、无主窗口，靠 Info.plist 的 LSUIElement=YES 实现）。
 @main
@@ -7,12 +8,14 @@ struct MoniSwitchApp: App {
 
     @StateObject private var state = AppState()
     @StateObject private var l10n = L10n.shared
+    @StateObject private var settings = AppSettings.shared
 
     var body: some Scene {
         // 顶部菜单栏图标 + 下拉菜单（系统标准 .menu 样式）
         MenuBarExtra {
             menuContent
                 .environmentObject(l10n)
+                .environmentObject(settings)
         } label: {
             // 菜单栏图标：先用 SF Symbol 占位，后续替换为自定义图标
             Image(systemName: "rectangle.on.rectangle")
@@ -75,11 +78,18 @@ struct MoniSwitchApp: App {
                     }
                 }
 
-                // 镜像 / 扩展：对所有外接屏统一操作（与谁主屏无关）
+                // 镜像 / 扩展：操作对象随主屏身份切换。
+                //   - 外接非主屏（常规）：镜像/扩展的就是这个外接屏。
+                //   - 外接是主屏：镜像基准是外接，被镜像是内置屏；否则 mirror(ext==main)
+                //     会退化成 id:A+A 无效命令。这里显式选内置屏作为操作对端。
                 Divider()
-                if let ext = externals.first {
-                    Button(checkMarked(state.localized(.mirrorMain),    active: state.isMirroring(ext))) { state.mirror(ext)   }
-                    Button(checkMarked(state.localized(.extendDisplay), active: !state.isMirroring(ext))) { state.unmirror(ext) }
+                let isMirroring = externals.contains { state.isMirroring($0) }
+                if state.externalIsMain, let builtIn = state.builtInDisplay {
+                    Button(checkMarked(state.localized(.mirrorMain),    active: isMirroring)) { state.mirror(builtIn) }
+                    Button(checkMarked(state.localized(.extendDisplay), active: !isMirroring)) { state.unmirror(builtIn) }
+                } else if let ext = externals.first {
+                    Button(checkMarked(state.localized(.mirrorMain),    active: isMirroring)) { state.mirror(ext) }
+                    Button(checkMarked(state.localized(.extendDisplay), active: !isMirroring)) { state.unmirror(ext) }
                 }
             }
             Divider()
@@ -130,9 +140,41 @@ final class AppState: ObservableObject {
 
     private let manager = DisplayManager.shared
     private let queue = DispatchQueue(label: "moniswitch.ops")
+    private let settings = AppSettings.shared
+
+    /// 自动刷新定时器。nil 表示未启用。
+    private var autoRefreshTimer: Timer?
+    /// Combine 订阅，观察自动刷新设置变化以重建 timer。
+    private var cancellables: Set<AnyCancellable> = []
 
     init() {
         refresh()
+        setupAutoRefreshBinding()
+    }
+
+    /// 订阅 AppSettings：当自动刷新开关或间隔变化时，重建/销毁 timer。
+    private func setupAutoRefreshBinding() {
+        // 任一变化都触发一次 timer 重建。
+        settings.$autoRefreshEnabled
+            .combineLatest(settings.$autoRefreshInterval)
+            .sink { [weak self] enabled, interval in
+                self?.rebuildAutoRefreshTimer(enabled: enabled, interval: interval)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// 根据开关与间隔重建自动刷新 timer。
+    private func rebuildAutoRefreshTimer(enabled: Bool, interval: Int) {
+        autoRefreshTimer?.invalidate()
+        autoRefreshTimer = nil
+        guard enabled, interval > 0 else { return }
+
+        // 用 schedule + RunLoop 的 .common 模式，保证菜单打开/拖动时也能触发。
+        let timer = Timer(timeInterval: TimeInterval(interval), repeats: true) { [weak self] _ in
+            self?.refresh()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        autoRefreshTimer = timer
     }
 
     /// 重新读取当前屏幕列表。
@@ -146,20 +188,27 @@ final class AppState: ObservableObject {
     }
 
     func setPrimary(_ d: DisplayInfo) {
-        runOp { [self, displays] in manager.setPrimary(d, in: displays) }
+        runOp(kind: .primary) { [self, displays] in
+            // 防御：目标已是主屏时直接成功返回，避免无意义调用（也避免点已为主屏的外接时
+            // 触发意外平移）。镜像态下点外接名（外接是基准主屏）也命中此分支。
+            if displays.first(where: { $0.id == d.id })?.isMain == true { return true }
+            return manager.setPrimary(d, in: displays)
+        }
     }
 
     func mirror(_ ext: DisplayInfo) {
-        runOp { [self, displays] in
+        runOp(kind: .mirror) { [self, displays] in
             guard let main = displays.first(where: { $0.isMain }) else { return false }
+            // 已在镜像态则视为成功，不再重复发镜像命令
+            if manager.isMirroring(ext, main) { return true }
             return manager.mirror(ext, to: main)
         }
     }
 
     func unmirror(_ ext: DisplayInfo) {
-        runOp { [self, displays] in
+        runOp(kind: .extend) { [self, displays] in
             guard let main = displays.first(where: { $0.isMain }) else { return false }
-            return manager.unmirror(main: main, external: ext)
+            return manager.unmirror(main: main, external: ext, in: displays)
         }
     }
 
@@ -167,7 +216,8 @@ final class AppState: ObservableObject {
     /// - 非主屏（外接或内置）：移动该屏本身
     /// - 主屏（外接为主屏时）：保持自身不动，平移其他屏到对侧
     func moveArrangement(_ display: DisplayInfo, side: HorizontalSide) {
-        runOp { [self, displays] in manager.moveExternal(display, side: side, in: displays) }
+        let kind: OpKind = (side == .left) ? .moveLeft : .moveRight
+        runOp(kind: kind) { [self, displays] in manager.moveExternal(display, side: side, in: displays) }
     }
 
     // MARK: - 状态查询（供菜单显示 ✓ 标记用）
@@ -201,13 +251,17 @@ final class AppState: ObservableObject {
         return nil
     }
 
-    /// 在后台执行一个切换操作，完成后刷新列表。
-    private func runOp(_ work: @escaping () -> Bool) {
+    /// 在后台执行一个切换操作，完成后刷新列表；成功时发通知。
+    /// - Parameter kind: 操作类型，决定切换完成通知的正文文案。
+    private func runOp(kind: OpKind, work: @escaping () -> Bool) {
         queue.async { [weak self] in
-            _ = work()
+            let ok = work()
             let list = self?.manager.currentDisplays() ?? []
             DispatchQueue.main.async {
                 self?.displays = list
+                if ok {
+                    self?.settings.sendSwitchNotification(kind)
+                }
             }
         }
     }
@@ -221,8 +275,16 @@ private extension AppState {
         L10n.shared.t(key)
     }
 
-    /// 某个显示器的本地化菜单标签：名称 (宽x高)。
+    /// 某个显示器的本地化菜单标签：名称 (宽x高)，按设置可选追加 @Hz 与 HiDPI。
     func localizedLabel(for d: DisplayInfo) -> String {
-        "\(d.localizedTypeName(l10n: L10n.shared)) (\(d.resolution.width)x\(d.resolution.height))"
+        let name = d.localizedTypeName(l10n: L10n.shared)
+        var label = "\(name) (\(d.resolution.width)x\(d.resolution.height))"
+        if AppSettings.shared.detailedMenuInfo {
+            label += " @\(d.hertz)Hz"
+            if d.scalingOn {
+                label += " HiDPI"
+            }
+        }
+        return label
     }
 }

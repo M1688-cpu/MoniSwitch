@@ -4,6 +4,7 @@
 
 ![status](https://img.shields.io/badge/platform-macOS%2013%2B-blue)
 ![status](https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey)
+![version](https://img.shields.io/badge/version-0.1.2%20beta-orange)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## 功能
@@ -12,10 +13,40 @@
 - 🔀 **一键切主屏**：在列表里点任意显示器，立即把它设为主显示器（白条所在屏）
 - ↔️ **左右移动外接屏**：把外接屏放到主屏的左边或右边
 - 🪞 **扩展 / 镜像切换**：把外接屏在「扩展显示」和「镜像主屏」之间切换
+- ⚙️ **设置窗口**：中英双语界面切换、开机自启动、切换后通知、自动刷新列表
+- 🌐 **中英双语**：界面语言一键切换，重启后保持
 
 ## 截图
 
-（待补充：菜单栏图标 + 下拉菜单）
+### 菜单栏菜单
+
+点击菜单栏图标即弹出显示器列表，当前主屏前显示 ✓。
+
+![菜单栏菜单](screenshots/menu-bar.png)
+
+### 镜像 / 扩展切换
+
+镜像态下「镜像主屏」前显示 ✓，一键切换扩展 / 镜像。
+
+![镜像 / 扩展切换](screenshots/menu-mirror.png)
+
+### 菜单显示刷新率与 HiDPI
+
+开启设置后，菜单项追加 `@Hz` 与 `HiDPI` 信息。
+
+![菜单显示刷新率与 HiDPI](screenshots/menu-detailed.png)
+
+### 设置窗口 — 通用
+
+语言、启动、显示器、通知四组偏好。
+
+![设置窗口 — 通用](screenshots/settings-general.png)
+
+### 设置窗口 — 关于
+
+应用图标、版本号与测试版本徽标。
+
+![设置窗口 — 关于](screenshots/settings-about.png)
 
 ## 安装
 
@@ -85,12 +116,19 @@ MoniSwitch/
 │   ├── MoniSwitchApp.swift        # 菜单栏 UI 入口
 │   ├── Models.swift               # 显示器数据模型
 │   ├── ShellRunner.swift          # displayplacer 调用封装
-│   └── DisplayManager.swift       # 解析 + 切换算法
+│   ├── DisplayManager.swift       # 解析 + 切换算法（含镜像组检测）
+│   ├── AppSettings.swift          # 用户偏好单例（自启动/通知/自动刷新）
+│   ├── DockPolicyManager.swift    # Dock 策略 + 设置窗口（NSWindow + NSToolbar）
+│   ├── SettingsView.swift         # 设置窗口 SwiftUI 视图
+│   └── Localization.swift         # 中英双语（L10n 类 + TextKey 枚举）
 ├── Resources/
-│   └── displayplacer              # 打包的显示控制二进制
+│   ├── displayplacer              # 打包的显示控制二进制（不入库）
+│   ├── AppIcon.icns               # 应用图标
+│   └── AppIcon-source.png         # 图标源图
 ├── Support/
 │   ├── Info.plist                 # App 元信息（LSUIElement 等）
 │   └── build-app.sh               # 一键打包脚本
+├── screenshots/                   # README 截图（待补充）
 ├── README.md                      # 本文件
 └── GITHUB_GUIDE.md                # 维护者的 GitHub 操作手册
 ```
@@ -100,10 +138,16 @@ MoniSwitch/
 - [x] 显示器列表 + 切换主屏
 - [x] 外接屏左/右移动
 - [x] 扩展 / 镜像切换
-- [ ] 自定义 App 图标与菜单栏图标
+- [x] 自定义 App 图标
+- [x] 中英双语界面切换
+- [x] 设置窗口（通用 / 关于）
+- [x] 开机自启动选项
+- [x] 切换后系统通知
+- [x] 自动刷新显示器列表
+- [x] 菜单显示刷新率与 HiDPI
 - [ ] 适配 Intel 芯片
-- [ ] 启动时自启动选项
 - [ ] 多屏（>2）场景优化
+- [ ] Apple 公证
 
 ## License
 

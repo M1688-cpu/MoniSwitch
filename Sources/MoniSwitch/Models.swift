@@ -3,15 +3,17 @@ import Foundation
 /// 一个显示器的完整状态信息（解析自 `displayplacer list` 的输出）。
 struct DisplayInfo: Identifiable, Equatable {
     /// displayplacer 的持久化屏幕 ID（通常跨插拔保持稳定）
-    let id: String
+    /// 设为 var：镜像态解析时需要把合并行 "A+B" 拆开后回填独立 id。
+    var id: String
     /// 显示器的人类可读名称，例如 "34 inch external screen" 或 "MacBook built in screen"
-    let typeName: String
+    /// 设为 var：镜像态补造被镜像屏的占位信息时需要回填。
+    var typeName: String
     /// 当前分辨率（像素），例如 (3440, 1440)
-    let resolution: (width: Int, height: Int)
+    var resolution: (width: Int, height: Int)
     /// 屏幕左上角的逻辑坐标 (x, y)。origin 为 (0,0) 的屏即为主显示器。
     var origin: (x: Int, y: Int)
     /// 是否为当前主显示器（白条所在屏）
-    let isMain: Bool
+    var isMain: Bool
     /// scaling 状态：on 表示开启 HiDPI 缩放
     let scalingOn: Bool
     /// 刷新率（Hz）

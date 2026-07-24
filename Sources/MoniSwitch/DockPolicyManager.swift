@@ -28,6 +28,11 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
     @MainActor
     func openSettings() {
         let l10n = L10n.shared
+        let settings = AppSettings.shared
+
+        // 打开前同步一次开机自启动的真实状态：用户可能在"系统设置 > 登录项"
+        // 里手动改动，开关要与系统真实状态对齐。
+        settings.syncLaunchAtLoginStatus()
 
         // 1) 切到普通模式：Dock 图标出现，App 才能成为前台
         NSApp.setActivationPolicy(.regular)
@@ -38,6 +43,7 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
             // 用 NSHostingController 把 SwiftUI 视图嵌入 AppKit 窗口
             let rootView = SettingsView()
                 .environmentObject(l10n)
+                .environmentObject(settings)
             let hosting = NSHostingController(rootView: rootView)
 
             let window = NSWindow(contentViewController: hosting)
@@ -138,6 +144,9 @@ extension DockPolicyManager {
         group.label = ""
         group.paletteLabel = ""
         group.toolTip = nil
+        // 去掉 Sonoma/Sequoia 给自定义 view 项默认渲染的 pill/圆角背景。
+        // 自 macOS 13 起可用，正好匹配本项目最低版本。
+        group.isBordered = false
         return group
     }
 }
