@@ -10,6 +10,7 @@ DerivedData/
 # ===== 打包产物 =====
 *.dmg
 *.tmp.dmg
+*.zip
 /dmg-staging/
 /build/
 /Support/MoniSwitch.app
