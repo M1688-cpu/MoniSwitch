@@ -11,11 +11,16 @@ import SwiftUI
 ///   - 打开设置时：临时切到 `.regular` → Dock 出现图标、App 成为前台
 ///   - 用自己管理的 NSWindow 承载设置界面（不依赖脆弱的 Settings 场景）
 ///   - 设置窗口关闭后：切回 `.accessory` → Dock 图标消失
-final class DockPolicyManager: NSObject, NSWindowDelegate {
+final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
 
     static let shared = DockPolicyManager()
 
     private var settingsWindow: NSWindow?
+
+    /// 工具栏居中标题项的标识符（承载"设置"文字）。
+    private let titleItemIdentifier = NSToolbarItem.Identifier("SettingsTitleItem")
+    /// 工具栏居中标题文案，在 openSettings 时设置。
+    private var toolbarTitle: String = ""
 
     private override init() { super.init() }
 
@@ -41,6 +46,16 @@ final class DockPolicyManager: NSObject, NSWindowDelegate {
             window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
             window.titlebarAppearsTransparent = false
             window.titleVisibility = .hidden
+            // 用 NSToolbar 承载居中标题：principal 项 + centeredItem，
+            // 使"设置"相对整窗水平居中（覆盖边栏+内容区），与系统设置/Finder 一致。
+            toolbarTitle = l10n.t(.settingsTitle)
+            let toolbar = NSToolbar(identifier: "SettingsToolbar")
+            toolbar.delegate = self
+            toolbar.displayMode = .labelOnly
+            toolbar.showsBaselineSeparator = false
+            window.toolbar = toolbar
+            // centeredItemIdentifiers 让该标题项相对整窗水平居中（macOS 13+）。
+            toolbar.centeredItemIdentifiers = [titleItemIdentifier]
             window.setContentSize(NSSize(width: 680, height: 460))
             // 锁死尺寸，不可拉伸
             window.minSize = NSSize(width: 680, height: 460)
@@ -77,6 +92,47 @@ final class DockPolicyManager: NSObject, NSWindowDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             NSApp.setActivationPolicy(.accessory)
         }
+    }
+}
+
+// MARK: - NSToolbarDelegate
+
+extension DockPolicyManager {
+
+    /// 工具栏只含一个居中标题项。
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [titleItemIdentifier]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [titleItemIdentifier]
+    }
+
+    /// 创建居中标题项：用 NSToolbarItem(groupContaining:) 包一层，
+    /// 内部放居中的标题标签——这是让标题在工具栏里水平居中的稳妥写法。
+    func toolbar(_ toolbar: NSToolbar,
+                 itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        guard itemIdentifier == titleItemIdentifier else { return nil }
+
+        let label = NSTextField(labelWithString: toolbarTitle)
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.alignment = .center
+        label.textColor = .labelColor
+        label.isBezeled = false
+        label.drawsBackground = false
+        label.isEditable = false
+        label.isSelectable = false
+
+        let container = NSStackView(views: [label])
+        container.orientation = .horizontal
+        container.alignment = .centerY
+        container.edgeInsets = NSEdgeInsets(top: 2, left: 0, bottom: 2, right: 0)
+
+        let group = NSToolbarItem(itemIdentifier: itemIdentifier)
+        group.view = container
+        group.label = toolbarTitle
+        return group
     }
 }
 

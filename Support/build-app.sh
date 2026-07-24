@@ -56,6 +56,14 @@ cp "$BIN_PATH" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 # Info.plist
 cp "$SCRIPT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
+# 应用图标
+if [ -f "$PROJECT_DIR/Resources/AppIcon.icns" ]; then
+    cp "$PROJECT_DIR/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+    echo "  ✓ 已打包应用图标 AppIcon.icns"
+else
+    echo "  ⚠ 警告: 未找到 Resources/AppIcon.icns，App 将使用默认图标。"
+fi
+
 # 打包 displayplacer 进 Resources
 if [ -f "$PROJECT_DIR/Resources/displayplacer" ]; then
     cp "$PROJECT_DIR/Resources/displayplacer" "$APP_BUNDLE/Contents/Resources/displayplacer"
