@@ -57,10 +57,36 @@ Support/
 - 菜单栏常驻，点击弹出显示器列表
 - 一键切换主屏、左右移动外接屏、扩展/镜像切换
 - 中英双语界面切换
-- 设置窗口（NavigationSplitView 边栏 + 通用/关于页）
+- 设置窗口（NavigationSplitView 边栏 + 通用/预设/关于页）
 - 自定义应用图标
 - 设置窗口标题整窗居中（NSToolbar centeredItemIdentifiers）
+- 开机自启动、自动刷新列表、菜单显示刷新率/HiDPI
+- 显示器布局预设（保存/应用/删除，菜单栏联动，感知镜像组）
+- 菜单内切换外接屏刷新率
 - Release v0.1.1 产物在 dist/
+
+## 已知 bug（待修复）
+
+### 通知 bug：镜像/扩展操作的通知不弹出
+- 现象：切主屏/左右移动/改刷新率的通知正常弹出；但镜像、扩展、预设应用这三类操作的通知不弹出。
+- 根因（已诊断，非猜测）：这三类操作会让 displayplacer 触发系统级显示器重新配置（display mode 切换），全程约 1.2~1.5 秒。期间 UNUserNotificationCenter 的投递被系统中断/丢弃。代码层面 sendSwitchNotification 已被正确调用（日志证实 enabled=true），问题在 macOS 通知投递时机。
+- 已尝试但无效的方案：
+  - UNTimeIntervalNotificationTrigger 延迟投递（延迟只决定何时显示，不解决提交时机问题）
+  - DispatchQueue.main.asyncAfter 延迟 0.8s 提交（displayplacer 重配要 1.2s，0.8s 时仍在重配窗口内）
+- 待尝试的方案：
+  - 延迟 2s+ 提交（需验证 2s 是否足够）
+  - 改用 NSUserNotification（旧 API，对运行时状态不敏感）
+  - 用 Process 完成回调而非固定延迟来判定重配结束
+
+## 暂缓功能（下个版本）
+
+### 全局快捷键（已实现但移除）
+- 0.1.2 开发期间曾实现，因 Carbon 事件分发与 SwiftUI 集成问题（GetEventDispatcherTarget 修复后仍不稳定）暂缓。
+- 关键经验（下个版本复用）：
+  - 全局快捷键必须用 GetEventDispatcherTarget，不能用 GetApplicationEventTarget——后者需传统 Carbon 事件循环
+  - 录键必须要求"修饰键+主键"组合，避免单独按键误录
+  - keyCode 显示用 UCKeyTranslate 动态转换，比静态表准确
+- 保留的脚手架：Models.swift 的 HotkeyBinding 结构体、Preset.hotkey 字段（保数据兼容）
 
 ## 注意事项
 
@@ -68,6 +94,8 @@ Support/
 - DockPolicyManager 的 NSToolbar 居中标题：window.title 必须留空，否则 NavigationSplitView 会继承并在边栏重复渲染
 - windowWillClose 无条件延迟 0.2s 后 setActivationPolicy(.accessory)，确保 Dock 图标消失
 - 远程仓库: https://github.com/M1688-cpu/MoniSwitch.git
+- **displayplacer persistent id 会漂移**：外接屏唤醒/重新插拔/换屏后 persistent id 可能变化，导致预设失效。当前无 ID 重映射兜底，漂移时需重新保存预设
+- **displayplacer 镜像用 `id:A+B` 语法**：镜像组的屏合并成一条 arg（共用基准屏的 res/scaling/origin），不能拆成多条 origin 相同的独立 arg（会让 displayplacer 误判，把后执行的屏设为主屏）
 
 ## 风格约定
 

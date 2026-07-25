@@ -65,6 +65,25 @@ enum TextKey: String {
     case notifExtend            = "notifExtend"            // 已切换为扩展显示
     case notifMoveLeft          = "notifMoveLeft"          // 已移到主屏左侧
     case notifMoveRight         = "notifMoveRight"         // 已移到主屏右侧
+    case notifPresetApplied     = "notifPresetApplied"     // 已应用预设
+    case notifRefreshRate       = "notifRefreshRate"       // 已切换刷新率
+
+    // 设置 - 预设
+    case tabPresets             = "tabPresets"             // 预设
+    case groupPresets           = "groupPresets"           // 预设
+    case presetCaptureHint      = "presetCaptureHint"      // 保存当前显示器布局为预设
+    case presetNamePlaceholder  = "presetNamePlaceholder"  // 预设名称
+    case presetCaptureButton    = "presetCaptureButton"    // 保存预设
+    case presetApplyButton      = "presetApplyButton"      // 应用
+    case presetDeleteButton     = "presetDeleteButton"     // 删除
+    case presetEmptyHint        = "presetEmptyHint"        // 还没有保存任何预设
+    case presetApplyConfirm     = "presetApplyConfirm"     // 应用此预设？
+
+    // 菜单 - 刷新率子菜单
+
+    // 菜单 - 刷新率子菜单
+    case refreshRateMenu        = "refreshRateMenu"        // 刷新率
+    case hertzLabel             = "hertzLabel"             // Hz
 }
 
 /// 轻量国际化中心：持有当前语言（@Published），切换时所有 UI 自动刷新。
@@ -136,5 +155,20 @@ final class L10n: ObservableObject {
         .notifExtend:      [.zh: "已切换为扩展显示",              .en: "Switched to extended display"],
         .notifMoveLeft:    [.zh: "已移到主屏左侧",                .en: "Moved to the left of main"],
         .notifMoveRight:   [.zh: "已移到主屏右侧",                .en: "Moved to the right of main"],
+        .notifPresetApplied:[.zh: "已应用预设",                   .en: "Preset applied"],
+        .notifRefreshRate:  [.zh: "已切换刷新率",                 .en: "Refresh rate changed"],
+
+        .tabPresets:       [.zh: "预设",                          .en: "Presets"],
+        .groupPresets:     [.zh: "预设",                          .en: "Presets"],
+        .presetCaptureHint:[.zh: "保存当前显示器布局为预设",      .en: "Save current display layout as a preset"],
+        .presetNamePlaceholder:[.zh: "预设名称",                  .en: "Preset name"],
+        .presetCaptureButton:[.zh: "保存预设",                    .en: "Save Preset"],
+        .presetApplyButton:[.zh: "应用",                          .en: "Apply"],
+        .presetDeleteButton:[.zh: "删除",                         .en: "Delete"],
+        .presetEmptyHint:  [.zh: "还没有保存任何预设",            .en: "No presets saved yet"],
+        .presetApplyConfirm:[.zh: "应用此预设？",                 .en: "Apply this preset?"],
+
+        .refreshRateMenu:  [.zh: "刷新率",                        .en: "Refresh Rate"],
+        .hertzLabel:       [.zh: "Hz",                            .en: "Hz"],
     ]
 }

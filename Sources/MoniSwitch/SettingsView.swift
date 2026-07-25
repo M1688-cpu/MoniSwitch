@@ -14,12 +14,13 @@ import AppKit
 struct SettingsView: View {
 
     enum Tab: String, CaseIterable, Identifiable, Hashable {
-        case general, about
+        case general, presets, about
         var id: String { rawValue }
 
         var systemImage: String {
             switch self {
             case .general: return "gearshape"
+            case .presets: return "square.stack"
             case .about:   return "info.circle"
             }
         }
@@ -35,6 +36,7 @@ struct SettingsView: View {
             // —— 左侧边栏 ——
             List(selection: $selectedTab) {
                 Label(l10n.t(.tabGeneral), systemImage: "gearshape").tag(Tab.general)
+                Label(l10n.t(.tabPresets), systemImage: "square.stack").tag(Tab.presets)
                 Label(l10n.t(.tabAbout), systemImage: "info.circle").tag(Tab.about)
             }
             .listStyle(.sidebar)
@@ -43,9 +45,10 @@ struct SettingsView: View {
         } detail: {
             // —— 右侧内容区：按选中标签直接切换 ——
             switch selectedTab {
-            case .general:  GeneralTab()
-            case .about:    AboutTab()
-            case .none:     GeneralTab()
+            case .general: GeneralTab()
+            case .presets: PresetsTab()
+            case .about:   AboutTab()
+            case .none:    GeneralTab()
             }
         }
         // 显式置空导航标题，避免 NavigationSplitView 继承窗口标题
@@ -99,6 +102,7 @@ struct GeneralTab: View {
                     Spacer()
                     Toggle("", isOn: $settings.launchAtLogin)
                         .labelsHidden()
+                        .toggleStyle(.switch)
                 }
                 .padding(.vertical, 4)
 
@@ -116,6 +120,7 @@ struct GeneralTab: View {
                     Spacer()
                     Toggle("", isOn: $settings.autoRefreshEnabled)
                         .labelsHidden()
+                        .toggleStyle(.switch)
                 }
                 .padding(.vertical, 4)
 
@@ -145,6 +150,7 @@ struct GeneralTab: View {
                     Spacer()
                     Toggle("", isOn: $settings.detailedMenuInfo)
                         .labelsHidden()
+                        .toggleStyle(.switch)
                 }
                 .padding(.vertical, 4)
 
@@ -162,6 +168,7 @@ struct GeneralTab: View {
                     Spacer()
                     Toggle("", isOn: $settings.notificationsEnabled)
                         .labelsHidden()
+                        .toggleStyle(.switch)
                 }
                 .padding(.vertical, 4)
 
@@ -192,12 +199,41 @@ struct AboutTab: View {
         return "\(v) (\(b))"
     }
 
+    /// 加载真实 App 图标用于关于页。
+    /// 打包后从 Bundle.main 取 AppIcon.icns；dev 模式下回退到源码目录 Resources/AppIcon.icns。
+    private func loadAppIcon() -> NSImage? {
+        // 1. 打包后的 App：Bundle.main 里按 Info.plist 的 CFBundleIconFile 取
+        if let icon = NSImage(named: "AppIcon") {
+            return icon
+        }
+        if Bundle.main.url(forResource: "AppIcon", withExtension: "icns") != nil,
+           let icon = NSImage(contentsOfFile: Bundle.main.path(forResource: "AppIcon", ofType: "icns") ?? "") {
+            return icon
+        }
+        // 2. dev 模式：从源码目录 Resources/AppIcon.icns 读
+        let devPath = "Resources/AppIcon.icns"
+        if FileManager.default.fileExists(atPath: devPath) {
+            return NSImage(contentsOfFile: devPath)
+        }
+        return nil
+    }
+
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "rectangle.on.rectangle")
-                .font(.system(size: 64))
-                .foregroundStyle(.tint)
-                .padding(.top, 32)
+            // 关于页图标：优先用真实 App 图标（打包后从 Bundle 取），
+            // dev 模式下 Bundle.main 取不到则回退到 SF Symbol 占位。
+            if let appIcon = loadAppIcon() {
+                Image(nsImage: appIcon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 96, height: 96)
+                    .padding(.top, 32)
+            } else {
+                Image(systemName: "rectangle.on.rectangle")
+                    .font(.system(size: 64))
+                    .foregroundStyle(.tint)
+                    .padding(.top, 32)
+            }
 
             Text("MoniSwitch")
                 .font(.system(size: 22, weight: .bold))
@@ -212,18 +248,106 @@ struct AboutTab: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
-            // 测试版本徽标：胶囊样式，提示当前非正式发布版
-            Text(l10n.t(.testBuildLabel))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.orange)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule().strokeBorder(.orange.opacity(0.5), lineWidth: 1)
-                )
-
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+
+// MARK: - 预设标签
+
+struct PresetsTab: View {
+
+    @EnvironmentObject private var l10n: L10n
+    @EnvironmentObject private var presetManager: PresetManager
+
+    /// 新预设名称输入框的文本。
+    @State private var newName: String = ""
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // —— 保存当前布局 ——
+                Text(l10n.t(.groupPresets))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(l10n.t(.presetCaptureHint))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    TextField(l10n.t(.presetNamePlaceholder), text: $newName)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(capture)
+
+                    Button(l10n.t(.presetCaptureButton), action: capture)
+                        .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                Divider()
+
+                // —— 已保存的预设列表 ——
+                if presetManager.presets.isEmpty {
+                    Text(l10n.t(.presetEmptyHint))
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 24)
+                } else {
+                    ForEach(presetManager.presets) { preset in
+                        PresetRow(preset: preset)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(24)
+        }
+    }
+
+    /// 保存当前布局：校验名称非空后调 captureCurrent，并清空输入框。
+    private func capture() {
+        let trimmed = newName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        if presetManager.captureCurrent(name: trimmed) != nil {
+            newName = ""
+        }
+    }
+}
+
+/// 单个预设行：名称 + 应用按钮 + 删除按钮。
+struct PresetRow: View {
+
+    @EnvironmentObject private var l10n: L10n
+    @EnvironmentObject private var presetManager: PresetManager
+    let preset: Preset
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "square.stack")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+
+            Text(preset.name)
+                .font(.system(size: 13))
+
+            Spacer()
+
+            Button(l10n.t(.presetApplyButton)) {
+                presetManager.apply(preset)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button(l10n.t(.presetDeleteButton), role: .destructive) {
+                presetManager.delete(preset)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.vertical, 4)
+    }
+}
+

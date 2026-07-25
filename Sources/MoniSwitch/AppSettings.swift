@@ -5,11 +5,13 @@ import UserNotifications
 
 /// 操作类型，用于发送切换完成通知时选择正文文案。
 enum OpKind {
-    case primary       // 切换主屏
-    case mirror        // 镜像主屏
-    case extend        // 扩展显示（取消镜像）
-    case moveLeft      // 移到主屏左侧
-    case moveRight     // 移到主屏右侧
+    case primary         // 切换主屏
+    case mirror          // 镜像主屏
+    case extend          // 扩展显示（取消镜像）
+    case moveLeft        // 移到主屏左侧
+    case moveRight       // 移到主屏右侧
+    case presetApplied   // 应用了布局预设
+    case refreshRate     // 切换了刷新率
 }
 
 /// 全局用户偏好（单例 + @Published + UserDefaults 持久化）。
@@ -166,14 +168,39 @@ final class AppSettings: ObservableObject {
     /// - Parameter kind: 操作类型，决定通知正文文案。
     func sendSwitchNotification(_ kind: OpKind) {
         guard notificationsEnabled else { return }
+
+        // 镜像类操作（镜像、扩展、预设应用）会让 displayplacer 触发系统级显示器
+        // 重新配置（display mode 切换 + CGCompleteDisplayConfiguration），全程约
+        // 1.2~1.5 秒。这段时间内 UNUserNotificationCenter 的投递会被系统中断/丢弃。
+        // 这类操作把"提交通知请求"本身延迟 2 秒，确保落在重配完全结束之后。
+        // 轻量操作（切主屏、左右移动、改刷新率）只改 origin，瞬时完成，立即提交。
+        let needsDelay: Bool
+        switch kind {
+        case .mirror, .extend, .presetApplied: needsDelay = true
+        default: needsDelay = false
+        }
+
+        let work = { self.actuallySendNotification(kind: kind) }
+        if needsDelay {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: work)
+        } else {
+            work()
+        }
+    }
+
+    /// 实际构建并发送一条通知（私有，由 sendSwitchNotification 调度）。
+    private func actuallySendNotification(kind: OpKind) {
+        guard notificationsEnabled else { return }
         let l10n = L10n.shared
         let body: String
         switch kind {
-        case .primary:    body = l10n.t(.notifPrimary)
-        case .mirror:     body = l10n.t(.notifMirror)
-        case .extend:     body = l10n.t(.notifExtend)
-        case .moveLeft:   body = l10n.t(.notifMoveLeft)
-        case .moveRight:  body = l10n.t(.notifMoveRight)
+        case .primary:        body = l10n.t(.notifPrimary)
+        case .mirror:         body = l10n.t(.notifMirror)
+        case .extend:         body = l10n.t(.notifExtend)
+        case .moveLeft:       body = l10n.t(.notifMoveLeft)
+        case .moveRight:      body = l10n.t(.notifMoveRight)
+        case .presetApplied:  body = l10n.t(.notifPresetApplied)
+        case .refreshRate:    body = l10n.t(.notifRefreshRate)
         }
 
         let content = UNMutableNotificationContent()

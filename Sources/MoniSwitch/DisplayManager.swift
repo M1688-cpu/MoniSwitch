@@ -34,6 +34,73 @@ final class DisplayManager {
         return parseList(result.stdout)
     }
 
+    /// 抓取当前显示器布局的 displayplacer 参数快照，供预设保存使用。
+    ///
+    /// 关键：必须感知镜像组。displayplacer 的镜像用 `id:基准+副1+副2` 语法
+    /// （合并成一条 arg，整组共用基准屏的 res/scaling/origin），而非把每块屏
+    /// 各拼一条 origin 相同的独立 arg——后者会被 displayplacer 当成"两块独立屏
+    /// 叠在 (0,0)"，导致后执行的 arg 把副屏设为主屏（这是预设失效的根因）。
+    ///
+    /// - 非 mirrorGroups 里的屏：逐条拼（与 makeScreenArg 同源）。
+    /// - 镜像组内的屏：合并成一条 arg，基准屏在首位，副屏用 + 追加。
+    /// - Returns: 参数数组；失败返回空数组。
+    func currentSnapshotArgs() -> [String] {
+        let displays = currentDisplays()
+        guard !displays.isEmpty else { return [] }
+
+        // 收集所有已归入镜像组的 id，避免后面又被当作独立屏拼一次。
+        var mirroredIDs = Set<String>()
+        for group in mirrorGroups {
+            mirroredIDs.formUnion(group)
+        }
+
+        var args: [String] = []
+
+        // 1. 先处理镜像组：每个组生成一条合并 arg。
+        for group in mirrorGroups {
+            // 组里找出基准屏（主屏优先；都不是主屏则取第一个）。
+            // 镜像态下副屏的 res/scaling 等无意义，整组用基准屏的配置。
+            let members = displays.filter { group.contains($0.id) }
+            guard let base = members.first(where: { $0.isMain }) ?? members.first else { continue }
+            let others = members.filter { $0.id != base.id }
+
+            // id:基准+副1+副2，共用基准屏的 res/hz/scaling/origin。
+            let combinedID = [base.id] + others.map { $0.id }
+            args.append(makeScreenArg(
+                id: combinedID.joined(separator: "+"),
+                res: base.resolution,
+                hz: base.hertz,
+                colorDepth: base.colorDepth,
+                scaling: base.scalingOn,
+                origin: base.origin,
+                degree: base.degree
+            ))
+        }
+
+        // 2. 再处理不在任何镜像组里的独立屏。
+        for d in displays where !mirroredIDs.contains(d.id) {
+            args.append(makeScreenArg(
+                id: d.id,
+                res: d.resolution,
+                hz: d.hertz,
+                colorDepth: d.colorDepth,
+                scaling: d.scalingOn,
+                origin: d.origin,
+                degree: d.degree
+            ))
+        }
+
+        return args
+    }
+
+    /// 应用一组 displayplacer 参数（预设回放）。
+    /// - Parameter args: 每块屏一条裸配置串（与 currentSnapshotArgs 输出同格式）。
+    /// - Returns: 是否执行成功。
+    @discardableResult
+    func applyArgs(_ args: [String]) -> Bool {
+        runConfig(args)
+    }
+
     /// 解析 `displayplacer list` 的纯文本输出。
     ///
     /// 关于镜像态的输出格式（经 displayplacer 源码 DisplayPlacer.c 核实）：
@@ -104,6 +171,10 @@ final class DisplayManager {
             .components(separatedBy: .whitespaces).first ?? "") ?? 0
         let enabled = (value(of: "Enabled:", in: block)?.localizedCaseInsensitiveContains("true")) ?? true
 
+        // 解析当前分辨率下可选的刷新率：从 "Resolutions for rotation" 段的
+        // "mode N: res:WxH hz:X" 行里，筛出与当前分辨率相同的模式，收集 hz 去重升序。
+        let availableRates = parseRefreshRates(for: resolution, in: block)
+
         return DisplayInfo(
             id: cleanID,
             typeName: typeName,
@@ -114,8 +185,35 @@ final class DisplayManager {
             hertz: hertz,
             colorDepth: colorDepth,
             degree: degree,
-            enabled: enabled
+            enabled: enabled,
+            availableRefreshRates: availableRates
         )
+    }
+
+    /// 从屏块里解析与指定分辨率匹配的所有刷新率。
+    /// 解析 "mode N: res:WxH hz:X" 行，只保留 res 等于目标分辨率的 hz，去重升序。
+    private func parseRefreshRates(for targetRes: (width: Int, height: Int),
+                                   in block: String) -> [Int] {
+        guard targetRes.width > 0, targetRes.height > 0 else { return [] }
+        // 匹配 "res:WxH hz:X"，捕获 H 的数字部分
+        let pattern = #"res:(\d+)x(\d+)\s+hz:(\d+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
+        let range = NSRange(block.startIndex..., in: block)
+        var rates = Set<Int>()
+        regex.enumerateMatches(in: block, options: [], range: range) { match, _, _ in
+            guard let match,
+                  let wRange = Range(match.range(at: 1), in: block),
+                  let hRange = Range(match.range(at: 2), in: block),
+                  let hzRange = Range(match.range(at: 3), in: block) else { return }
+            let w = Int(block[wRange]) ?? 0
+            let h = Int(block[hRange]) ?? 0
+            // 只收当前分辨率下的刷新率
+            guard w == targetRes.width && h == targetRes.height else { return }
+            if let hz = Int(block[hzRange]) {
+                rates.insert(hz)
+            }
+        }
+        return rates.sorted()
     }
 
     /// 从 block 中取 "Key: value" 的 value 部分。
@@ -325,6 +423,30 @@ final class DisplayManager {
                 colorDepth: d.colorDepth,
                 scaling: d.scalingOn,
                 origin: origin,
+                degree: d.degree
+            )
+        }
+        return runConfig(args)
+    }
+
+    /// 切换某块屏的刷新率，其余屏保持不变。
+    ///
+    /// 实现方式：遍历所有屏生成 args，仅目标屏用新的 hz 值（分辨率/位置等不变）。
+    /// - Parameters:
+    ///   - hz: 目标刷新率。
+    ///   - display: 要切换刷新率的屏。
+    ///   - displays: 当前完整屏幕列表。
+    /// - Returns: 是否执行成功。
+    @discardableResult
+    func setRefreshRate(hz: Int, for display: DisplayInfo, in displays: [DisplayInfo]) -> Bool {
+        let args = displays.map { d -> String in
+            makeScreenArg(
+                id: d.id,
+                res: d.resolution,
+                hz: d.id == display.id ? hz : d.hertz,
+                colorDepth: d.colorDepth,
+                scaling: d.scalingOn,
+                origin: d.origin,
                 degree: d.degree
             )
         }

@@ -25,6 +25,11 @@ struct DisplayInfo: Identifiable, Equatable {
     /// 是否启用
     let enabled: Bool
 
+    /// 当前分辨率下可选的刷新率（去重、升序），用于菜单切换刷新率。
+    /// 从 displayplacer list 的 "Resolutions for rotation" 段解析，
+    /// 只保留与当前分辨率相同的模式的 hz。空数组表示无多选项（或未解析）。
+    var availableRefreshRates: [Int]
+
     /// 是否为笔记本内置屏（displayplacer 的 Type 里包含 "built in"）
     var isBuiltIn: Bool {
         typeName.localizedCaseInsensitiveContains("built in")
@@ -64,5 +69,45 @@ struct DisplayInfo: Identifiable, Equatable {
 
     static func == (lhs: DisplayInfo, rhs: DisplayInfo) -> Bool {
         lhs.id == rhs.id
+    }
+}
+
+// MARK: - 快捷键绑定
+
+/// 一个可持久化的全局快捷键绑定。
+///
+/// 存 Carbon 的 keyCode（硬件按键码，跨布局稳定）和 modifier 标志位，
+/// 不存字符（字符会随键盘布局/输入法变化）。功能二由 HotkeyManager 使用。
+struct HotkeyBinding: Codable, Equatable, Hashable {
+    /// Carbon 键码（kVK_* 常量对应的数值）。
+    var keyCode: UInt32
+    /// Carbon 修饰键标志位（组合 cmdKey/shiftKey/optionKey/controlKey）。
+    var modifiers: UInt32
+
+    /// 是否为"未绑定"（keyCode=0 且无修饰键视为空）。
+    var isEmpty: Bool { keyCode == 0 && modifiers == 0 }
+}
+
+// MARK: - 显示器布局预设
+
+/// 一份显示器布局预设：保存时刻的屏幕配置快照，可一键恢复。
+///
+/// `screenArgs` 是 displayplacer 的裸参数数组（每块屏一条，不含外层引号），
+/// 应用时直接喂给 ShellRunner.run。格式与 DisplayManager.makeScreenArg 同源。
+struct Preset: Codable, Identifiable, Equatable {
+    /// 唯一标识，跨重命名保持稳定。
+    var id: UUID
+    /// 用户起的名字，如「办公」「演示」。
+    var name: String
+    /// 每块屏一条 displayplacer 配置串，应用时整体回放。
+    var screenArgs: [String]
+    /// 可选绑定的全局快捷键（功能二启用，首批为 nil）。
+    var hotkey: HotkeyBinding?
+
+    init(id: UUID = UUID(), name: String, screenArgs: [String], hotkey: HotkeyBinding? = nil) {
+        self.id = id
+        self.name = name
+        self.screenArgs = screenArgs
+        self.hotkey = hotkey
     }
 }

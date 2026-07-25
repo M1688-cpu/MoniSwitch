@@ -4,7 +4,7 @@
 
 ![status](https://img.shields.io/badge/platform-macOS%2013%2B-blue)
 ![status](https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey)
-![version](https://img.shields.io/badge/version-0.1.2%20beta-orange)
+![version](https://img.shields.io/badge/version-0.1.2-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
 ## 功能
@@ -13,7 +13,9 @@
 - 🔀 **一键切主屏**：在列表里点任意显示器，立即把它设为主显示器（白条所在屏）
 - ↔️ **左右移动外接屏**：把外接屏放到主屏的左边或右边
 - 🪞 **扩展 / 镜像切换**：把外接屏在「扩展显示」和「镜像主屏」之间切换
-- ⚙️ **设置窗口**：中英双语界面切换、开机自启动、切换后通知、自动刷新列表
+- 📦 **布局预设**：把整套显示器配置（主屏+位置+镜像）保存为预设，一键切换（如「办公」「演示」）
+- 🔄 **菜单切换刷新率**：直接在菜单里切换外接屏刷新率（如 60Hz ↔ 120Hz）
+- ⚙️ **设置窗口**：中英双语、开机自启动、切换后通知、自动刷新列表
 - 🌐 **中英双语**：界面语言一键切换，重启后保持
 
 ## 截图
@@ -36,15 +38,27 @@
 
 ![菜单显示刷新率与 HiDPI](screenshots/menu-detailed.png)
 
+### 菜单内切换刷新率
+
+展开外接屏菜单，直接切换该屏支持的刷新率，当前生效项打勾。
+
+![菜单内切换刷新率](screenshots/menu-refresh-rate.png)
+
 ### 设置窗口 — 通用
 
 语言、启动、显示器、通知四组偏好。
 
 ![设置窗口 — 通用](screenshots/settings-general.png)
 
+### 设置窗口 — 预设
+
+保存当前显示器布局为命名预设，一键应用或删除。
+
+![设置窗口 — 预设](screenshots/settings-presets.png)
+
 ### 设置窗口 — 关于
 
-应用图标、版本号与测试版本徽标。
+应用图标与版本号。
 
 ![设置窗口 — 关于](screenshots/settings-about.png)
 
@@ -118,6 +132,7 @@ MoniSwitch/
 │   ├── ShellRunner.swift          # displayplacer 调用封装
 │   ├── DisplayManager.swift       # 解析 + 切换算法（含镜像组检测）
 │   ├── AppSettings.swift          # 用户偏好单例（自启动/通知/自动刷新）
+│   ├── PresetManager.swift        # 显示器布局预设管理（保存/应用/删除）
 │   ├── DockPolicyManager.swift    # Dock 策略 + 设置窗口（NSWindow + NSToolbar）
 │   ├── SettingsView.swift         # 设置窗口 SwiftUI 视图
 │   └── Localization.swift         # 中英双语（L10n 类 + TextKey 枚举）
@@ -140,13 +155,16 @@ MoniSwitch/
 - [x] 扩展 / 镜像切换
 - [x] 自定义 App 图标
 - [x] 中英双语界面切换
-- [x] 设置窗口（通用 / 关于）
+- [x] 设置窗口（通用 / 预设 / 关于）
 - [x] 开机自启动选项
 - [x] 切换后系统通知
 - [x] 自动刷新显示器列表
 - [x] 菜单显示刷新率与 HiDPI
+- [x] 显示器布局预设（一键保存/切换整套配置）
+- [x] 菜单内切换外接屏刷新率
 - [ ] 适配 Intel 芯片
 - [ ] 多屏（>2）场景优化
+- [ ] 全局快捷键（开发中，下个版本）
 - [ ] Apple 公证
 
 ## License

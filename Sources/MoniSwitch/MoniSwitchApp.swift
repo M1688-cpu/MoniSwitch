@@ -9,6 +9,7 @@ struct MoniSwitchApp: App {
     @StateObject private var state = AppState()
     @StateObject private var l10n = L10n.shared
     @StateObject private var settings = AppSettings.shared
+    @StateObject private var presetManager = PresetManager.shared
 
     var body: some Scene {
         // 顶部菜单栏图标 + 下拉菜单（系统标准 .menu 样式）
@@ -16,6 +17,7 @@ struct MoniSwitchApp: App {
             menuContent
                 .environmentObject(l10n)
                 .environmentObject(settings)
+                .environmentObject(presetManager)
         } label: {
             // 菜单栏图标：先用 SF Symbol 占位，后续替换为自定义图标
             Image(systemName: "rectangle.on.rectangle")
@@ -95,6 +97,18 @@ struct MoniSwitchApp: App {
             Divider()
         }
 
+        // 2.5) 布局预设：仅当有保存的预设时显示，点击即一键应用。
+        if !presetManager.presets.isEmpty {
+            Section(state.localized(.groupPresets)) {
+                ForEach(presetManager.presets) { preset in
+                    Button(preset.name) {
+                        presetManager.apply(preset)
+                    }
+                }
+            }
+            Divider()
+        }
+
         // 3) 杂项
         Button(state.localized(.refreshList)) { state.refresh() }
             .keyboardShortcut("r")
@@ -107,7 +121,7 @@ struct MoniSwitchApp: App {
         .keyboardShortcut("q")
     }
 
-    /// 构建排列二级菜单（左移/右移），在当前生效侧前加 ✓。
+    /// 构建排列二级菜单（左移/右移 + 可选刷新率），在当前生效侧前加 ✓。
     /// - 当 isBuiltIn=true 时，标题用内置屏名称，操作对象也是内置屏。
     @ViewBuilder
     private func arrangementMenu(for display: DisplayInfo, isBuiltIn: Bool) -> some View {
@@ -119,6 +133,19 @@ struct MoniSwitchApp: App {
             }
             Button(checkMarked(state.localized(.moveRight), active: currentSide == .right)) {
                 state.moveArrangement(display, side: .right)
+            }
+
+            // 刷新率子菜单：仅当该屏当前分辨率下有多个可选刷新率时显示。
+            if display.availableRefreshRates.count > 1 {
+                Divider()
+                Menu(state.localized(.refreshRateMenu)) {
+                    ForEach(display.availableRefreshRates, id: \.self) { hz in
+                        Button(checkMarked("\(hz) \(state.localized(.hertzLabel))",
+                                           active: hz == display.hertz)) {
+                            state.setRefreshRate(hz, for: display)
+                        }
+                    }
+                }
             }
         }
     }
@@ -218,6 +245,13 @@ final class AppState: ObservableObject {
     func moveArrangement(_ display: DisplayInfo, side: HorizontalSide) {
         let kind: OpKind = (side == .left) ? .moveLeft : .moveRight
         runOp(kind: kind) { [self, displays] in manager.moveExternal(display, side: side, in: displays) }
+    }
+
+    /// 切换某屏刷新率。
+    func setRefreshRate(_ hz: Int, for display: DisplayInfo) {
+        runOp(kind: .refreshRate) { [self, displays] in
+            manager.setRefreshRate(hz: hz, for: display, in: displays)
+        }
     }
 
     // MARK: - 状态查询（供菜单显示 ✓ 标记用）

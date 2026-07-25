@@ -44,6 +44,7 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
             let rootView = SettingsView()
                 .environmentObject(l10n)
                 .environmentObject(settings)
+                .environmentObject(PresetManager.shared)
             let hosting = NSHostingController(rootView: rootView)
 
             let window = NSWindow(contentViewController: hosting)
