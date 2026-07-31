@@ -38,6 +38,13 @@ struct DisplayInfo: Identifiable, Equatable {
     /// 是否处于镜像状态（通过观察 id 是否被加号拼接判断；这里保留扩展字段）
     var mirroredPeerID: String? = nil
 
+    /// 宽高比（width / height），供布局示意图按比例绘制使用。
+    /// height 为 0 时返回 1.0，避免除零。
+    var aspectRatio: Double {
+        guard resolution.height > 0 else { return 1.0 }
+        return Double(resolution.width) / Double(resolution.height)
+    }
+
     /// 简短显示文本，用于菜单项：名称 (宽x高)。
     /// 注意：菜单层请优先用 localizedTypeName 做本地化显示。
     var menuLabel: String {

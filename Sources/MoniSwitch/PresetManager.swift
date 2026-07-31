@@ -79,6 +79,13 @@ final class PresetManager: ObservableObject {
         presets[index].hotkey = hotkey
     }
 
+    /// 绑定/解绑快捷键到指定预设（按 id 查找）。
+    /// 给 HotkeyManager 录键回调用——它手上有 id、但未必有完整 Preset 引用。
+    func setHotkey(_ hotkey: HotkeyBinding?, forId presetId: Preset.ID) {
+        guard let index = presets.firstIndex(where: { $0.id == presetId }) else { return }
+        presets[index].hotkey = hotkey
+    }
+
     // MARK: - 应用
 
     /// 应用一份预设：在后台线程回放其 displayplacer 参数，完成后发通知。
@@ -96,5 +103,12 @@ final class PresetManager: ObservableObject {
                 settings.sendSwitchNotification(.presetApplied)
             }
         }
+    }
+
+    /// 按 id 应用预设。给全局热键命中回调用——Carbon 回调只手握 hotKeyId→presetId,
+    /// 走这条路复用 apply 的队列与通知逻辑,不另起实现。
+    func applyById(_ presetId: Preset.ID) {
+        guard let preset = presets.first(where: { $0.id == presetId }) else { return }
+        apply(preset)
     }
 }

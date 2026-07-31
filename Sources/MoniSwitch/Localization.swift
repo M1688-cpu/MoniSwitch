@@ -18,13 +18,13 @@ enum Language: String, CaseIterable, Identifiable {
 /// 所有需要翻译的文案 key。
 enum TextKey: String {
     // 菜单
-    case displaysSection        = "displaysSection"        // 主显示器（点击切换）
+    case displaysSection        = "displaysSection"        // 主显示器
     case noDisplays             = "noDisplays"             // 未检测到显示器
     case externalSection        = "externalSection"        // 扩展显示器
     case moveLeft               = "moveLeft"               // 移到主屏左侧
     case moveRight              = "moveRight"              // 移到主屏右侧
     case mirrorMain             = "mirrorMain"             // 镜像主屏
-    case extendDisplay          = "extendDisplay"          // 扩展显示（取消镜像）
+    case extendDisplay          = "extendDisplay"          // 扩展显示
     case refreshList            = "refreshList"            // 刷新列表
     case settings               = "settings"               // 设置…
     case quit                   = "quit"                   // 退出 MoniSwitch
@@ -79,12 +79,25 @@ enum TextKey: String {
     case presetEmptyHint        = "presetEmptyHint"        // 还没有保存任何预设
     case presetApplyConfirm     = "presetApplyConfirm"     // 应用此预设？
 
-    // 菜单 - 刷新率子菜单
+    // 设置 - 预设快捷键
+    case hotkeyLabel            = "hotkeyLabel"            // 快捷键
+    case hotkeyNone             = "hotkeyNone"             // 未设置
+    case hotkeyRecord           = "hotkeyRecord"           // 录制
+    case hotkeyRecording        = "hotkeyRecording"        // 按下组合键…(Esc 取消)
+    case hotkeyRecordCancel     = "hotkeyRecordCancel"     // 取消
+    case hotkeyClear            = "hotkeyClear"            // 清除
 
     // 菜单 - 刷新率子菜单
     case refreshRateMenu        = "refreshRateMenu"        // 刷新率
     case hertzLabel             = "hertzLabel"             // Hz
+
+    // 面板气泡卡片（.window 样式专用）
+    case panelArrange           = "panelArrange"           // 排列与镜像
+    case panelLayoutPreview     = "panelLayoutPreview"     // 布局预览
+    case panelScreenPreview     = "panelScreenPreview"     // 画面预览：即将推出
+    case panelPrimaryBadge      = "panelPrimaryBadge"      // 主屏
 }
+
 
 /// 轻量国际化中心：持有当前语言（@Published），切换时所有 UI 自动刷新。
 /// 语言持久化到 UserDefaults，下次启动自动恢复。
@@ -114,13 +127,13 @@ final class L10n: ObservableObject {
 
     /// 翻译表。
     private let table: [TextKey: [Language: String]] = [
-        .displaysSection:  [.zh: "主显示器（点击切换）",          .en: "Primary display (click to switch)"],
+        .displaysSection:  [.zh: "主显示器",                      .en: "Primary display"],
         .noDisplays:       [.zh: "未检测到显示器",                .en: "No displays detected"],
         .externalSection:  [.zh: "扩展显示器",                    .en: "Extended displays"],
         .moveLeft:         [.zh: "移到主屏左侧",                  .en: "Move to left of main"],
         .moveRight:        [.zh: "移到主屏右侧",                  .en: "Move to right of main"],
         .mirrorMain:       [.zh: "镜像主屏",                      .en: "Mirror main display"],
-        .extendDisplay:    [.zh: "扩展显示（取消镜像）",          .en: "Extend display (stop mirroring)"],
+        .extendDisplay:    [.zh: "扩展显示",                      .en: "Extend display"],
         .refreshList:      [.zh: "刷新列表",                      .en: "Refresh list"],
         .settings:         [.zh: "设置…",                         .en: "Settings…"],
         .quit:             [.zh: "退出 MoniSwitch",               .en: "Quit MoniSwitch"],
@@ -168,7 +181,19 @@ final class L10n: ObservableObject {
         .presetEmptyHint:  [.zh: "还没有保存任何预设",            .en: "No presets saved yet"],
         .presetApplyConfirm:[.zh: "应用此预设？",                 .en: "Apply this preset?"],
 
+        .hotkeyLabel:      [.zh: "快捷键",                        .en: "Hotkey"],
+        .hotkeyNone:       [.zh: "未设置",                        .en: "None"],
+        .hotkeyRecord:     [.zh: "录制",                          .en: "Record"],
+        .hotkeyRecording:  [.zh: "按下组合键…（Esc 取消）",        .en: "Press combo… (Esc to cancel)"],
+        .hotkeyRecordCancel:[.zh: "取消",                         .en: "Cancel"],
+        .hotkeyClear:      [.zh: "清除",                          .en: "Clear"],
+
         .refreshRateMenu:  [.zh: "刷新率",                        .en: "Refresh Rate"],
         .hertzLabel:       [.zh: "Hz",                            .en: "Hz"],
+
+        .panelArrange:     [.zh: "排列与镜像",                    .en: "Arrange & Mirror"],
+        .panelLayoutPreview:[.zh: "布局预览",                     .en: "Layout"],
+        .panelScreenPreview:[.zh: "画面预览：即将推出",            .en: "Live preview: coming soon"],
+        .panelPrimaryBadge:[.zh: "主屏",                          .en: "Main"],
     ]
 }

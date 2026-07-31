@@ -12,17 +12,22 @@ struct MoniSwitchApp: App {
     @StateObject private var presetManager = PresetManager.shared
 
     var body: some Scene {
-        // 顶部菜单栏图标 + 下拉菜单（系统标准 .menu 样式）
+        // 顶部菜单栏图标 + 下拉面板（.window 样式：可完全自定义的 SwiftUI 视图，
+        // 用于实现「气泡卡片」设计；原 .menu 样式是原生 NSMenu，无法做卡片/配色）。
         MenuBarExtra {
-            menuContent
+            PanelView(state: state)
                 .environmentObject(l10n)
                 .environmentObject(settings)
                 .environmentObject(presetManager)
         } label: {
-            // 菜单栏图标：先用 SF Symbol 占位，后续替换为自定义图标
-            Image(systemName: "rectangle.on.rectangle")
+            // 菜单栏图标:必须用模板 NSImage(SF Symbol 天然是模板)。
+            // .window 样式下面板打开时系统给图标加深色高亮背景,非 template 视图
+            // (如用 .primary 描边的自绘视图)会与高亮背景同色,表现为图标位置一整块黑。
+            // 模板 image 由系统在高亮/深浅态自动反色,稳定可见(见下方 menuBarIcon)。
+            Image(nsImage: Self.menuBarIcon)
+                .renderingMode(.template)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
 
         // 设置窗口不再用 SwiftUI 的 Settings 场景——它在菜单栏 App 中不可靠。
         // 改由 DockPolicyManager 用自管理的 NSWindow 承载。
@@ -36,124 +41,31 @@ struct MoniSwitchApp: App {
             }
         }
     }
+}
 
-    @ViewBuilder
-    private var menuContent: some View {
-        // 1) 显示器列表：点击即设为主屏，主屏项打勾
-        if state.displays.isEmpty {
-            Text(state.localized(.noDisplays))
-            Divider()
-        } else {
-            Section(state.localized(.displaysSection)) {
-                ForEach(state.displays) { d in
-                    Button {
-                        state.setPrimary(d)
-                    } label: {
-                        if d.isMain {
-                            Text("✓ \(state.localizedLabel(for: d))")
-                        } else {
-                            Text(state.localizedLabel(for: d))
-                        }
-                    }
-                }
-            }
-        }
+// MARK: - 菜单栏图标
 
-        Divider()
-
-        // 2) 外接显示器排列。
-        //    关键：当外接屏是非主屏时，操作对象就是该外接屏本身（常规情况）；
-        //         当外接屏是主屏时，"移动"操作的对象其实是内置屏，
-        //         这时把"移动内置屏到左/右"作为独立项列出，避免语义混乱。
-        let externals = state.displays.filter { !$0.isBuiltIn }
-        if !externals.isEmpty {
-            Section(state.localized(.externalSection)) {
-                if state.externalIsMain {
-                    // 外接是主屏 → 列出"移动内置屏"
-                    if let builtIn = state.builtInDisplay {
-                        arrangementMenu(for: builtIn, isBuiltIn: true)
-                    }
-                } else {
-                    // 外接是非主屏 → 列出每个外接屏的排列
-                    ForEach(externals) { ext in
-                        arrangementMenu(for: ext, isBuiltIn: false)
-                    }
-                }
-
-                // 镜像 / 扩展：操作对象随主屏身份切换。
-                //   - 外接非主屏（常规）：镜像/扩展的就是这个外接屏。
-                //   - 外接是主屏：镜像基准是外接，被镜像是内置屏；否则 mirror(ext==main)
-                //     会退化成 id:A+A 无效命令。这里显式选内置屏作为操作对端。
-                Divider()
-                let isMirroring = externals.contains { state.isMirroring($0) }
-                if state.externalIsMain, let builtIn = state.builtInDisplay {
-                    Button(checkMarked(state.localized(.mirrorMain),    active: isMirroring)) { state.mirror(builtIn) }
-                    Button(checkMarked(state.localized(.extendDisplay), active: !isMirroring)) { state.unmirror(builtIn) }
-                } else if let ext = externals.first {
-                    Button(checkMarked(state.localized(.mirrorMain),    active: isMirroring)) { state.mirror(ext) }
-                    Button(checkMarked(state.localized(.extendDisplay), active: !isMirroring)) { state.unmirror(ext) }
-                }
-            }
-            Divider()
-        }
-
-        // 2.5) 布局预设：仅当有保存的预设时显示，点击即一键应用。
-        if !presetManager.presets.isEmpty {
-            Section(state.localized(.groupPresets)) {
-                ForEach(presetManager.presets) { preset in
-                    Button(preset.name) {
-                        presetManager.apply(preset)
-                    }
-                }
-            }
-            Divider()
-        }
-
-        // 3) 杂项
-        Button(state.localized(.refreshList)) { state.refresh() }
-            .keyboardShortcut("r")
-        Button(state.localized(.settings)) { DockPolicyManager.shared.openSettings() }
-            .keyboardShortcut(",", modifiers: .command)
-        Divider()
-        Button(state.localized(.quit)) {
-            NSApplication.shared.terminate(nil)
-        }
-        .keyboardShortcut("q")
-    }
-
-    /// 构建排列二级菜单（左移/右移 + 可选刷新率），在当前生效侧前加 ✓。
-    /// - 当 isBuiltIn=true 时，标题用内置屏名称，操作对象也是内置屏。
-    @ViewBuilder
-    private func arrangementMenu(for display: DisplayInfo, isBuiltIn: Bool) -> some View {
-        let currentSide = state.side(of: display)
-
-        Menu(display.localizedTypeName(l10n: l10n)) {
-            Button(checkMarked(state.localized(.moveLeft),  active: currentSide == .left)) {
-                state.moveArrangement(display, side: .left)
-            }
-            Button(checkMarked(state.localized(.moveRight), active: currentSide == .right)) {
-                state.moveArrangement(display, side: .right)
-            }
-
-            // 刷新率子菜单：仅当该屏当前分辨率下有多个可选刷新率时显示。
-            if display.availableRefreshRates.count > 1 {
-                Divider()
-                Menu(state.localized(.refreshRateMenu)) {
-                    ForEach(display.availableRefreshRates, id: \.self) { hz in
-                        Button(checkMarked("\(hz) \(state.localized(.hertzLabel))",
-                                           active: hz == display.hertz)) {
-                            state.setRefreshRate(hz, for: display)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// 若 active 为 true，在文字前加 ✓（与主屏列表的勾号风格一致）。
-    private func checkMarked(_ text: String, active: Bool) -> String {
-        active ? "✓ \(text)" : text
-    }
+extension MoniSwitchApp {
+    /// 菜单栏图标的模板 NSImage。
+    ///
+    /// 用 SF Symbol `display`（苹果系统标准显示器图标）—— 为菜单栏这种小尺寸场景
+    /// 专门优化，16pt 下粗描边 + 扁宽屏 + 醒目底座，一眼可辨；且与菜单栏其他系统图标
+    /// （WiFi/电池/控制中心）视觉语言统一。
+    ///
+    /// 关键：SF Symbol 返回的 NSImage 天然是模板 image（isTemplate 默认 true），
+    /// 系统会在深浅/高亮态自动反色 —— 这是 `.window` 样式 MenuBarExtra 防止图标
+    /// 变黑的核心机制（见 AGENTS.md「MenuBarExtra .window 样式…」条目）。
+    static let menuBarIcon: NSImage = {
+        // semibold weight：默认 regular 在 16pt 下偏细，semibold 让视觉重量
+        // 与其他菜单栏图标一致，更醒目但不至于过粗。
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
+        return NSImage(systemSymbolName: "display",
+                       accessibilityDescription: "MoniSwitch")?
+            .withSymbolConfiguration(config)
+            ?? NSImage(systemSymbolName: "display",
+                       accessibilityDescription: "MoniSwitch")
+            ?? NSImage()
+    }()
 }
 
 // MARK: - UI 状态
@@ -175,8 +87,12 @@ final class AppState: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     init() {
+        // 装一次性 Carbon 事件处理器(整个进程生命周期只装一次)。
+        // 必须在任意热键注册之前完成。
+        HotkeyManager.shared.installEventHandler()
         refresh()
         setupAutoRefreshBinding()
+        setupHotkeyBinding()
     }
 
     /// 订阅 AppSettings：当自动刷新开关或间隔变化时，重建/销毁 timer。
@@ -186,6 +102,16 @@ final class AppState: ObservableObject {
             .combineLatest(settings.$autoRefreshInterval)
             .sink { [weak self] enabled, interval in
                 self?.rebuildAutoRefreshTimer(enabled: enabled, interval: interval)
+            }
+            .store(in: &cancellables)
+    }
+
+    /// 订阅 PresetManager：presets 任意变化(增删/改名/改热键)时全量重注册热键。
+    /// 启动时也会触发一次,完成从持久化数据恢复热键。
+    private func setupHotkeyBinding() {
+        PresetManager.shared.$presets
+            .sink { presets in
+                HotkeyManager.shared.reregisterAll(from: presets)
             }
             .store(in: &cancellables)
     }
@@ -303,7 +229,7 @@ final class AppState: ObservableObject {
 
 // MARK: - 本地化便捷方法（供 View 层使用）
 
-private extension AppState {
+extension AppState {
     /// 取一条文案。
     func localized(_ key: TextKey) -> String {
         L10n.shared.t(key)

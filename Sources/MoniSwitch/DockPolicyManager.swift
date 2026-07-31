@@ -51,7 +51,7 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
             // 注意：不设置 window.title，避免 NavigationSplitView 继承窗口标题
             // 并在边栏/内容区重复显示——标题统一由下方 NSToolbar 的居中项承担。
             window.title = ""
-            // 固定尺寸窗口；用 fullSizeContentView 让内容延伸到标题栏下方
+            // 固定尺寸窗口（520×720，竖向）；用 fullSizeContentView 让内容延伸到标题栏下方
             window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
             window.titlebarAppearsTransparent = false
             window.titleVisibility = .hidden
@@ -65,10 +65,10 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
             window.toolbar = toolbar
             // centeredItemIdentifiers 让该标题项相对整窗水平居中（macOS 13+）。
             toolbar.centeredItemIdentifiers = [titleItemIdentifier]
-            window.setContentSize(NSSize(width: 680, height: 460))
-            // 锁死尺寸，不可拉伸
-            window.minSize = NSSize(width: 680, height: 460)
-            window.maxSize = NSSize(width: 680, height: 460)
+            window.setContentSize(NSSize(width: 520, height: 720))
+            // 锁死尺寸，不可拉伸。三处必须同步：只改 setContentSize 会被 maxSize 钳回。
+            window.minSize = NSSize(width: 520, height: 720)
+            window.maxSize = NSSize(width: 520, height: 720)
             window.isMovableByWindowBackground = true
             window.isReleasedWhenClosed = false   // 复用窗口对象
             window.center()
