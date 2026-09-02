@@ -174,6 +174,11 @@ struct PanelView: View {
                     // 镜像 / 扩展：两个互斥按钮，当前态强调色高亮。
                     // 操作对端随主屏身份切换（与原 menu 逻辑一致，避免 mirror(ext==main) 退化）。
                     mirrorExtendRow
+
+                    Divider().padding(.vertical, 4)
+
+                    // 一键自动排列：横向排开、消除重叠（镜像组保持完整）。
+                    autoArrangeRow
                 } else if let builtIn = state.builtInDisplay {
                     // 单内置屏：无位置可排、无镜像对象，仅分辨率/刷新率。
                     ArrangementRow(display: builtIn,
@@ -248,6 +253,25 @@ struct PanelView: View {
     }
 
     // MARK: - 布局预设卡片
+
+    /// 一键自动排列行：全行可点的小按钮，横排所有屏并消除重叠。
+    private var autoArrangeRow: some View {
+        RowButton(action: { state.autoArrange() }) {
+            HStack(spacing: 8) {
+                Image(systemName: "wand.and.rays")
+                    .font(.system(size: BubbleMetrics.fontControl))
+                    .foregroundStyle(accent)
+                    .frame(width: 16)
+                Text(l10n.t(.autoArrange))
+                    .font(.system(size: BubbleMetrics.fontCaption))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
 
     /// 已保存预设：每条一行（名称 + 快捷键角标 + 应用按钮）。
     private var presetsCard: some View {

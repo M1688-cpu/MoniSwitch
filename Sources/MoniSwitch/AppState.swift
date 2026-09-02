@@ -139,6 +139,13 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// 一键自动排列：所有屏横向排开、消除重叠（镜像组保持完整）。
+    func autoArrange() {
+        runOp(kind: .autoArrange) { [self, displays] in
+            manager.autoArrange(in: displays)
+        }
+    }
+
     // MARK: - 状态查询（供菜单显示 ✓ 标记用）
 
     /// 外接屏是否为主屏（决定菜单显示哪个屏的排列项）。

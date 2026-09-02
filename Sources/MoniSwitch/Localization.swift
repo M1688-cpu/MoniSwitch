@@ -69,6 +69,7 @@ enum TextKey: String {
     case notifRefreshRate       = "notifRefreshRate"       // 已切换刷新率
     case notifResolution        = "notifResolution"        // 已切换分辨率
     case notifOpFailed          = "notifOpFailed"          // 操作失败（正文）
+    case notifAutoArrange       = "notifAutoArrange"       // 已自动排列
 
     // 设置 - 预设
     case tabPresets             = "tabPresets"             // 预设
@@ -100,7 +101,8 @@ enum TextKey: String {
     case panelDisplayAdjust     = "panelDisplayAdjust"     // 显示器调节（单内置屏时的卡片标题）
     case panelLayoutPreview     = "panelLayoutPreview"     // 布局预览
     case panelPrimaryBadge      = "panelPrimaryBadge"      // 主屏
-    case mirrorTarget           = "mirrorTarget"           // 镜像目标：%@
+    case mirrorTarget           = "mirrorTarget"           // 镜像目标：@
+    case autoArrange            = "autoArrange"            // 自动排列按钮
 }
 
 
@@ -183,6 +185,7 @@ final class L10n: ObservableObject {
         .notifRefreshRate:  [.zh: "已切换刷新率",                 .en: "Refresh rate changed"],
         .notifResolution:   [.zh: "已切换分辨率",                 .en: "Resolution changed"],
         .notifOpFailed:     [.zh: "操作失败，未能完成切换",        .en: "Operation failed"],
+        .notifAutoArrange:  [.zh: "已自动排列所有显示器",          .en: "Displays auto-arranged"],
 
         .tabPresets:       [.zh: "预设",                          .en: "Presets"],
         .groupPresets:     [.zh: "预设",                          .en: "Presets"],
@@ -209,5 +212,6 @@ final class L10n: ObservableObject {
         .panelLayoutPreview:[.zh: "布局预览",                     .en: "Layout"],
         .panelPrimaryBadge:[.zh: "主屏",                          .en: "Main"],
         .mirrorTarget:     [.zh: "镜像目标：%@",                  .en: "Mirror target: %@"],
+        .autoArrange:      [.zh: "自动排列（横向排开，消除重叠）",  .en: "Auto-arrange (line up, fix overlap)"],
     ]
 }

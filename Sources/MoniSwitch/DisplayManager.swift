@@ -543,6 +543,56 @@ final class DisplayManager {
         return mirrorGroups.contains { $0.contains(display.id) }
     }
 
+    /// 一键自动排列：所有屏横向排开、消除重叠，主屏（所在镜像组）归 (0,0)。
+    ///
+    /// 镜像组感知：组内屏保持 `id:基准+副` 合并 arg（整组共用基准配置），
+    /// 不会被拆成独立 arg 而意外取消镜像；组与其余独立屏按「单元」横排，
+    /// 主屏单元在 (0,0)，其余单元按原 origin.x 顺序排在右侧（保留用户大致左右习惯）。
+    /// 全部单元 y=0（顶部对齐）。
+    @discardableResult
+    func autoArrange(in displays: [DisplayInfo]) -> Bool {
+        guard !displays.isEmpty else { return false }
+
+        // 归并出「单元」：独立屏 = 单屏单元；镜像组 = 合并单元（基准屏优先主屏）。
+        struct Unit { let ids: [String]; let base: DisplayInfo }
+        var units: [Unit] = []
+        var seen = Set<String>()
+        // 主屏先入队（保证排 (0,0)），其余按 origin.x 升序。
+        let ordered = displays.sorted {
+            if $0.isMain != $1.isMain { return $0.isMain }
+            return $0.origin.x < $1.origin.x
+        }
+        for d in ordered {
+            if seen.contains(d.id) { continue }
+            if let group = mirrorGroups.first(where: { $0.contains(d.id) && $0.count > 1 }) {
+                let members = displays.filter { group.contains($0.id) }
+                let base = members.first(where: \.isMain) ?? d
+                units.append(Unit(ids: [base.id] + members.filter { $0.id != base.id }.map(\.id),
+                                  base: base))
+                seen.formUnion(group)
+            } else {
+                units.append(Unit(ids: [d.id], base: d))
+                seen.insert(d.id)
+            }
+        }
+
+        var cursorX = 0
+        var args: [String] = []
+        for unit in units {
+            args.append(makeScreenArg(
+                id: unit.ids.joined(separator: "+"),
+                res: unit.base.resolution,
+                hz: unit.base.hertz,
+                colorDepth: unit.base.colorDepth,
+                scaling: unit.base.scalingOn,
+                origin: (cursorX, 0),
+                degree: unit.base.degree
+            ))
+            cursorX += unit.base.resolution.width
+        }
+        return runConfig(args)
+    }
+
     /// 取消镜像，恢复为扩展（并排）布局：主屏在左 (0,0)，其余屏依次排在右侧。
     ///
     /// - Parameter main: 当前主屏（镜像态下的基准屏）。

@@ -13,6 +13,7 @@ enum OpKind {
     case presetApplied   // 应用了布局预设
     case refreshRate     // 切换了刷新率
     case resolution      // 切换了分辨率
+    case autoArrange     // 一键自动排列
 }
 
 /// 全局用户偏好（单例 + @Published + UserDefaults 持久化）。
@@ -209,6 +210,7 @@ final class AppSettings: ObservableObject {
         case .presetApplied:  body = l10n.t(.notifPresetApplied)
         case .refreshRate:    body = l10n.t(.notifRefreshRate)
         case .resolution:     body = l10n.t(.notifResolution)
+        case .autoArrange:    body = l10n.t(.notifAutoArrange)
         }
 
         let content = UNMutableNotificationContent()
