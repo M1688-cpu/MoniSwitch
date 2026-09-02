@@ -31,6 +31,8 @@ Sources/MoniSwitch/
   PanelView.swift          # 菜单栏气泡卡片面板（主屏/排列/预设/交互式布局预览）
   Components.swift         # 全站共享视觉组件（BrandColor/BubbleBackground/BubbleCard/
                            #   SettingsCard/RowButton/ActivePill/IndeterminateBar/PlainIcon…）
+  LiquidGlass.swift        # 液态玻璃组件（liquidGlass 修饰器 + LiquidGlassToggleStyle，
+                           #   手工绘制跨 macOS 13~26——本机 SDK 15.5 无 glassEffect API）
   BubbleMetrics.swift      # 圆角/字号/间距刻度 + 气泡深色填充色 + bubbleShadow()
   Models.swift             # 显示器数据模型（DisplayInfo/HotkeyBinding/Preset）
   ShellRunner.swift        # displayplacer 调用封装
@@ -142,6 +144,7 @@ Support/
 - **自动化验证的 2026-09 增补（macOS 26 实测）**：① 菜单栏图标窗口**不再出现在 CGWindowList 里**（owner/layer 都查不到，但图标实际显示）——定位改用「裁剪菜单栏区域放大 + 视觉读图」推算坐标；② CGEvent 合成点击对**普通 NSWindow 里的 SwiftUI `onTapGesture` 同样无效**（设置窗口边栏行点不切 tab），不只限 MenuBarExtra 面板；③ **合成 ⌘, 键盘事件有效**（`CGEvent keyboardEventSource + .maskCommand`，virtualKey 0x2F）：面板打开时可触发 `.commands` 打开设置窗口——这是唯一可自动打开设置窗口的路径；④ **裸二进制 `.build/debug/MoniSwitch` 从终端后台启动不创建任何窗口**（进程活着但无菜单栏图标），验证 UI 必须走 `.app`（build-app.sh 产物 + lsregister 登记 + open）。
 - **通知时序契约（v0.2.0 起）**：`AppSettings.sendSwitchNotification` 要求调用方已在显示器配置稳定后调用（先经 `DisplayManager.waitForStableDisplays`）。新增发通知的代码路径若绕过此契约，镜像/扩展类操作会复现「通知不弹出」bug。
 - **PanelView 的展开互斥/联动状态都是面板级 @State**：`expandedRowID`（SelectionRow 互斥）、`selectedDisplayID`/`hoveredDisplayID`（布局图联动）挂在 PanelView 上经参数传入 ArrangementRow/SelectionRow——新增联动屏相关的行时记得挂 onHover 上报 hoveredDisplayID，否则布局图不联动。
+- **液态玻璃是手工绘制，不是系统 glassEffect**（2026-09 实测）：本机工具链 SDK 为 15.5，`glassEffect`/`Glass` 需要 macOS 26 SDK 才能编译（`xcrun --show-sdk-version` 可查）。`LiquidGlass.swift` 用「染色基底 + 上缘镜面高光（白渐变）+ 边缘亮线（白描边）+ 下缘内阴影 + 落影」手工模拟，四要素对应 Apple Liquid Glass 视觉语言，macOS 13~26 观感一致。设置页 4 个 Toggle 用 `LiquidGlassToggleStyle`（`.toggleStyle(.liquidGlass)`，尺寸对齐 NSSwitch）；面板互斥胶囊（ActivePill）激活=染色玻璃、非激活=中性玻璃悬停提亮；位置分段=中性玻璃槽内嵌染色激活段。玻璃 tint 用 SwiftUI 原生 `Color.accentColor`（非桥接 NSColor——AGENTS 既有教训：桥接动态色在系统合成路径有渲染风险）。
 
 ## 风格约定
 

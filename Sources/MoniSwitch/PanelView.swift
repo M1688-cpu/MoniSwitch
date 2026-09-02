@@ -224,7 +224,7 @@ struct PanelView: View {
             }
 
             HStack(spacing: 8) {
-                ActivePill(active: isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
+                ActivePill(active: isMirroring, verticalPadding: 6) {
                     HStack(spacing: 5) {
                         Image(systemName: "rectangle.on.rectangle").font(.system(size: BubbleMetrics.fontCaption))
                         Text(l10n.t(.mirrorMain)).font(.system(size: BubbleMetrics.fontControl, weight: isMirroring ? .semibold : .regular))
@@ -236,7 +236,7 @@ struct PanelView: View {
                 }
                 .disabled(peer == nil)
 
-                ActivePill(active: !isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
+                ActivePill(active: !isMirroring, verticalPadding: 6) {
                     HStack(spacing: 5) {
                         Image(systemName: "rectangle.dashed").font(.system(size: BubbleMetrics.fontCaption))
                         Text(l10n.t(.extendDisplay)).font(.system(size: BubbleMetrics.fontControl, weight: !isMirroring ? .semibold : .regular))
@@ -469,7 +469,7 @@ private struct ArrangementRow: View {
         }
     }
 
-    /// 位置分段控件：「◀ 左侧 | 右侧 ▶」，当前生效侧填充强调色，点击移动排列。
+    /// 位置分段控件：「◀ 左侧 | 右侧 ▶」，玻璃槽 + 染色玻璃激活段。
     /// 当前侧未知（镜像中/重叠布局）时两段均不高亮。
     private var sideSegmented: some View {
         let current = state.side(of: display)
@@ -478,9 +478,9 @@ private struct ArrangementRow: View {
             sideSegment(.right, active: current == .right)
         }
         .padding(2)
-        .background(
-            Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-        )
+        // 外壳从描边胶囊升级为中性玻璃槽：与激活段的染色玻璃形成液态玻璃分层
+        //（槽 = 磨砂容器，段 = 槽内玻璃块）。恒定高光，不随 hover 闪烁。
+        .liquidGlass(hoverBoost: 0)
     }
 
     /// 分段控件的单段：箭头指向移动方向，激活段强调色实心。

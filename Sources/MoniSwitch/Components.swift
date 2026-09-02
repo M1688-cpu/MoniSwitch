@@ -190,26 +190,20 @@ extension View {
     }
 }
 
-/// 激活态胶囊：active 时强调色实心 + 白字，非激活时透明底 + 主色字。
-/// 镜像/扩展切换按钮与位置分段控件的段共用，激活态视觉由此统一。
-/// - `strokeWhenInactive`：非激活时是否给整胶囊加淡描边（镜像/扩展按钮用；
-///   位置分段的描边由外层分段容器统一承担，传 false）。
+/// 激活态玻璃胶囊：active 时强调色染色玻璃 + 白字，非激活时中性玻璃 + 主色字
+/// （悬停高光提亮）。镜像/扩展切换按钮与位置分段控件的段共用，激活态视觉由此统一。
+/// 玻璃质感见 LiquidGlass.swift 的 liquidGlass 修饰器。
 struct ActivePill<Content: View>: View {
     let active: Bool
     var verticalPadding: CGFloat = 3
-    var strokeWhenInactive = false
     @ViewBuilder let content: Content
 
     var body: some View {
         content
             .padding(.vertical, verticalPadding)
-            .background {
-                if active {
-                    Capsule().fill(BrandColor.accent)
-                } else if strokeWhenInactive {
-                    Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                }
-            }
+            // 染色玻璃（激活）恒定高光；中性玻璃（未激活）悬停提亮，提示可点。
+            .liquidGlass(tint: active ? Color.accentColor : nil,
+                         hoverBoost: active ? 0 : 0.5)
             .foregroundStyle(active ? Color.white : Color.primary)
             .contentShape(Rectangle())
     }

@@ -37,7 +37,7 @@ struct GeneralTab: View {
                     settingRow(l10n.t(.launchAtLogin)) {
                         Toggle("", isOn: $settings.launchAtLogin)
                             .labelsHidden()
-                            .toggleStyle(.switch)
+                            .toggleStyle(.liquidGlass)
                     }
                 }
 
@@ -47,7 +47,7 @@ struct GeneralTab: View {
                         settingRow(l10n.t(.autoRefresh)) {
                             Toggle("", isOn: $settings.autoRefreshEnabled)
                                 .labelsHidden()
-                                .toggleStyle(.switch)
+                                .toggleStyle(.liquidGlass)
                         }
                         // 刷新间隔：仅当自动刷新开启时显示
                         if settings.autoRefreshEnabled {
@@ -68,7 +68,7 @@ struct GeneralTab: View {
                         settingRow(l10n.t(.detailedMenuInfo)) {
                             Toggle("", isOn: $settings.detailedMenuInfo)
                                 .labelsHidden()
-                                .toggleStyle(.switch)
+                                .toggleStyle(.liquidGlass)
                         }
                     }
                 }
@@ -78,7 +78,7 @@ struct GeneralTab: View {
                     settingRow(l10n.t(.notifyOnSwitch)) {
                         Toggle("", isOn: $settings.notificationsEnabled)
                             .labelsHidden()
-                            .toggleStyle(.switch)
+                            .toggleStyle(.liquidGlass)
                     }
                 }
 
