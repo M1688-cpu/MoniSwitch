@@ -1,6 +1,12 @@
 import Foundation
 import Combine
 
+extension Notification.Name {
+    /// 预设应用完成（已过配置稳定等待）后广播。
+    /// userInfo["displays"] 携带稳定后的屏幕列表，AppState 监听以刷新面板。
+    static let moniswitchPresetApplied = Notification.Name("moniswitch.presetApplied")
+}
+
 /// 预设管理（单例 + @Published + UserDefaults JSON 持久化）。
 ///
 /// 职责：保存/删除/重命名/应用 显示器布局预设。
@@ -88,19 +94,31 @@ final class PresetManager: ObservableObject {
 
     // MARK: - 应用
 
-    /// 应用一份预设：在后台线程回放其 displayplacer 参数，完成后发通知。
+    /// 应用一份预设：在后台线程回放其 displayplacer 参数，等配置稳定后发通知。
     ///
     /// 注意：通知的发送不依赖 displayplacer 的退出码。原因——displayplacer 对
     /// 单屏失败（如 persistent id 漂移导致找不到屏）采用"跳过+报错+继续"策略，
     /// 仍会尽力应用其他屏，整体命令可能返回非零退出码，但对用户而言预设已生效。
     /// 因此只要执行了，就提示用户（与"看到布局变化"的体感一致）。
+    ///
+    /// 完成后广播 `.moniswitchPresetApplied`（携带稳定后的屏幕列表）：AppState
+    /// 监听它刷新面板——面板点击与全局热键两条路径共用本方法，热键路径下
+    /// AppState 无法感知布局变化，不广播面板会停在旧布局。
     func apply(_ preset: Preset) {
         let args = preset.screenArgs
         let settings = AppSettings.shared
         queue.async {
             _ = self.manager.applyArgs(args)
+            // 预设回放常含镜像/res 变更，等系统重配稳定后再提交通知，
+            // 否则 UNUserNotificationCenter 的投递会被重配窗口中断（通知不弹出）。
+            let list = self.manager.waitForStableDisplays()
             DispatchQueue.main.async {
                 settings.sendSwitchNotification(.presetApplied)
+                NotificationCenter.default.post(
+                    name: .moniswitchPresetApplied,
+                    object: nil,
+                    userInfo: ["displays": list]
+                )
             }
         }
     }

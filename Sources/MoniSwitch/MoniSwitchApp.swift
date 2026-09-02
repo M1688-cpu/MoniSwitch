@@ -93,6 +93,23 @@ final class AppState: ObservableObject {
         refresh()
         setupAutoRefreshBinding()
         setupHotkeyBinding()
+        setupPresetAppliedBinding()
+    }
+
+    /// 订阅 PresetManager 的应用完成广播：面板点击与全局热键两条路径都经
+    /// PresetManager.apply，热键路径下 AppState 无从感知，靠广播拿到稳定后的
+    /// 屏幕列表刷新面板。
+    private func setupPresetAppliedBinding() {
+        NotificationCenter.default.publisher(for: .moniswitchPresetApplied)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in
+                if let list = note.userInfo?["displays"] as? [DisplayInfo] {
+                    self?.displays = list
+                } else {
+                    self?.refresh()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     /// 订阅 AppSettings：当自动刷新开关或间隔变化时，重建/销毁 timer。
@@ -225,25 +242,16 @@ final class AppState: ObservableObject {
     /// CoreGraphics 对 origin/hertz/res 的系统级重配是异步的（AGENTS.md 记录镜像类
     /// 重配耗时约 1.2-1.5s；origin/hertz 变更更短，但仍有数百毫秒窗口）。
     /// 若在 work() 返回后立即 currentDisplays()，会读到重配未完成时的旧值，
-    /// 表现为面板高光停在旧选项。修复：延迟 0.4s 再读。
+    /// 表现为面板高光停在旧选项。修复：waitForStableDisplays 轮询 list 输出
+    /// 直到连续两次一致再读终值；通知也在稳定后提交（避开投递被重配中断的窗口）。
     private func runOp(kind: OpKind, work: @escaping () -> Bool) {
         queue.async { [weak self] in
             let ok = work()
-            // 临时诊断日志：对比 work 前后目标屏的关键字段，确认重配时序。
-            // 根因确认、延迟值定稿后可移除。
-            let before = self?.manager.currentDisplays() ?? []
-            self?.queue.asyncAfter(deadline: .now() + 0.4) {
-                let list = self?.manager.currentDisplays() ?? []
-                #if DEBUG
-                let b = before.first(where: { $0.isMain == false }) ?? before.first
-                let a = list.first(where: { $0.isMain == false }) ?? list.first
-                print("[runOp] kind=\(kind) before=\(b?.hertz ?? -1)hz \(b?.resolution.width ?? 0)x\(b?.resolution.height ?? 0) origin=\(b?.origin.x ?? 0) → after=\(a?.hertz ?? -1)hz \(a?.resolution.width ?? 0)x\(a?.resolution.height ?? 0) origin=\(a?.origin.x ?? 0)")
-                #endif
-                DispatchQueue.main.async {
-                    self?.displays = list
-                    if ok {
-                        self?.settings.sendSwitchNotification(kind)
-                    }
+            let list = self?.manager.waitForStableDisplays() ?? []
+            DispatchQueue.main.async {
+                self?.displays = list
+                if ok {
+                    self?.settings.sendSwitchNotification(kind)
                 }
             }
         }

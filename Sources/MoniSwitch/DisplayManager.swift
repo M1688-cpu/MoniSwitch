@@ -276,6 +276,46 @@ final class DisplayManager {
         return (x, y)
     }
 
+    // MARK: - 稳定检测
+
+    /// 轮询 `displayplacer list`，直到配置输出连续两次一致或超时，返回稳定后的屏幕列表。
+    ///
+    /// 存在原因：displayplacer 进程退出 ≠ 系统显示器配置已生效。CoreGraphics 的
+    /// 重配（display mode 切换 + origin 变更）是异步的，镜像/扩展类操作全程约
+    /// 1.2~1.5 秒。期间：
+    ///   - 立即 currentDisplays() 会读到重配未完成的旧值（面板高亮不跟随）；
+    ///   - 立即提交 UNUserNotificationCenter 请求会被系统中断/丢弃（通知不弹出）。
+    /// 用「连续两次读取结果一致」判定重配结束，替代按操作类型猜固定延迟的盲等。
+    ///
+    /// - Parameters:
+    ///   - pollInterval: 轮询间隔（秒）。
+    ///   - maxWait: 最长等待（秒），超时返回最后一次读取结果。
+    /// - Returns: 稳定后的屏幕列表。必须在后台线程调用（内部同步跑 shell 并 sleep）。
+    func waitForStableDisplays(pollInterval: TimeInterval = 0.25,
+                               maxWait: TimeInterval = 3.0) -> [DisplayInfo] {
+        var last = currentDisplays()
+        let deadline = Date().addingTimeInterval(maxWait)
+        while Date() < deadline {
+            Thread.sleep(forTimeInterval: pollInterval)
+            let next = currentDisplays()
+            // 比对关键字段签名（DisplayInfo 的 == 只比 id，不能直接用数组判等）
+            if displayListSignature(last) == displayListSignature(next) {
+                return next
+            }
+            last = next
+        }
+        return last
+    }
+
+    /// 屏幕列表的配置签名：每屏取 id/分辨率/origin/刷新率/主屏位拼接，排序后合并。
+    /// 两次签名一致即认为系统配置已稳定。
+    private func displayListSignature(_ displays: [DisplayInfo]) -> String {
+        displays
+            .map { "\($0.id)|\($0.resolution.width)x\($0.resolution.height)|\($0.origin.x),\($0.origin.y)|\($0.hertz)|\($0.isMain)" }
+            .sorted()
+            .joined(separator: ";")
+    }
+
     // MARK: - 操作
 
     /// 切换主显示器：把目标屏 origin 平移到 (0,0)，其余屏按相同向量平移，

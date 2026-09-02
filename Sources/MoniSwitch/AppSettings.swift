@@ -166,27 +166,17 @@ final class AppSettings: ObservableObject {
     }
 
     /// 发送一条切换完成通知。若用户未开启则直接忽略。
+    ///
+    /// 时序契约：调用方必须已在显示器配置稳定后调用（AppState.runOp /
+    /// PresetManager.apply 均先经 DisplayManager.waitForStableDisplays 等待
+    /// 系统重配完成）。镜像/扩展/预设类操作会触发系统级 display mode 重配，
+    /// 重配窗口内提交的 UNUserNotificationCenter 请求会被系统中断/丢弃——
+    /// 这曾是"镜像/扩展/预设通知不弹出"bug 的根因，早期按操作类型盲等 2s 的
+    /// 写法已被稳定检测替代（见 DisplayManager.waitForStableDisplays）。
     /// - Parameter kind: 操作类型，决定通知正文文案。
     func sendSwitchNotification(_ kind: OpKind) {
         guard notificationsEnabled else { return }
-
-        // 镜像类操作（镜像、扩展、预设应用）会让 displayplacer 触发系统级显示器
-        // 重新配置（display mode 切换 + CGCompleteDisplayConfiguration），全程约
-        // 1.2~1.5 秒。这段时间内 UNUserNotificationCenter 的投递会被系统中断/丢弃。
-        // 这类操作把"提交通知请求"本身延迟 2 秒，确保落在重配完全结束之后。
-        // 轻量操作（切主屏、左右移动、改刷新率）只改 origin，瞬时完成，立即提交。
-        let needsDelay: Bool
-        switch kind {
-        case .mirror, .extend, .presetApplied, .resolution: needsDelay = true
-        default: needsDelay = false
-        }
-
-        let work = { self.actuallySendNotification(kind: kind) }
-        if needsDelay {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: work)
-        } else {
-            work()
-        }
+        actuallySendNotification(kind: kind)
     }
 
     /// 实际构建并发送一条通知（私有，由 sendSwitchNotification 调度）。
