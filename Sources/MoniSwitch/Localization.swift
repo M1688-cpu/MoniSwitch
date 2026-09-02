@@ -68,6 +68,7 @@ enum TextKey: String {
     case notifPresetApplied     = "notifPresetApplied"     // 已应用预设
     case notifRefreshRate       = "notifRefreshRate"       // 已切换刷新率
     case notifResolution        = "notifResolution"        // 已切换分辨率
+    case notifOpFailed          = "notifOpFailed"          // 操作失败（正文）
 
     // 设置 - 预设
     case tabPresets             = "tabPresets"             // 预设
@@ -99,6 +100,7 @@ enum TextKey: String {
     case panelDisplayAdjust     = "panelDisplayAdjust"     // 显示器调节（单内置屏时的卡片标题）
     case panelLayoutPreview     = "panelLayoutPreview"     // 布局预览
     case panelPrimaryBadge      = "panelPrimaryBadge"      // 主屏
+    case mirrorTarget           = "mirrorTarget"           // 镜像目标：%@
 }
 
 
@@ -126,6 +128,12 @@ final class L10n: ObservableObject {
     func t(_ key: TextKey, _ value: Int) -> String {
         let raw = (table[key]?[lang]) ?? key.rawValue
         return raw.replacingOccurrences(of: "%d", with: "\(value)")
+    }
+
+    /// 取文案并用一个字符串替换其中的 %@ 占位符（如"镜像目标： %@"）。
+    func t(_ key: TextKey, _ value: String) -> String {
+        let raw = (table[key]?[lang]) ?? key.rawValue
+        return raw.replacingOccurrences(of: "%@", with: value)
     }
 
     /// 翻译表。
@@ -174,6 +182,7 @@ final class L10n: ObservableObject {
         .notifPresetApplied:[.zh: "已应用预设",                   .en: "Preset applied"],
         .notifRefreshRate:  [.zh: "已切换刷新率",                 .en: "Refresh rate changed"],
         .notifResolution:   [.zh: "已切换分辨率",                 .en: "Resolution changed"],
+        .notifOpFailed:     [.zh: "操作失败，未能完成切换",        .en: "Operation failed"],
 
         .tabPresets:       [.zh: "预设",                          .en: "Presets"],
         .groupPresets:     [.zh: "预设",                          .en: "Presets"],
@@ -199,5 +208,6 @@ final class L10n: ObservableObject {
         .panelDisplayAdjust: [.zh: "显示器调节",                  .en: "Display Adjustment"],
         .panelLayoutPreview:[.zh: "布局预览",                     .en: "Layout"],
         .panelPrimaryBadge:[.zh: "主屏",                          .en: "Main"],
+        .mirrorTarget:     [.zh: "镜像目标：%@",                  .en: "Mirror target: %@"],
     ]
 }

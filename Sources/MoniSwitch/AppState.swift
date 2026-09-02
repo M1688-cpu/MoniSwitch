@@ -8,6 +8,10 @@ final class AppState: ObservableObject {
 
     @Published var displays: [DisplayInfo] = []
 
+    /// 是否有切换操作正在后台执行（面板据此禁用控件 + 显示进度条，
+    /// 防止连点重复触发 displayplacer 命令）。
+    @Published var isOperating = false
+
     private let manager = DisplayManager.shared
     private let queue = DispatchQueue(label: "moniswitch.ops")
     private let settings = AppSettings.shared
@@ -176,13 +180,18 @@ final class AppState: ObservableObject {
     /// 表现为面板高光停在旧选项。修复：waitForStableDisplays 轮询 list 输出
     /// 直到连续两次一致再读终值；通知也在稳定后提交（避开投递被重配中断的窗口）。
     private func runOp(kind: OpKind, work: @escaping () -> Bool) {
+        // runOp 由 UI 回调触发（主线程），置位后再进后台队列。
+        isOperating = true
         queue.async { [weak self] in
             let ok = work()
             let list = self?.manager.waitForStableDisplays() ?? []
             DispatchQueue.main.async {
                 self?.displays = list
+                self?.isOperating = false
                 if ok {
                     self?.settings.sendSwitchNotification(kind)
+                } else {
+                    self?.settings.sendFailureNotification()
                 }
             }
         }

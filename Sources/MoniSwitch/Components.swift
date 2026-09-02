@@ -231,6 +231,31 @@ private struct HoverRowHighlightModifier: ViewModifier {
     }
 }
 
+// MARK: - 进度指示
+
+/// 不确定进度条：一段强调色胶囊在轨道内循环流动，用于后台切换操作进行中的提示。
+struct IndeterminateBar: View {
+    var accent: Color
+    @State private var phase: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { geo in
+            let barWidth = geo.size.width * 0.28
+            Capsule()
+                .fill(accent.opacity(0.85))
+                .frame(width: barWidth, height: 2.5)
+                .offset(x: -barWidth + phase * (geo.size.width + barWidth))
+        }
+        .frame(height: 2.5)
+        .clipped()
+        .onAppear {
+            withAnimation(.linear(duration: 1.1).repeatForever(autoreverses: false)) {
+                phase = 1
+            }
+        }
+    }
+}
+
 // MARK: - 控件配色
 
 extension View {

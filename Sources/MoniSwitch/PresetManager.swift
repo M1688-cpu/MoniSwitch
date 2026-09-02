@@ -24,6 +24,9 @@ final class PresetManager: ObservableObject {
         didSet { persist() }
     }
 
+    /// 是否有预设正在后台回放（面板据此与 AppState.isOperating 一起禁用控件）。
+    @Published var isApplying = false
+
     private let manager = DisplayManager.shared
     private let queue = DispatchQueue(label: "moniswitch.presets")
 
@@ -107,12 +110,15 @@ final class PresetManager: ObservableObject {
     func apply(_ preset: Preset) {
         let args = preset.screenArgs
         let settings = AppSettings.shared
+        // apply 由 UI/热键回调触发（主线程），置位后再进后台队列。
+        isApplying = true
         queue.async {
             _ = self.manager.applyArgs(args)
             // 预设回放常含镜像/res 变更，等系统重配稳定后再提交通知，
             // 否则 UNUserNotificationCenter 的投递会被重配窗口中断（通知不弹出）。
             let list = self.manager.waitForStableDisplays()
             DispatchQueue.main.async {
+                self.isApplying = false
                 settings.sendSwitchNotification(.presetApplied)
                 NotificationCenter.default.post(
                     name: .moniswitchPresetApplied,

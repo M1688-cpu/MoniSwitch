@@ -179,6 +179,22 @@ final class AppSettings: ObservableObject {
         actuallySendNotification(kind: kind)
     }
 
+    /// 发送一条操作失败通知（displayplacer 执行失败等）。
+    /// 原先失败只写 stderr，用户完全无感知；现在至少给一条通知提示。
+    func sendFailureNotification() {
+        guard notificationsEnabled else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "MoniSwitch"
+        content.body = L10n.shared.t(.notifOpFailed)
+        content.sound = nil
+        let request = UNNotificationRequest(
+            identifier: "moniswitch.failure.\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
     /// 实际构建并发送一条通知（私有，由 sendSwitchNotification 调度）。
     private func actuallySendNotification(kind: OpKind) {
         guard notificationsEnabled else { return }
