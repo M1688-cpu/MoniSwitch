@@ -108,11 +108,15 @@ final class PresetManager: ObservableObject {
     /// 监听它刷新面板——面板点击与全局热键两条路径共用本方法，热键路径下
     /// AppState 无法感知布局变化，不广播面板会停在旧布局。
     func apply(_ preset: Preset) {
-        let args = preset.screenArgs
+        let rawArgs = preset.screenArgs
         let settings = AppSettings.shared
         // apply 由 UI/热键回调触发（主线程），置位后再进后台队列。
         isApplying = true
         queue.async {
+            // id 漂移兜底：旧 persistent id 不在当前屏中时，按 分辨率+屏数
+            // 启发式重映射到当前屏（见 DisplayManager.remappedArgsIfDrifted）。
+            let current = self.manager.currentDisplays()
+            let args = self.manager.remappedArgsIfDrifted(rawArgs, current: current) ?? rawArgs
             _ = self.manager.applyArgs(args)
             // 预设回放常含镜像/res 变更，等系统重配稳定后再提交通知，
             // 否则 UNUserNotificationCenter 的投递会被重配窗口中断（通知不弹出）。

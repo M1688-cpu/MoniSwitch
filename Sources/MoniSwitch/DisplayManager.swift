@@ -314,6 +314,88 @@ final class DisplayManager {
             .joined(separator: ";")
     }
 
+    // MARK: - 预设 id 漂移兜底
+
+    /// 尝试把预设 args 里的旧 persistent id 重映射到当前屏，抵御 id 漂移。
+    ///
+    /// 背景：外接屏唤醒/重插拔/换屏后 displayplacer 的 persistent id 可能变化，
+    /// 导致预设里的旧 id 找不到屏、回放失效。兜底策略（保守，宁缺毋滥）：
+    ///   1. 所有旧 id 仍存在 → 无漂移，返回 nil（调用方按原 args 应用）；
+    ///   2. 旧 id 总数 ≠ 当前屏数 → 环境已实质变化，返回 nil（不猜）；
+    ///   3. 按条目匹配：分辨率一致的未分配屏中依序取用；镜像合并条目（id:A+B）
+    ///      按段逐一映射；分辨率全部对不上但剩余屏恰好一一对应时兜底直配。
+    ///   4. 任一条目无法完整匹配 → 返回 nil（按原样应用，行为与旧版一致）。
+    /// - Returns: 需要改写且能完整改写时返回新 args；否则 nil。
+    func remappedArgsIfDrifted(_ args: [String], current: [DisplayInfo]) -> [String]? {
+        guard !args.isEmpty, !current.isEmpty else { return nil }
+
+        // 每条 arg 的 (id 列表, 分辨率)
+        var entries: [(ids: [String], res: (Int, Int))] = []
+        for arg in args {
+            guard let ids = idTokens(of: arg), let res = resToken(of: arg) else { return nil }
+            entries.append((ids, res))
+        }
+
+        // 全部旧 id 仍有效 → 无漂移。
+        let currentIDs = Set(current.map(\.id))
+        let argIDs = entries.flatMap(\.ids)
+        guard !argIDs.allSatisfy({ currentIDs.contains($0) }) else { return nil }
+
+        // 屏数量必须一致（镜像合并条目的段数也计入），否则视为环境已实质变化。
+        guard argIDs.count == current.count else { return nil }
+
+        // 逐条目分配屏。
+        var used = Set<String>()
+        var mapping: [String: String] = [:]   // 旧 id → 新 id
+        for entry in entries {
+            var candidates = current.filter { !used.contains($0.id) && $0.resolution == entry.res }
+            if candidates.isEmpty {
+                // 分辨率也变了（如外接换了档位）：仅在剩余屏与条目段数恰好一一对应时兜底。
+                let rest = current.filter { !used.contains($0.id) }
+                guard entry.ids.count == rest.count else { return nil }
+                candidates = rest
+            }
+            guard candidates.count >= entry.ids.count else { return nil }
+            for (i, oldID) in entry.ids.enumerated() {
+                mapping[oldID] = candidates[i].id
+                used.insert(candidates[i].id)
+            }
+        }
+
+        // 改写每条 arg 的 id 段（其余字段原样保留）。
+        return args.map { replacingIDs(in: $0, mapping: mapping) }
+    }
+
+    /// 解析 arg 的 id 段：`id:A+B+C res:…` → ["A","B","C"]。
+    private func idTokens(of arg: String) -> [String]? {
+        guard arg.hasPrefix("id:") else { return nil }
+        let rest = arg.dropFirst(3)
+        let segment = rest.prefix(while: { $0 != " " })
+        let ids = segment.split(separator: "+").map(String.init)
+        return ids.isEmpty ? nil : ids
+    }
+
+    /// 解析 arg 的分辨率段：`… res:3440x1440 …` → (3440, 1440)。
+    private func resToken(of arg: String) -> (Int, Int)? {
+        guard let range = arg.range(of: "res:") else { return nil }
+        let segment = arg[range.upperBound...].prefix(while: { $0 != " " })
+        let parts = segment.split(separator: "x")
+        guard parts.count == 2, let w = Int(parts[0]), let h = Int(parts[1]) else { return nil }
+        return (w, h)
+    }
+
+    /// 把 arg 的 id 段按映射表替换（镜像合并结构 id:A+B 逐段替换），其余原样保留。
+    private func replacingIDs(in arg: String, mapping: [String: String]) -> String {
+        guard arg.hasPrefix("id:") else { return arg }
+        let rest = arg.dropFirst(3)
+        let segment = rest.prefix(while: { $0 != " " })
+        let tail = rest.dropFirst(segment.count)
+        let newIDs = segment
+            .split(separator: "+", omittingEmptySubsequences: false)
+            .map { mapping[String($0)] ?? String($0) }
+        return "id:" + newIDs.joined(separator: "+") + tail
+    }
+
     // MARK: - 操作
 
     /// 切换主显示器：把目标屏 origin 平移到 (0,0)，其余屏按相同向量平移，
