@@ -42,9 +42,8 @@ struct PanelView: View {
                 }
             } else {
                 primaryCard
-                if !state.displays.filter({ !$0.isBuiltIn }).isEmpty {
-                    arrangeCard
-                }
+                // 单内置屏时也显示：卡片退化为内置屏的分辨率/刷新率调节。
+                arrangeCard
                 if !presetManager.presets.isEmpty {
                     presetsCard
                 }
@@ -117,30 +116,46 @@ struct PanelView: View {
     // MARK: - 排列与镜像卡片
 
     /// 外接屏排列（每屏一行，可展开左/右移 + 刷新率）+ 镜像/扩展切换。
+    ///
+    /// 单内置屏（无外接）时卡片退化为「显示器调节」：只保留内置屏的分辨率/刷新率行，
+    /// 隐藏无意义的「位置」分段控件与镜像/扩展切换（标题与图标随之切换）。
     private var arrangeCard: some View {
-        BubbleCard(title: l10n.t(.panelArrange), systemImage: "arrow.left.and.right", accent: accent) {
+        let externals = state.displays.filter { !$0.isBuiltIn }
+        let hasExternals = !externals.isEmpty
+        return BubbleCard(title: hasExternals ? l10n.t(.panelArrange) : l10n.t(.panelDisplayAdjust),
+                          systemImage: hasExternals ? "arrow.left.and.right" : "slider.horizontal.3",
+                          accent: accent) {
             VStack(spacing: 2) {
-                // 排列对象随主屏身份切换（与原 menu 逻辑一致）：
-                //   外接是主屏 → 排列内置屏；否则逐个排列外接屏。
-                if state.externalIsMain, let builtIn = state.builtInDisplay {
+                if hasExternals {
+                    // 排列对象随主屏身份切换（与原 menu 逻辑一致）：
+                    //   外接是主屏 → 排列内置屏；否则逐个排列外接屏。
+                    if state.externalIsMain, let builtIn = state.builtInDisplay {
+                        ArrangementRow(display: builtIn,
+                                       state: state,
+                                       accent: accent,
+                                       label: builtIn.localizedTypeName(l10n: l10n))
+                    } else {
+                        ForEach(externals) { ext in
+                            ArrangementRow(display: ext,
+                                           state: state,
+                                           accent: accent,
+                                           label: ext.localizedTypeName(l10n: l10n))
+                        }
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    // 镜像 / 扩展：两个互斥按钮，当前态 Teal 高亮。
+                    // 操作对端随主屏身份切换（与原 menu 逻辑一致，避免 mirror(ext==main) 退化）。
+                    mirrorExtendRow
+                } else if let builtIn = state.builtInDisplay {
+                    // 单内置屏：无位置可排、无镜像对象，仅分辨率/刷新率。
                     ArrangementRow(display: builtIn,
                                    state: state,
                                    accent: accent,
-                                   label: builtIn.localizedTypeName(l10n: l10n))
-                } else {
-                    ForEach(state.displays.filter { !$0.isBuiltIn }) { ext in
-                        ArrangementRow(display: ext,
-                                       state: state,
-                                       accent: accent,
-                                       label: ext.localizedTypeName(l10n: l10n))
-                    }
+                                   label: builtIn.localizedTypeName(l10n: l10n),
+                                   showsPosition: false)
                 }
-
-                Divider().padding(.vertical, 4)
-
-                // 镜像 / 扩展：两个互斥按钮，当前态 Teal 高亮。
-                // 操作对端随主屏身份切换（与原 menu 逻辑一致，避免 mirror(ext==main) 退化）。
-                mirrorExtendRow
             }
         }
     }
@@ -221,7 +236,7 @@ struct PanelView: View {
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+                                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: BubbleMetrics.keycapCornerRadius))
                             }
                             Image(systemName: "play.fill")
                                 .font(.system(size: 10))
@@ -281,10 +296,8 @@ struct PanelView: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 6)
-        // 与气泡统一材质（thinMaterial）+ 阴影，使整列观感一致。
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        // 自适应淡描边：浅色下清晰勾边，深色下几乎不可见（不破坏深色观感）。
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+        // 与气泡统一材质（thinMaterial + 浅色叠白提亮）+ 描边 + 阴影，使整列观感一致。
+        .modifier(BubbleBackground())
         .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
     }
 
@@ -305,16 +318,16 @@ struct PanelView: View {
     }
 }
 
-// MARK: - 排列行（可展开左/右移 + 刷新率）
+// MARK: - 排列行（常驻左/右移 + 刷新率 + 分辨率）
 
-/// 单个屏的排列行：点击 chevron 展开左移/右移按钮与刷新率选择。
+/// 单个屏的排列行：标题行 + 位置分段控件、刷新率与分辨率「当前值 + 点击展开」选择。
+/// `showsPosition` 为 false 时隐藏位置行（单内置屏无左右可排）。
 private struct ArrangementRow: View {
     let display: DisplayInfo
     @ObservedObject var state: AppState
     let accent: Color
     let label: String
-
-    @State private var expanded = false
+    var showsPosition: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -328,102 +341,185 @@ private struct ArrangementRow: View {
                     .font(.system(size: 13))
                     .foregroundStyle(.primary)
                 Spacer()
-                if let side = state.side(of: display) {
-                    Text(side == .left ? "◀" : "▶")
-                        .font(.system(size: 10))
-                        .foregroundStyle(accent)
-                }
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
-                        .frame(width: 18, height: 18)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
             .padding(.vertical, 5)
             .padding(.horizontal, 4)
             .contentShape(Rectangle())
 
-            if expanded {
-                VStack(spacing: 6) {
-                    HStack(spacing: 8) {
-                        sideButton(.left)
-                        sideButton(.right)
-                        Spacer(minLength: 0)
+            // 表单风三行：位置（分段控件）/ 分辨率 / 刷新率，标题靠左、控件靠右对齐。
+            VStack(spacing: 2) {
+                if showsPosition {
+                    HStack {
+                        Text(state.localized(.positionLabel))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 12)
+                        sideSegmented
                     }
-                    if display.availableRefreshRates.count > 1 {
-                        refreshRateMenu
-                    }
+                    .padding(.vertical, 3)
                 }
-                .padding(.leading, 28)   // 与标题行文字对齐
-                .padding(.trailing, 4)
-                .padding(.bottom, 6)
+                // 分辨率选择：多于一个可选分辨率时才显示。
+                if display.availableResolutions.count > 1 {
+                    SelectionRow(
+                        title: state.localized(.resolutionMenu),
+                        currentValue: "\(display.resolution.width)×\(display.resolution.height)",
+                        accent: accent,
+                        options: display.availableResolutions.map { res in
+                            .init(text: "\(res.width)×\(res.height)",
+                                  isActive: (res.width == display.resolution.width
+                                             && res.height == display.resolution.height)) {
+                                state.setResolution(res, for: display)
+                            }
+                        }
+                    )
+                }
+                // 刷新率选择：当前分辨率下多于一个可选刷新率时才显示。
+                if display.availableRefreshRates.count > 1 {
+                    SelectionRow(
+                        title: state.localized(.refreshRateMenu),
+                        currentValue: "\(display.hertz) \(state.localized(.hertzLabel))",
+                        accent: accent,
+                        options: display.availableRefreshRates.map { hz in
+                            .init(text: "\(hz) \(state.localized(.hertzLabel))",
+                                  isActive: hz == display.hertz) {
+                                state.setRefreshRate(hz, for: display)
+                            }
+                        }
+                    )
+                }
             }
+            .padding(.leading, 24)   // 与标题行文字对齐：图标 frame 14 + spacing 10
+            .padding(.trailing, 4)
+            .padding(.bottom, 6)
         }
     }
 
-    /// 左移/右移胶囊按钮，当前生效侧 Teal 高亮。
-    private func sideButton(_ side: HorizontalSide) -> some View {
+    /// 位置分段控件：「◀ 左侧 | 右侧 ▶」，当前生效侧填充强调色，点击移动排列。
+    /// 当前侧未知（镜像中/重叠布局）时两段均不高亮。
+    private var sideSegmented: some View {
         let current = state.side(of: display)
-        let active = (current == side)
-        return Button {
+        return HStack(spacing: 2) {
+            sideSegment(.left, active: current == .left)
+            sideSegment(.right, active: current == .right)
+        }
+        .padding(2)
+        .background(
+            Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    /// 分段控件的单段：箭头指向移动方向，激活段强调色实心。
+    private func sideSegment(_ side: HorizontalSide, active: Bool) -> some View {
+        Button {
             state.moveArrangement(display, side: side)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: side == .left ? "arrow.left" : "arrow.right").font(.system(size: 10))
-                Text(side == .left ? state.localized(.moveLeft) : state.localized(.moveRight))
+            HStack(spacing: 3) {
+                if side == .left {
+                    Image(systemName: "arrow.left").font(.system(size: 9))
+                }
+                Text(side == .left ? state.localized(.sideLeft) : state.localized(.sideRight))
                     .font(.system(size: 11))
+                if side == .right {
+                    Image(systemName: "arrow.right").font(.system(size: 9))
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .frame(minWidth: 58)
+            .padding(.vertical, 3)
             .background {
                 if active {
                     Capsule().fill(accent)
-                } else {
-                    Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 1)
                 }
             }
             .foregroundStyle(active ? .white : .primary)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
+}
 
-    /// 刷新率选择：胶囊形态的横向选择条。
-    private var refreshRateMenu: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "gauge.medium")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            ForEach(display.availableRefreshRates, id: \.self) { hz in
-                let active = (hz == display.hertz)
-                Button {
-                    state.setRefreshRate(hz, for: display)
-                } label: {
-                    Text("\(hz)")
-                        .font(.system(size: 11, weight: active ? .semibold : .regular))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background {
-                            if active {
-                                Capsule().fill(accent)
-                            } else {
-                                Capsule().fill(Color.secondary.opacity(0.1))
-                            }
-                        }
-                        .foregroundStyle(active ? .white : .primary)
+/// 「当前值 + 点击展开」选择行：左侧标题，右侧当前值，点击整行在面板内展开选项列表。
+///
+/// 不能用原生 `Menu` 弹下拉：本面板位于 MenuBarExtra(.window) 的 borderless 弹出面板内，
+/// 系统菜单在这种窗口里会渲染成分离的空白窗口（macOS 系统级 bug，实测必现）。
+/// 故改为自绘行内展开：当前项前 ✓、行 hover 高亮、选项多时列表内滚动，与气泡卡片风格统一。
+private struct SelectionRow: View {
+    /// 一个可选项：显示文本 + 是否当前生效 + 选中时执行的操作。
+    struct Option {
+        let text: String
+        let isActive: Bool
+        let action: () -> Void
+    }
+
+    let title: String
+    let currentValue: String
+    let accent: Color
+    let options: [Option]
+
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 12)
+                    Text(currentValue)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.primary)
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .padding(.vertical, 3)
+                .hoverRowHighlight()
             }
-            Text(state.localized(.hertzLabel))
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
+            .buttonStyle(.plain)
+
+            if expanded {
+                // 展开列表：浅灰圆角底呈现「菜单浮层」感；选项多时内部滚动并限高，面板高度可控。
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(options.indices, id: \.self) { idx in
+                            optionRow(options[idx])
+                        }
+                    }
+                    .padding(3)
+                }
+                .frame(maxHeight: 216)
+                .background(
+                    RoundedRectangle(cornerRadius: BubbleMetrics.hoverCornerRadius)
+                        .fill(Color.secondary.opacity(0.08))
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
+    }
+
+    /// 单个选项行：当前项前 ✓（固定占位对齐），点击执行操作并收起。
+    private func optionRow(_ option: Option) -> some View {
+        Button {
+            option.action()
+            withAnimation(.easeInOut(duration: 0.15)) { expanded = false }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .opacity(option.isActive ? 1 : 0)
+                    .frame(width: 12)
+                Text(option.text)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 3)
+            .padding(.horizontal, 6)
+            .hoverRowHighlight()
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -533,7 +629,7 @@ private struct BubbleCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 10) {
             // 标题行：品牌蓝圆角方块图标 + 标题
             HStack(spacing: 9) {
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: BubbleMetrics.iconBadgeCornerRadius)
                     .fill(accent)
                     .frame(width: 22, height: 22)
                     .overlay(
@@ -549,9 +645,8 @@ private struct BubbleCard<Content: View>: View {
             content
         }
         .padding(16)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        // 自适应淡描边：浅色下清晰勾边，深色下几乎不可见（不破坏深色观感）。
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+        // 不透明填充（浅色纯白 / 深色卡片色）+ 自适应淡描边（与设置卡片同源）。
+        .modifier(BubbleBackground())
         // 四周悬浮阴影：气泡与原生毛玻璃背景拉开层次，呈现「浮于桌面之上」的观感。
         .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
     }
@@ -574,7 +669,7 @@ private struct HoverRowHighlightModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: BubbleMetrics.hoverCornerRadius)
                     .fill(accent.opacity(isHovered ? 0.14 : 0))
                     .animation(.easeInOut(duration: 0.12), value: isHovered)
             )

@@ -12,6 +12,7 @@ enum OpKind {
     case moveRight       // 移到主屏右侧
     case presetApplied   // 应用了布局预设
     case refreshRate     // 切换了刷新率
+    case resolution      // 切换了分辨率
 }
 
 /// 全局用户偏好（单例 + @Published + UserDefaults 持久化）。
@@ -176,7 +177,7 @@ final class AppSettings: ObservableObject {
         // 轻量操作（切主屏、左右移动、改刷新率）只改 origin，瞬时完成，立即提交。
         let needsDelay: Bool
         switch kind {
-        case .mirror, .extend, .presetApplied: needsDelay = true
+        case .mirror, .extend, .presetApplied, .resolution: needsDelay = true
         default: needsDelay = false
         }
 
@@ -201,6 +202,7 @@ final class AppSettings: ObservableObject {
         case .moveRight:      body = l10n.t(.notifMoveRight)
         case .presetApplied:  body = l10n.t(.notifPresetApplied)
         case .refreshRate:    body = l10n.t(.notifRefreshRate)
+        case .resolution:     body = l10n.t(.notifResolution)
         }
 
         let content = UNMutableNotificationContent()

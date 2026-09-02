@@ -29,51 +29,53 @@
 
 ## 截图
 
+> 界面语言一键切换（中文 / English），下列截图以中文界面为准。
+
 <table>
   <tr>
-    <th width="50%">中文</th>
-    <th width="50%">English</th>
+    <td align="center">
+      <img src="screenshots/zh/panel-overview.png" alt="面板全貌">
+      <br><b>面板全貌</b> · 主屏切换 / 排列与镜像 / 预设 / 布局预览 / 底部工具栏
+      <br><sub>气泡卡片面板，跟随系统强调色</sub>
+    </td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><b>面板全貌</b> · 主屏切换 / 排列与镜像 / 预设 / 布局预览 / 底部工具栏<br><sub>气泡卡片面板，跟随系统强调色</sub></td>
+    <td align="center">
+      <img src="screenshots/zh/panel-arrange.png" alt="排列展开">
+      <br><b>排列展开</b> · 左/右移动 + 刷新率切换 + 镜像/扩展
+      <br><sub>展开外接屏行，露出胶囊按钮</sub>
+    </td>
   </tr>
   <tr>
-    <td width="50%" align="center"><img src="screenshots/zh/panel-overview.png" alt="面板全貌（中文）"></td>
-    <td width="50%" align="center"><img src="screenshots/en/panel-overview.png" alt="Panel overview (English)"></td>
+    <td align="center">
+      <img src="screenshots/zh/settings-general.png" width="420" alt="设置-通用">
+      <br><b>设置 — 通用</b> · 语言 / 自启动 / 自动刷新 / 通知
+      <br><sub>开启自动刷新后显示刷新间隔选择器</sub>
+    </td>
   </tr>
   <tr>
-    <td colspan="2" align="center"><b>排列展开</b> · 左/右移动 + 刷新率切换 + 镜像/扩展<br><sub>展开外接屏行，露出胶囊按钮</sub></td>
+    <td align="center">
+      <img src="screenshots/zh/settings-presets.png" width="420" alt="设置-预设">
+      <br><b>设置 — 预设</b> · 保存 / 应用 / 删除 + 全局快捷键绑定
+      <br><sub>每个预设可录制一个快捷键（Esc 取消）</sub>
+    </td>
   </tr>
   <tr>
-    <td width="50%" align="center"><img src="screenshots/zh/panel-arrange.png" alt="排列展开（中文）"></td>
-    <td width="50%" align="center"><img src="screenshots/en/panel-arrange.png" alt="Arrange detail (English)"></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><b>设置 — 通用</b> · 语言 / 自启动 / 自动刷新 / 通知<br><sub>开启自动刷新后显示刷新间隔选择器</sub></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center"><img src="screenshots/zh/settings-general.png" width="360" alt="设置-通用（中文）"></td>
-    <td width="50%" align="center"><img src="screenshots/en/settings-general.png" width="360" alt="Settings — General (English)"></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><b>设置 — 预设</b> · 保存 / 应用 / 删除 + 全局快捷键绑定<br><sub>每个预设可录制一个快捷键（Esc 取消）</sub></td>
-  </tr>
-  <tr>
-    <td width="50%" align="center"><img src="screenshots/zh/settings-presets.png" width="360" alt="设置-预设（中文）"></td>
-    <td width="50%" align="center"><img src="screenshots/en/settings-presets.png" width="360" alt="Settings — Presets (English)"></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><b>设置 — 关于</b> · 图标 / 简介 / 版本号</td>
-  </tr>
-  <tr>
-    <td width="50%" align="center"><img src="screenshots/zh/settings-about.png" width="360" alt="设置-关于（中文）"></td>
-    <td width="50%" align="center"><img src="screenshots/en/settings-about.png" width="360" alt="Settings — About (English)"></td>
+    <td align="center">
+      <img src="screenshots/zh/settings-about.png" width="420" alt="设置-关于">
+      <br><b>设置 — 关于</b> · 图标 / 简介 / 版本号
+    </td>
   </tr>
 </table>
 
 ## 安装
 
 ### 方式一：下载 DMG（普通用户推荐）
+
+<p align="center">
+  <img src="screenshots/dmg-install.png" width="560" alt="DMG 拖拽安装">
+  <br><sub>双击打开 DMG，把左边的 MoniSwitch 拖到右边的 Applications</sub>
+</p>
 
 1. 前往 [Releases 页面](../../releases)，下载最新的 `MoniSwitch.dmg`
 2. 双击打开，把 **MoniSwitch** 拖入 **Applications** 文件夹

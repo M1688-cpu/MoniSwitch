@@ -102,18 +102,66 @@ echo ""
 # ---------- 5. 生成 DMG ----------
 echo "▶ [5/6] 生成 $APP_NAME.dmg ..."
 
-# 准备 DMG 暂存目录：.app + /Applications 拖拽安装软链接
+# 准备 DMG 暂存目录：.app + /Applications 拖拽安装软链接 + 隐藏背景图
 DMG_STAGING="$PROJECT_DIR/dmg-staging"
 rm -rf "$DMG_STAGING"
 mkdir -p "$DMG_STAGING"
 cp -R "$APP_BUNDLE" "$DMG_STAGING/"
 ln -s /Applications "$DMG_STAGING/Applications"
 
-# 先建可读写 DMG，再转换为压缩只读 DMG（标准做法）
+# 背景图打进 .background/ 隐藏目录（若不存在则跳过，退化为无背景 DMG）
+DMG_BG_SOURCE="$PROJECT_DIR/Resources/dmg-background.png"
+if [ -f "$DMG_BG_SOURCE" ]; then
+    mkdir -p "$DMG_STAGING/.background"
+    cp "$DMG_BG_SOURCE" "$DMG_STAGING/.background/dmg-background.png"
+    echo "  ✓ 接入背景图: dmg-background.png"
+else
+    echo "  ⚠ 未找到 Resources/dmg-background.png，将生成无背景 DMG"
+fi
+
+# 先建可读写 DMG，再设置 Finder 视图，最后转换为压缩只读 DMG
 RW_DMG="$STAGING_DIR/$APP_NAME.tmp.dmg"
 hdiutil create -volname "$APP_NAME" -fs HFS+ \
     -srcfolder "$DMG_STAGING" -format UDRW \
     -ov "$RW_DMG" 2>&1 | tail -2
+
+# ---- 用 AppleScript 设置 Finder 视图元数据（背景 / 窗口大小 / 图标位置）----
+# 关键经验（曾导致背景与图标位置全部丢失）：
+#   1. 不能用 -mountpoint 自定义挂载点 → Finder 不会往自定义路径的卷写 .DS_Store。
+#      必须默认挂载到 /Volumes/<卷名>，Finder 才会把视图元数据刷盘。
+#   2. 不能在 tell disk 块里把 POSIX file "..." as alias 直接当背景赋值
+#      （HFS 路径冒号会被 Finder 误解，报 -1700）。需先在块外解析成变量再传入。
+VOLUME="/Volumes/$APP_NAME"
+# 若该卷名已被占用（残留挂载），先尝试卸载
+hdiutil detach "$VOLUME" -force -quiet 2>/dev/null || true
+hdiutil attach "$RW_DMG" -quiet
+
+BG_PATH="$VOLUME/.background/dmg-background.png"
+
+osascript <<APPLESCRIPT
+set bgFile to POSIX file "$BG_PATH"
+tell application "Finder"
+    activate
+    tell disk "$APP_NAME"
+        open
+        delay 2
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set the bounds of container window to {0, 0, 660, 400}
+        set theViewOptions to icon view options of container window
+        set arrangement of theViewOptions to not arranged
+        set icon size of theViewOptions to 128
+        set background picture of theViewOptions to bgFile
+        set position of item "$APP_NAME" of container window to {140, 180}
+        set position of item "Applications" of container window to {480, 180}
+    end tell
+end tell
+APPLESCRIPT
+
+# 给 Finder 一点时间把 .DS_Store 刷盘，再卸载
+sleep 2
+hdiutil detach "$VOLUME" -quiet 2>&1 || hdiutil detach "$VOLUME" -force -quiet 2>&1 || true
 
 hdiutil convert "$RW_DMG" \
     -format UDZO -imagekey zlib-level=9 \

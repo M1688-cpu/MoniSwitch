@@ -174,6 +174,8 @@ final class DisplayManager {
         // 解析当前分辨率下可选的刷新率：从 "Resolutions for rotation" 段的
         // "mode N: res:WxH hz:X" 行里，筛出与当前分辨率相同的模式，收集 hz 去重升序。
         let availableRates = parseRefreshRates(for: resolution, in: block)
+        // 解析该屏所有可选分辨率（去重，保持首次出现顺序）。
+        let availableResolutions = parseResolutions(in: block)
 
         return DisplayInfo(
             id: cleanID,
@@ -186,8 +188,33 @@ final class DisplayManager {
             colorDepth: colorDepth,
             degree: degree,
             enabled: enabled,
-            availableRefreshRates: availableRates
+            availableRefreshRates: availableRates,
+            availableResolutions: availableResolutions
         )
+    }
+
+    /// 解析屏块里出现的所有分辨率（去重，保持 displayplacer 输出顺序）。
+    /// 解析 "mode N: res:WxH hz:X" 行，收集全部 (W,H)，不去重为单维度，按 "WxH" 字符串去重。
+    private func parseResolutions(in block: String) -> [(width: Int, height: Int)] {
+        // 与 parseRefreshRates 共用正则，但不过滤当前分辨率。
+        let pattern = #"res:(\d+)x(\d+)\s+hz:(\d+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
+        let range = NSRange(block.startIndex..., in: block)
+        var seen = Set<String>()
+        var result: [(width: Int, height: Int)] = []
+        regex.enumerateMatches(in: block, options: [], range: range) { match, _, _ in
+            guard let match,
+                  let wRange = Range(match.range(at: 1), in: block),
+                  let hRange = Range(match.range(at: 2), in: block) else { return }
+            let w = Int(block[wRange]) ?? 0
+            let h = Int(block[hRange]) ?? 0
+            guard w > 0, h > 0 else { return }
+            let key = "\(w)x\(h)"
+            guard !seen.contains(key) else { return }
+            seen.insert(key)
+            result.append((width: w, height: h))
+        }
+        return result
     }
 
     /// 从屏块里解析与指定分辨率匹配的所有刷新率。
@@ -444,6 +471,31 @@ final class DisplayManager {
                 id: d.id,
                 res: d.resolution,
                 hz: d.id == display.id ? hz : d.hertz,
+                colorDepth: d.colorDepth,
+                scaling: d.scalingOn,
+                origin: d.origin,
+                degree: d.degree
+            )
+        }
+        return runConfig(args)
+    }
+
+    /// 切换某块屏的分辨率，其余屏保持不变。
+    ///
+    /// 实现方式：遍历所有屏生成 args，仅目标屏用新的 res（刷新率/位置等不变）。
+    /// 注意：切换分辨率后该屏的可用刷新率集合可能变化，UI 刷新会通过 currentDisplays() 重读得到。
+    /// - Parameters:
+    ///   - res: 目标分辨率。
+    ///   - display: 要切换分辨率的屏。
+    ///   - displays: 当前完整屏幕列表。
+    /// - Returns: 是否执行成功。
+    @discardableResult
+    func setResolution(_ res: (width: Int, height: Int), for display: DisplayInfo, in displays: [DisplayInfo]) -> Bool {
+        let args = displays.map { d -> String in
+            makeScreenArg(
+                id: d.id,
+                res: d.id == display.id ? res : d.resolution,
+                hz: d.hertz,
                 colorDepth: d.colorDepth,
                 scaling: d.scalingOn,
                 origin: d.origin,

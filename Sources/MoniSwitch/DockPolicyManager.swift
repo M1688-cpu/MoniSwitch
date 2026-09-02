@@ -11,16 +11,11 @@ import SwiftUI
 ///   - 打开设置时：临时切到 `.regular` → Dock 出现图标、App 成为前台
 ///   - 用自己管理的 NSWindow 承载设置界面（不依赖脆弱的 Settings 场景）
 ///   - 设置窗口关闭后：切回 `.accessory` → Dock 图标消失
-final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
+final class DockPolicyManager: NSObject, NSWindowDelegate {
 
     static let shared = DockPolicyManager()
 
     private var settingsWindow: NSWindow?
-
-    /// 工具栏居中标题项的标识符（承载"设置"文字）。
-    private let titleItemIdentifier = NSToolbarItem.Identifier("SettingsTitleItem")
-    /// 工具栏居中标题文案，在 openSettings 时设置。
-    private var toolbarTitle: String = ""
 
     private override init() { super.init() }
 
@@ -48,28 +43,21 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
             let hosting = NSHostingController(rootView: rootView)
 
             let window = NSWindow(contentViewController: hosting)
-            // 注意：不设置 window.title，避免 NavigationSplitView 继承窗口标题
-            // 并在边栏/内容区重复显示——标题统一由下方 NSToolbar 的居中项承担。
+            // 注意：不设置 window.title，避免 NavigationSplitView 继承窗口标题。
             window.title = ""
-            // 固定尺寸窗口（520×720，竖向）；用 fullSizeContentView 让内容延伸到标题栏下方
+            // 固定尺寸窗口（680×760，横向更宽）；用 fullSizeContentView 让内容延伸到标题栏下方。
             window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
-            window.titlebarAppearsTransparent = false
+            // 透明标题栏：去掉顶部"设置"白色条，让 NavigationSplitView 的边栏毛玻璃向上贯通
+            // 覆盖整个标题区（红绿灯按钮浮在毛玻璃上），对齐系统设置/图二图三的无标题观感。
+            // 标题改由右侧内容区顶部的「图标 + 已选功能名」承担（见 SettingsView.DetailHeader）。
+            window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
-            // 用 NSToolbar 承载居中标题：principal 项 + centeredItem，
-            // 使"设置"相对整窗水平居中（覆盖边栏+内容区），与系统设置/Finder 一致。
-            toolbarTitle = l10n.t(.settingsTitle)
-            let toolbar = NSToolbar(identifier: "SettingsToolbar")
-            toolbar.delegate = self
-            toolbar.displayMode = .labelOnly
-            toolbar.showsBaselineSeparator = false
-            window.toolbar = toolbar
-            // centeredItemIdentifiers 让该标题项相对整窗水平居中（macOS 13+）。
-            toolbar.centeredItemIdentifiers = [titleItemIdentifier]
-            window.setContentSize(NSSize(width: 520, height: 720))
+            window.setContentSize(NSSize(width: 680, height: 760))
             // 锁死尺寸，不可拉伸。三处必须同步：只改 setContentSize 会被 maxSize 钳回。
-            window.minSize = NSSize(width: 520, height: 720)
-            window.maxSize = NSSize(width: 520, height: 720)
-            window.isMovableByWindowBackground = true
+            window.minSize = NSSize(width: 680, height: 760)
+            window.maxSize = NSSize(width: 680, height: 760)
+            // 仅允许在原生标题栏（红绿灯按钮条）拖动窗口，避免边栏/内容区背景任意拖动。
+            window.isMovableByWindowBackground = false
             window.isReleasedWhenClosed = false   // 复用窗口对象
             window.center()
             window.delegate = self                 // 监听关闭事件
@@ -80,11 +68,8 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        // 4) 把 NavigationSplitView 自带的分割线设为细线样式，
-        //    避免默认粗分割线在边栏处显示异常光标（可拖拽提示）。
-        if let splitView = settingsWindow?.contentView?.findFirst(NSSplitView.self) {
-            splitView.dividerStyle = .thin
-        }
+        // 4) 边栏与内容区的分界由 SettingsView 用 HStack 中间一条自绘深灰竖线承担
+        //    （颜色可控）。已弃用 NavigationSplitView，无 NSSplitView 分隔线需要处理。
     }
 
     // MARK: - NSWindowDelegate
@@ -101,66 +86,5 @@ final class DockPolicyManager: NSObject, NSWindowDelegate, NSToolbarDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             NSApp.setActivationPolicy(.accessory)
         }
-    }
-}
-
-// MARK: - NSToolbarDelegate
-
-extension DockPolicyManager {
-
-    /// 工具栏只含一个居中标题项。
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [titleItemIdentifier]
-    }
-
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [titleItemIdentifier]
-    }
-
-    /// 创建居中标题项：用 NSToolbarItem(groupContaining:) 包一层，
-    /// 内部放居中的标题标签——这是让标题在工具栏里水平居中的稳妥写法。
-    func toolbar(_ toolbar: NSToolbar,
-                 itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
-                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        guard itemIdentifier == titleItemIdentifier else { return nil }
-
-        let label = NSTextField(labelWithString: toolbarTitle)
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
-        label.alignment = .center
-        label.textColor = .labelColor
-        label.isBezeled = false
-        label.drawsBackground = false
-        label.isEditable = false
-        label.isSelectable = false
-
-        let container = NSStackView(views: [label])
-        container.orientation = .horizontal
-        container.alignment = .centerY
-        container.edgeInsets = NSEdgeInsets(top: 2, left: 0, bottom: 2, right: 0)
-
-        let group = NSToolbarItem(itemIdentifier: itemIdentifier)
-        group.view = container
-        // label 留空：displayMode=.labelOnly 时若 label 非空会额外渲染文字，
-        // 导致标题重复。居中标题完全由上面的 container 承载。
-        group.label = ""
-        group.paletteLabel = ""
-        group.toolTip = nil
-        // 去掉 Sonoma/Sequoia 给自定义 view 项默认渲染的 pill/圆角背景。
-        // 自 macOS 13 起可用，正好匹配本项目最低版本。
-        group.isBordered = false
-        return group
-    }
-}
-
-// MARK: - NSView 辅助
-
-private extension NSView {
-    /// 深度优先递归查找第一个指定类型的子视图。
-    func findFirst<T: NSView>(_ type: T.Type) -> T? {
-        if let match = self as? T { return match }
-        for sub in subviews {
-            if let found = sub.findFirst(type) { return found }
-        }
-        return nil
     }
 }

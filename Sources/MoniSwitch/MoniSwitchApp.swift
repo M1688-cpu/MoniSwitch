@@ -180,6 +180,13 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// 切换某屏分辨率。
+    func setResolution(_ res: (width: Int, height: Int), for display: DisplayInfo) {
+        runOp(kind: .resolution) { [self, displays] in
+            manager.setResolution(res, for: display, in: displays)
+        }
+    }
+
     // MARK: - 状态查询（供菜单显示 ✓ 标记用）
 
     /// 外接屏是否为主屏（决定菜单显示哪个屏的排列项）。
@@ -213,14 +220,30 @@ final class AppState: ObservableObject {
 
     /// 在后台执行一个切换操作，完成后刷新列表；成功时发通知。
     /// - Parameter kind: 操作类型，决定切换完成通知的正文文案。
+    ///
+    /// 高亮不跟随的根因：displayplacer 进程退出 ≠ 系统显示器配置已生效。
+    /// CoreGraphics 对 origin/hertz/res 的系统级重配是异步的（AGENTS.md 记录镜像类
+    /// 重配耗时约 1.2-1.5s；origin/hertz 变更更短，但仍有数百毫秒窗口）。
+    /// 若在 work() 返回后立即 currentDisplays()，会读到重配未完成时的旧值，
+    /// 表现为面板高光停在旧选项。修复：延迟 0.4s 再读。
     private func runOp(kind: OpKind, work: @escaping () -> Bool) {
         queue.async { [weak self] in
             let ok = work()
-            let list = self?.manager.currentDisplays() ?? []
-            DispatchQueue.main.async {
-                self?.displays = list
-                if ok {
-                    self?.settings.sendSwitchNotification(kind)
+            // 临时诊断日志：对比 work 前后目标屏的关键字段，确认重配时序。
+            // 根因确认、延迟值定稿后可移除。
+            let before = self?.manager.currentDisplays() ?? []
+            self?.queue.asyncAfter(deadline: .now() + 0.4) {
+                let list = self?.manager.currentDisplays() ?? []
+                #if DEBUG
+                let b = before.first(where: { $0.isMain == false }) ?? before.first
+                let a = list.first(where: { $0.isMain == false }) ?? list.first
+                print("[runOp] kind=\(kind) before=\(b?.hertz ?? -1)hz \(b?.resolution.width ?? 0)x\(b?.resolution.height ?? 0) origin=\(b?.origin.x ?? 0) → after=\(a?.hertz ?? -1)hz \(a?.resolution.width ?? 0)x\(a?.resolution.height ?? 0) origin=\(a?.origin.x ?? 0)")
+                #endif
+                DispatchQueue.main.async {
+                    self?.displays = list
+                    if ok {
+                        self?.settings.sendSwitchNotification(kind)
+                    }
                 }
             }
         }

@@ -21,8 +21,9 @@ enum TextKey: String {
     case displaysSection        = "displaysSection"        // 主显示器
     case noDisplays             = "noDisplays"             // 未检测到显示器
     case externalSection        = "externalSection"        // 扩展显示器
-    case moveLeft               = "moveLeft"               // 移到主屏左侧
-    case moveRight              = "moveRight"              // 移到主屏右侧
+    case positionLabel          = "positionLabel"          // 位置（排列表单行标题）
+    case sideLeft               = "sideLeft"               // 左侧（位置分段控件）
+    case sideRight              = "sideRight"              // 右侧（位置分段控件）
     case mirrorMain             = "mirrorMain"             // 镜像主屏
     case extendDisplay          = "extendDisplay"          // 扩展显示
     case refreshList            = "refreshList"            // 刷新列表
@@ -67,6 +68,7 @@ enum TextKey: String {
     case notifMoveRight         = "notifMoveRight"         // 已移到主屏右侧
     case notifPresetApplied     = "notifPresetApplied"     // 已应用预设
     case notifRefreshRate       = "notifRefreshRate"       // 已切换刷新率
+    case notifResolution        = "notifResolution"        // 已切换分辨率
 
     // 设置 - 预设
     case tabPresets             = "tabPresets"             // 预设
@@ -91,8 +93,12 @@ enum TextKey: String {
     case refreshRateMenu        = "refreshRateMenu"        // 刷新率
     case hertzLabel             = "hertzLabel"             // Hz
 
+    // 菜单 - 分辨率
+    case resolutionMenu         = "resolutionMenu"         // 分辨率
+
     // 面板气泡卡片（.window 样式专用）
     case panelArrange           = "panelArrange"           // 排列与镜像
+    case panelDisplayAdjust     = "panelDisplayAdjust"     // 显示器调节（单内置屏时的卡片标题）
     case panelLayoutPreview     = "panelLayoutPreview"     // 布局预览
     case panelScreenPreview     = "panelScreenPreview"     // 画面预览：即将推出
     case panelPrimaryBadge      = "panelPrimaryBadge"      // 主屏
@@ -130,8 +136,9 @@ final class L10n: ObservableObject {
         .displaysSection:  [.zh: "主显示器",                      .en: "Primary display"],
         .noDisplays:       [.zh: "未检测到显示器",                .en: "No displays detected"],
         .externalSection:  [.zh: "扩展显示器",                    .en: "Extended displays"],
-        .moveLeft:         [.zh: "移到主屏左侧",                  .en: "Move to left of main"],
-        .moveRight:        [.zh: "移到主屏右侧",                  .en: "Move to right of main"],
+        .positionLabel:    [.zh: "位置",                        .en: "Position"],
+        .sideLeft:         [.zh: "左侧",                        .en: "Left"],
+        .sideRight:        [.zh: "右侧",                        .en: "Right"],
         .mirrorMain:       [.zh: "镜像主屏",                      .en: "Mirror main display"],
         .extendDisplay:    [.zh: "扩展显示",                      .en: "Extend display"],
         .refreshList:      [.zh: "刷新列表",                      .en: "Refresh list"],
@@ -170,6 +177,7 @@ final class L10n: ObservableObject {
         .notifMoveRight:   [.zh: "已移到主屏右侧",                .en: "Moved to the right of main"],
         .notifPresetApplied:[.zh: "已应用预设",                   .en: "Preset applied"],
         .notifRefreshRate:  [.zh: "已切换刷新率",                 .en: "Refresh rate changed"],
+        .notifResolution:   [.zh: "已切换分辨率",                 .en: "Resolution changed"],
 
         .tabPresets:       [.zh: "预设",                          .en: "Presets"],
         .groupPresets:     [.zh: "预设",                          .en: "Presets"],
@@ -190,8 +198,10 @@ final class L10n: ObservableObject {
 
         .refreshRateMenu:  [.zh: "刷新率",                        .en: "Refresh Rate"],
         .hertzLabel:       [.zh: "Hz",                            .en: "Hz"],
+        .resolutionMenu:   [.zh: "分辨率",                        .en: "Resolution"],
 
         .panelArrange:     [.zh: "排列与镜像",                    .en: "Arrange & Mirror"],
+        .panelDisplayAdjust: [.zh: "显示器调节",                  .en: "Display Adjustment"],
         .panelLayoutPreview:[.zh: "布局预览",                     .en: "Layout"],
         .panelScreenPreview:[.zh: "画面预览：即将推出",            .en: "Live preview: coming soon"],
         .panelPrimaryBadge:[.zh: "主屏",                          .en: "Main"],

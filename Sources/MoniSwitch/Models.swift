@@ -30,6 +30,10 @@ struct DisplayInfo: Identifiable, Equatable {
     /// 只保留与当前分辨率相同的模式的 hz。空数组表示无多选项（或未解析）。
     var availableRefreshRates: [Int]
 
+    /// 该屏所有可选分辨率（去重，保持 displayplacer 输出顺序），用于菜单切换分辨率。
+    /// 从 "Resolutions for rotation" 段解析。空数组表示无多选项（或未解析）。
+    var availableResolutions: [(width: Int, height: Int)]
+
     /// 是否为笔记本内置屏（displayplacer 的 Type 里包含 "built in"）
     var isBuiltIn: Bool {
         typeName.localizedCaseInsensitiveContains("built in")
