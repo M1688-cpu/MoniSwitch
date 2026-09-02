@@ -1,20 +1,11 @@
 import SwiftUI
 import AppKit
 
-/// 强调色：跟随 macOS 系统强调色（系统设置 > 外观 > 强调色）。
-///
-/// 不再使用自定义品牌蓝：改读 `NSColor.controlAccentColor`（动态色），
-/// 用户在「系统设置 > 外观」切换强调色时本界面实时刷新。
-/// 项目约定「纯 SPM、无 xcassets」，故不引入 AccentColor.colorset，直接桥接 AppKit 动态色。
-enum BrandColor {
-    static var accent: Color { Color(NSColor.controlAccentColor) }
-}
-
 /// 菜单栏下拉面板（`.window` 样式）：按参考图做成分栏「气泡卡片」。
 ///
 /// 与原 `.menu` 样式相比，这里是一块可完全自定义的 SwiftUI 视图：
-///   - 每个功能分栏是一张圆角气泡卡片（`BubbleCard`）；
-///   - 强调色统一品牌蓝（取自 App 图标，见 BrandColor）；
+///   - 每个功能分栏是一张圆角气泡卡片（`BubbleCard`，Components.swift）；
+///   - 强调色跟随系统（`BrandColor.accent`，Components.swift）；
 ///   - 所有切换操作复用 `AppState` / `PresetManager` 的现有逻辑，只改触发控件形态。
 ///
 /// 卡片顺序：主显示器 → 排列与镜像 → 布局预设 → 布局预览 → 底部工具栏。
@@ -25,17 +16,17 @@ struct PanelView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var presetManager: PresetManager
 
-    /// 品牌强调色（取自 App 图标主色）。
+    /// 系统强调色（跟随「系统设置 > 外观 > 强调色」实时变化）。
     private let accent = BrandColor.accent
 
     var body: some View {
         // 不用 ScrollView：所有气泡卡片一次性全部展开，不滚动。
-        VStack(spacing: 14) {
+        VStack(spacing: BubbleMetrics.cardSpacing) {
             if state.displays.isEmpty {
                 // 无显示器：只放一张提示卡。
                 BubbleCard(title: l10n.t(.displaysSection), systemImage: "display", accent: accent) {
                     Text(l10n.t(.noDisplays))
-                        .font(.system(size: 13))
+                        .font(.system(size: BubbleMetrics.fontBody))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 16)
@@ -54,50 +45,43 @@ struct PanelView: View {
         .padding(14)
         // 只锁宽度，高度按内容自适应（气泡全展开）。
         .frame(minWidth: 380, idealWidth: 380, maxWidth: 380)
-        // 不再叠加自定义背景层：气泡（thinMaterial）直接浮在 MenuBarExtra(.window) 原生
-        // popover 的毛玻璃上，整体更通透、不再发灰。气泡四周各自带阴影呈现悬浮层次。
+        // 不再叠加自定义背景层：气泡直接浮在 MenuBarExtra(.window) 原生 popover 的
+        // 毛玻璃上，气泡四周各自带阴影呈现悬浮层次。
     }
 
     // MARK: - 主显示器卡片
 
-    /// 主显示器列表：每块屏一行，点击即设为主屏，主屏行带 Teal 勾选 + 角标。
+    /// 主显示器列表：每块屏一行，点击即设为主屏，主屏行带强调色角标。
     private var primaryCard: some View {
         BubbleCard(title: l10n.t(.displaysSection), systemImage: "display", accent: accent) {
-            VStack(spacing: 2) {
+            VStack(spacing: BubbleMetrics.rowSpacing) {
                 ForEach(state.displays) { d in
-                    Button {
-                        state.setPrimary(d)
-                    } label: {
+                    RowButton(action: { state.setPrimary(d) }) {
                         HStack(spacing: 10) {
-                            // 主屏用实心 Teal 圆点，非主屏用空心圆。
+                            // 主屏用实心强调色圆点，非主屏用空心圆。
                             Image(systemName: d.isMain ? "circle.fill" : "circle")
-                                .font(.system(size: 10))
+                                .font(.system(size: BubbleMetrics.fontMini))
                                 .foregroundStyle(d.isMain ? accent : Color.secondary.opacity(0.4))
                                 .frame(width: 14)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(d.localizedTypeName(l10n: l10n))
-                                    .font(.system(size: 13, weight: d.isMain ? .semibold : .regular))
+                                    .font(.system(size: BubbleMetrics.fontBody, weight: d.isMain ? .semibold : .regular))
                                     .foregroundStyle(.primary)
                                 Text(subtitle(for: d))
-                                    .font(.system(size: 11))
+                                    .font(.system(size: BubbleMetrics.fontCaption))
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
                             if d.isMain {
                                 Text(l10n.t(.panelPrimaryBadge))
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(.system(size: BubbleMetrics.fontMini, weight: .medium))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(accent, in: Capsule())
                             }
                         }
-                        .contentShape(Rectangle())
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 4)
-                        .hoverRowHighlight()
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -125,7 +109,7 @@ struct PanelView: View {
         return BubbleCard(title: hasExternals ? l10n.t(.panelArrange) : l10n.t(.panelDisplayAdjust),
                           systemImage: hasExternals ? "arrow.left.and.right" : "slider.horizontal.3",
                           accent: accent) {
-            VStack(spacing: 2) {
+            VStack(spacing: BubbleMetrics.rowSpacing) {
                 if hasExternals {
                     // 排列对象随主屏身份切换（与原 menu 逻辑一致）：
                     //   外接是主屏 → 排列内置屏；否则逐个排列外接屏。
@@ -145,7 +129,7 @@ struct PanelView: View {
 
                     Divider().padding(.vertical, 4)
 
-                    // 镜像 / 扩展：两个互斥按钮，当前态 Teal 高亮。
+                    // 镜像 / 扩展：两个互斥按钮，当前态强调色高亮。
                     // 操作对端随主屏身份切换（与原 menu 逻辑一致，避免 mirror(ext==main) 退化）。
                     mirrorExtendRow
                 } else if let builtIn = state.builtInDisplay {
@@ -171,43 +155,31 @@ struct PanelView: View {
             : externals.first
 
         return HStack(spacing: 8) {
-            Button {
-                if let peer { state.mirror(peer) }
-            } label: {
-                pillLabel(l10n.t(.mirrorMain), systemImage: "rectangle.on.rectangle",
-                          active: isMirroring)
+            ActivePill(active: isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
+                HStack(spacing: 5) {
+                    Image(systemName: "rectangle.on.rectangle").font(.system(size: BubbleMetrics.fontCaption))
+                    Text(l10n.t(.mirrorMain)).font(.system(size: BubbleMetrics.fontControl, weight: isMirroring ? .semibold : .regular))
+                }
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .asButton {
+                if let peer { state.mirror(peer) }
+            }
             .disabled(peer == nil)
 
-            Button {
-                if let peer { state.unmirror(peer) }
-            } label: {
-                pillLabel(l10n.t(.extendDisplay), systemImage: "rectangle.dashed",
-                          active: !isMirroring)
+            ActivePill(active: !isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
+                HStack(spacing: 5) {
+                    Image(systemName: "rectangle.dashed").font(.system(size: BubbleMetrics.fontCaption))
+                    Text(l10n.t(.extendDisplay)).font(.system(size: BubbleMetrics.fontControl, weight: !isMirroring ? .semibold : .regular))
+                }
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .asButton {
+                if let peer { state.unmirror(peer) }
+            }
             .disabled(peer == nil)
         }
         .padding(.top, 2)
-    }
-
-    /// 镜像/扩展胶囊按钮：激活态 Teal 实心，非激活态描边。
-    private func pillLabel(_ text: String, systemImage: String, active: Bool) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: systemImage).font(.system(size: 11))
-            Text(text).font(.system(size: 12, weight: active ? .semibold : .regular))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
-        .background {
-            if active {
-                Capsule().fill(accent)
-            } else {
-                Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-            }
-        }
-        .foregroundStyle(active ? .white : .primary)
     }
 
     // MARK: - 布局预设卡片
@@ -215,65 +187,45 @@ struct PanelView: View {
     /// 已保存预设：每条一行（名称 + 快捷键角标 + 应用按钮）。
     private var presetsCard: some View {
         BubbleCard(title: l10n.t(.groupPresets), systemImage: "square.stack", accent: accent) {
-            VStack(spacing: 2) {
+            VStack(spacing: BubbleMetrics.rowSpacing) {
                 ForEach(presetManager.presets) { preset in
-                    Button {
-                        presetManager.apply(preset)
-                    } label: {
+                    RowButton(action: { presetManager.apply(preset) }) {
                         HStack(spacing: 10) {
                             Image(systemName: "square.stack")
-                                .font(.system(size: 12))
+                                .font(.system(size: BubbleMetrics.fontControl))
                                 .foregroundStyle(.secondary)
                                 .frame(width: 14)
                             Text(preset.name)
-                                .font(.system(size: 13))
+                                .font(.system(size: BubbleMetrics.fontBody))
                                 .foregroundStyle(.primary)
                             Spacer()
                             // 快捷键角标（已绑定才显示）。
                             if let hk = preset.hotkey, !hk.isEmpty {
                                 Text(HotkeyManager.shared.displayString(for: hk))
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(.system(size: BubbleMetrics.fontCaption, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: BubbleMetrics.keycapCornerRadius))
                             }
                             Image(systemName: "play.fill")
-                                .font(.system(size: 10))
+                                .font(.system(size: BubbleMetrics.fontMini))
                                 .foregroundStyle(accent)
                         }
-                        .contentShape(Rectangle())
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 4)
-                        .hoverRowHighlight()
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
-    // MARK: - 布局预览卡片（画面预览功能预留位）
+    // MARK: - 布局预览卡片
 
     /// 等比布局示意图：按 origin + resolution 画出每块屏的相对位置与比例。
-    /// 真实画面截取留待下个版本（ScreenCaptureProvider 已预留接口），这里先用几何示意图。
     private var layoutPreviewCard: some View {
         BubbleCard(title: l10n.t(.panelLayoutPreview), systemImage: "rectangle.split.2x1", accent: accent) {
-            VStack(spacing: 8) {
-                LayoutDiagram(displays: state.displays, accent: accent)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 120)
-
-                // 占位提示：画面预览即将推出。
-                HStack(spacing: 6) {
-                    Image(systemName: "eye")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Text(l10n.t(.panelScreenPreview))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-            }
+            LayoutDiagram(displays: state.displays, accent: accent)
+                .frame(maxWidth: .infinity)
+                .frame(height: 120)
         }
     }
 
@@ -296,18 +248,18 @@ struct PanelView: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 6)
-        // 与气泡统一材质（thinMaterial + 浅色叠白提亮）+ 描边 + 阴影，使整列观感一致。
+        // 与气泡统一材质（BubbleBackground）+ 阴影，使整列观感一致。
         .modifier(BubbleBackground())
-        .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
+        .bubbleShadow()
     }
 
     private func toolbarButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 14))
+                    .font(.system(size: BubbleMetrics.fontTitle))
                 Text(title)
-                    .font(.system(size: 10))
+                    .font(.system(size: BubbleMetrics.fontMini))
             }
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity)
@@ -334,11 +286,11 @@ private struct ArrangementRow: View {
             // 标题行
             HStack(spacing: 10) {
                 Image(systemName: display.isBuiltIn ? "laptopcomputer" : "display")
-                    .font(.system(size: 12))
+                    .font(.system(size: BubbleMetrics.fontControl))
                     .foregroundStyle(.secondary)
                     .frame(width: 14)
                 Text(label)
-                    .font(.system(size: 13))
+                    .font(.system(size: BubbleMetrics.fontBody))
                     .foregroundStyle(.primary)
                 Spacer()
             }
@@ -347,11 +299,11 @@ private struct ArrangementRow: View {
             .contentShape(Rectangle())
 
             // 表单风三行：位置（分段控件）/ 分辨率 / 刷新率，标题靠左、控件靠右对齐。
-            VStack(spacing: 2) {
+            VStack(spacing: BubbleMetrics.rowSpacing) {
                 if showsPosition {
                     HStack {
                         Text(state.localized(.positionLabel))
-                            .font(.system(size: 11))
+                            .font(.system(size: BubbleMetrics.fontCaption))
                             .foregroundStyle(.secondary)
                         Spacer(minLength: 12)
                         sideSegmented
@@ -410,30 +362,22 @@ private struct ArrangementRow: View {
 
     /// 分段控件的单段：箭头指向移动方向，激活段强调色实心。
     private func sideSegment(_ side: HorizontalSide, active: Bool) -> some View {
-        Button {
-            state.moveArrangement(display, side: side)
-        } label: {
+        ActivePill(active: active) {
             HStack(spacing: 3) {
                 if side == .left {
                     Image(systemName: "arrow.left").font(.system(size: 9))
                 }
                 Text(side == .left ? state.localized(.sideLeft) : state.localized(.sideRight))
-                    .font(.system(size: 11))
+                    .font(.system(size: BubbleMetrics.fontCaption))
                 if side == .right {
                     Image(systemName: "arrow.right").font(.system(size: 9))
                 }
             }
             .frame(minWidth: 58)
-            .padding(.vertical, 3)
-            .background {
-                if active {
-                    Capsule().fill(accent)
-                }
-            }
-            .foregroundStyle(active ? .white : .primary)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .asButton {
+            state.moveArrangement(display, side: side)
+        }
     }
 }
 
@@ -458,29 +402,24 @@ private struct SelectionRow: View {
     @State private var expanded = false
 
     var body: some View {
-        VStack(spacing: 2) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
-            } label: {
+        VStack(spacing: BubbleMetrics.rowSpacing) {
+            RowButton(action: { withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() } },
+                      verticalPadding: 3, horizontalPadding: 0) {
                 HStack(spacing: 6) {
                     Text(title)
-                        .font(.system(size: 11))
+                        .font(.system(size: BubbleMetrics.fontCaption))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 12)
                     Text(currentValue)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: BubbleMetrics.fontCaption, weight: .medium))
                         .foregroundStyle(.primary)
                 }
-                .contentShape(Rectangle())
-                .padding(.vertical, 3)
-                .hoverRowHighlight()
             }
-            .buttonStyle(.plain)
 
             if expanded {
                 // 展开列表：浅灰圆角底呈现「菜单浮层」感；选项多时内部滚动并限高，面板高度可控。
                 ScrollView {
-                    VStack(spacing: 2) {
+                    VStack(spacing: BubbleMetrics.rowSpacing) {
                         ForEach(options.indices, id: \.self) { idx in
                             optionRow(options[idx])
                         }
@@ -499,10 +438,10 @@ private struct SelectionRow: View {
 
     /// 单个选项行：当前项前 ✓（固定占位对齐），点击执行操作并收起。
     private func optionRow(_ option: Option) -> some View {
-        Button {
+        RowButton(action: {
             option.action()
             withAnimation(.easeInOut(duration: 0.15)) { expanded = false }
-        } label: {
+        }, verticalPadding: 3, horizontalPadding: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 9, weight: .semibold))
@@ -510,16 +449,11 @@ private struct SelectionRow: View {
                     .opacity(option.isActive ? 1 : 0)
                     .frame(width: 12)
                 Text(option.text)
-                    .font(.system(size: 11))
+                    .font(.system(size: BubbleMetrics.fontCaption))
                     .foregroundStyle(.primary)
                 Spacer(minLength: 0)
             }
-            .contentShape(Rectangle())
-            .padding(.vertical, 3)
-            .padding(.horizontal, 6)
-            .hoverRowHighlight()
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -528,7 +462,7 @@ private struct SelectionRow: View {
 /// 等比绘制所有屏的相对位置与尺寸。
 ///
 /// 算法：取所有屏 origin + resolution 的包围盒，等比缩放到容器宽度，
-/// 用 ZStack 定位每块屏的圆角矩形。主屏用品牌蓝实心浅底，外接用描边。
+/// 用 ZStack 定位每块屏的圆角矩形。主屏用强调色实心浅底，外接用描边。
 private struct LayoutDiagram: View {
     let displays: [DisplayInfo]
     let accent: Color
@@ -610,73 +544,5 @@ private struct LayoutDiagram: View {
             return PlacedRect(id: d.id, display: d, rect: frame)
         }
         return LayoutResult(rects: rects)
-    }
-}
-
-// MARK: - 气泡卡片容器
-
-/// 圆角气泡卡片：顶部标题行（品牌蓝图标方块 + 标题）+ 自定义内容。
-///
-/// 无边框：不加 stroke 描边（参考图要求气泡后面不要边框），
-/// 仅靠柔和的半透明材质填充与圆角呈现气泡形态。
-private struct BubbleCard<Content: View>: View {
-    let title: String
-    let systemImage: String
-    let accent: Color
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // 标题行：品牌蓝圆角方块图标 + 标题
-            HStack(spacing: 9) {
-                RoundedRectangle(cornerRadius: BubbleMetrics.iconBadgeCornerRadius)
-                    .fill(accent)
-                    .frame(width: 22, height: 22)
-                    .overlay(
-                        Image(systemName: systemImage)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white)
-                    )
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
-            }
-            content
-        }
-        .padding(16)
-        // 不透明填充（浅色纯白 / 深色卡片色）+ 自适应淡描边（与设置卡片同源）。
-        .modifier(BubbleBackground())
-        // 四周悬浮阴影：气泡与原生毛玻璃背景拉开层次，呈现「浮于桌面之上」的观感。
-        .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
-    }
-}
-
-private extension View {
-    /// 类原生菜单的行 hover 高亮：鼠标悬停时给一层柔和的强调色叠加，
-    /// 提升可点性与「鲜活/原生」感。修饰在已带 .contentShape 的行上。
-    @ViewBuilder
-    func hoverRowHighlight() -> some View {
-        modifier(HoverRowHighlightModifier())
-    }
-}
-
-/// 行 hover 高亮修饰器：用局部 @State 跟踪悬停态，叠加半透明强调色背景。
-private struct HoverRowHighlightModifier: ViewModifier {
-    @State private var isHovered = false
-    @State private var accent: Color = BrandColor.accent
-
-    func body(content: Content) -> some View {
-        content
-            .background(
-                RoundedRectangle(cornerRadius: BubbleMetrics.hoverCornerRadius)
-                    .fill(accent.opacity(isHovered ? 0.14 : 0))
-                    .animation(.easeInOut(duration: 0.12), value: isHovered)
-            )
-            .onHover { hovering in
-                isHovered = hovering
-                // 进入悬停时刷新一次强调色，确保跟随用户当前系统选择。
-                if hovering { accent = BrandColor.accent }
-            }
     }
 }

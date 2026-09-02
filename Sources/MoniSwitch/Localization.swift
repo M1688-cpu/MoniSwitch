@@ -43,7 +43,6 @@ enum TextKey: String {
     case languageLabel          = "languageLabel"          // 界面语言
     case appDescription         = "appDescription"         // 一句话简介
     case versionLabel           = "versionLabel"           // 版本
-    case testBuildLabel         = "testBuildLabel"         // 测试版本
 
     // 设置 - 启动
     case groupStartup           = "groupStartup"           // 启动
@@ -79,7 +78,6 @@ enum TextKey: String {
     case presetApplyButton      = "presetApplyButton"      // 应用
     case presetDeleteButton     = "presetDeleteButton"     // 删除
     case presetEmptyHint        = "presetEmptyHint"        // 还没有保存任何预设
-    case presetApplyConfirm     = "presetApplyConfirm"     // 应用此预设？
 
     // 设置 - 预设快捷键
     case hotkeyLabel            = "hotkeyLabel"            // 快捷键
@@ -100,7 +98,6 @@ enum TextKey: String {
     case panelArrange           = "panelArrange"           // 排列与镜像
     case panelDisplayAdjust     = "panelDisplayAdjust"     // 显示器调节（单内置屏时的卡片标题）
     case panelLayoutPreview     = "panelLayoutPreview"     // 布局预览
-    case panelScreenPreview     = "panelScreenPreview"     // 画面预览：即将推出
     case panelPrimaryBadge      = "panelPrimaryBadge"      // 主屏
 }
 
@@ -156,7 +153,6 @@ final class L10n: ObservableObject {
         .languageLabel:    [.zh: "界面语言",                      .en: "Interface language"],
         .appDescription:   [.zh: "菜单栏里的显示器快捷切换小工具", .en: "A menu bar tool to switch displays quickly"],
         .versionLabel:     [.zh: "版本",                          .en: "Version"],
-        .testBuildLabel:   [.zh: "测试版本",                      .en: "Test Build"],
 
         .groupStartup:     [.zh: "启动",                          .en: "Startup"],
         .launchAtLogin:    [.zh: "登录时启动 MoniSwitch",         .en: "Launch MoniSwitch at login"],
@@ -187,7 +183,6 @@ final class L10n: ObservableObject {
         .presetApplyButton:[.zh: "应用",                          .en: "Apply"],
         .presetDeleteButton:[.zh: "删除",                         .en: "Delete"],
         .presetEmptyHint:  [.zh: "还没有保存任何预设",            .en: "No presets saved yet"],
-        .presetApplyConfirm:[.zh: "应用此预设？",                 .en: "Apply this preset?"],
 
         .hotkeyLabel:      [.zh: "快捷键",                        .en: "Hotkey"],
         .hotkeyNone:       [.zh: "未设置",                        .en: "None"],
@@ -203,7 +198,6 @@ final class L10n: ObservableObject {
         .panelArrange:     [.zh: "排列与镜像",                    .en: "Arrange & Mirror"],
         .panelDisplayAdjust: [.zh: "显示器调节",                  .en: "Display Adjustment"],
         .panelLayoutPreview:[.zh: "布局预览",                     .en: "Layout"],
-        .panelScreenPreview:[.zh: "画面预览：即将推出",            .en: "Live preview: coming soon"],
         .panelPrimaryBadge:[.zh: "主屏",                          .en: "Main"],
     ]
 }

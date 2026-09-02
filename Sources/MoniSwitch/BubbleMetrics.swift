@@ -26,6 +26,34 @@ enum BubbleMetrics {
     static let headerBlurRamp: CGFloat = 24
     /// 设置页顶部滚动毛玻璃：底边渐隐尾巴长度（延伸到标题栏下方，内容穿过时无硬切线）。
     static let headerBlurFadeTail: CGFloat = 18
+
+    // MARK: 字号刻度（面板 + 设置页统一，避免 9~14 的魔法数散落各视图）
+
+    /// 卡片标题（BubbleCard / SettingsCard 头部）。
+    static let fontTitle: CGFloat = 14
+    /// 行主文字 / 设置行标签。
+    static let fontBody: CGFloat = 13
+    /// 胶囊按钮文字 / 行内图标。
+    static let fontControl: CGFloat = 12
+    /// 副标题 / 表单行标题 / 展开选项。
+    static let fontCaption: CGFloat = 11
+    /// 徽章 / 底部工具栏文字。
+    static let fontMini: CGFloat = 10
+
+    // MARK: 间距刻度
+
+    /// 面板内卡片纵向间距（与面板外边距一致，视觉等距）。
+    static let cardSpacing: CGFloat = 14
+    /// 卡内列表行间距。
+    static let rowSpacing: CGFloat = 2
+}
+
+extension View {
+    /// 气泡悬浮阴影：BubbleCard / 面板底部工具栏 / SettingsCard 共用，
+    /// 呈现「浮于背景之上」的层次。设置页卡片可用稍浅的 opacity。
+    func bubbleShadow(opacity: Double = 0.12) -> some View {
+        shadow(color: .black.opacity(opacity), radius: 6, x: 0, y: 2)
+    }
 }
 
 extension Color {

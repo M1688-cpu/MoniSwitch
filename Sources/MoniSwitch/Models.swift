@@ -22,37 +22,19 @@ struct DisplayInfo: Identifiable, Equatable {
     let colorDepth: Int
     /// 旋转角度（0/90/180/270）
     let degree: Int
-    /// 是否启用
-    let enabled: Bool
 
     /// 当前分辨率下可选的刷新率（去重、升序），用于菜单切换刷新率。
     /// 从 displayplacer list 的 "Resolutions for rotation" 段解析，
     /// 只保留与当前分辨率相同的模式的 hz。空数组表示无多选项（或未解析）。
     var availableRefreshRates: [Int]
 
-    /// 该屏所有可选分辨率（去重，保持 displayplacer 输出顺序），用于菜单切换分辨率。
-    /// 从 "Resolutions for rotation" 段解析。空数组表示无多选项（或未解析）。
+    /// 该屏所有可选分辨率（去重、保持 displayplacer 输出顺序），用于菜单切换分辨率。
+    /// 从 displayplacer list 的 "Resolutions for rotation" 段解析。空数组表示无多选项（或未解析）。
     var availableResolutions: [(width: Int, height: Int)]
 
     /// 是否为笔记本内置屏（displayplacer 的 Type 里包含 "built in"）
     var isBuiltIn: Bool {
         typeName.localizedCaseInsensitiveContains("built in")
-    }
-
-    /// 是否处于镜像状态（通过观察 id 是否被加号拼接判断；这里保留扩展字段）
-    var mirroredPeerID: String? = nil
-
-    /// 宽高比（width / height），供布局示意图按比例绘制使用。
-    /// height 为 0 时返回 1.0，避免除零。
-    var aspectRatio: Double {
-        guard resolution.height > 0 else { return 1.0 }
-        return Double(resolution.width) / Double(resolution.height)
-    }
-
-    /// 简短显示文本，用于菜单项：名称 (宽x高)。
-    /// 注意：菜单层请优先用 localizedTypeName 做本地化显示。
-    var menuLabel: String {
-        "\(typeName) (\(resolution.width)x\(resolution.height))"
     }
 
     /// 把 displayplacer 给出的原始 Type 名称（如 "34 inch external screen"）

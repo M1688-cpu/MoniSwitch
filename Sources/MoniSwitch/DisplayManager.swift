@@ -169,7 +169,6 @@ final class DisplayManager {
         let colorDepth = Int(value(of: "Color Depth:", in: block)?.trimmingCharacters(in: .whitespaces) ?? "") ?? 8
         let degree = Int(value(of: "Rotation:", in: block)?
             .components(separatedBy: .whitespaces).first ?? "") ?? 0
-        let enabled = (value(of: "Enabled:", in: block)?.localizedCaseInsensitiveContains("true")) ?? true
 
         // 解析当前分辨率下可选的刷新率：从 "Resolutions for rotation" 段的
         // "mode N: res:WxH hz:X" 行里，筛出与当前分辨率相同的模式，收集 hz 去重升序。
@@ -187,7 +186,6 @@ final class DisplayManager {
             hertz: hertz,
             colorDepth: colorDepth,
             degree: degree,
-            enabled: enabled,
             availableRefreshRates: availableRates,
             availableResolutions: availableResolutions
         )
