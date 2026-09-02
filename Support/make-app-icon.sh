@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 #
 # make-app-icon.sh
-# 从一张正方形（或近正方形）源图重建 macOS AppIcon.icns
+# 重建 macOS AppIcon.icns
 #
-# 两步：
-#   1. 源图规整为 1024×1024（非正方形时，用 AppKit 合成：以源图边缘色填上下/左右边，
-#      源图居中合成，避免简单纯色条带感）
-#   2. sips 缩放 10 个标准尺寸 → AppIcon.iconset/ → iconutil -c icns → AppIcon.icns
+# 两种模式：
+#   自绘（默认，无参数或 --theme/--traffic）：
+#     调 Support/make-app-icon-design.swift 纯代码渲染 1024×1024 源图
+#     （Liquid Glass 风格显示器，多主题可选），再 sips → iconutil。
+#       bash Support/make-app-icon.sh                      # 靛蓝 + 屏内红绿灯
+#       bash Support/make-app-icon.sh --theme violet       # 其他主题
+#       bash Support/make-app-icon.sh --traffic bezel      # 红绿灯在边框下巴
 #
-# 源图规整用独立的 Swift 片段（Support/make-app-icon-square.swift），保持 macOS 原生工具链。
-#
-# 用法：bash Support/make-app-icon.sh [源图路径]
-#       默认源图 = /tmp/moniswitch-ref/ref2-icon.png
+#   外部源图（传入图片路径）：
+#     先经 make-app-icon-square.swift 规整为 1024×1024（近正方形时
+#     以边缘色合成补边，避免黑边），再 sips → iconutil。
+#       bash Support/make-app-icon.sh /path/to/image.png
 #
 set -euo pipefail
 
@@ -19,25 +22,51 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RESOURCES_DIR="$PROJECT_DIR/Resources"
 
-SOURCE="${1:-/tmp/moniswitch-ref/ref2-icon.png}"
+DESIGN_SWIFT="$SCRIPT_DIR/make-app-icon-design.swift"
 SQUARE_SWIFT="$SCRIPT_DIR/make-app-icon-square.swift"
 SOURCE_1024="$RESOURCES_DIR/AppIcon-source.png"
 ICONSET_DIR="$RESOURCES_DIR/AppIcon.iconset"
 ICNS_OUT="$RESOURCES_DIR/AppIcon.icns"
 
+# 默认主题/红绿灯摆法（v0.2.0 起的正式图标）
+THEME="blue"
+TRAFFIC="screen"
+EXTERNAL_SOURCE=""
+
+# 解析参数：--theme/--traffic 走自绘；非选项参数视为外部源图路径
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --theme)   THEME="${2:?--theme 需要值}"; shift 2 ;;
+        --traffic) TRAFFIC="${2:?--traffic 需要值}"; shift 2 ;;
+        -h|--help)
+            sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0 ;;
+        *)         EXTERNAL_SOURCE="$1"; shift ;;
+    esac
+done
+
 echo "▶ 重建 AppIcon"
-echo "  源图: $SOURCE"
 
-if [ ! -f "$SOURCE" ]; then
-    echo "  ✗ 源图不存在: $SOURCE" >&2
-    exit 1
+if [ -n "$EXTERNAL_SOURCE" ]; then
+    # ---------- 模式 B：外部源图（旧流程） ----------
+    if [ ! -f "$EXTERNAL_SOURCE" ]; then
+        echo "  ✗ 源图不存在: $EXTERNAL_SOURCE" >&2
+        exit 1
+    fi
+    echo "  源图(外部): $EXTERNAL_SOURCE"
+    echo "  [1/3] 规整源图 → 1024×1024 ..."
+    swift "$SQUARE_SWIFT" \
+        --source "$EXTERNAL_SOURCE" \
+        --output "$SOURCE_1024"
+else
+    # ---------- 模式 A：纯代码自绘（默认） ----------
+    echo "  源图(自绘): theme=$THEME traffic=$TRAFFIC"
+    echo "  [1/3] 渲染自绘图标 → 1024×1024 ..."
+    swift "$DESIGN_SWIFT" \
+        --theme "$THEME" \
+        --traffic "$TRAFFIC" \
+        --output "$SOURCE_1024"
 fi
-
-# ---------- 1. 规整源图为 1024×1024 ----------
-echo "  [1/3] 规整源图 → 1024×1024 ..."
-swift "$SQUARE_SWIFT" \
-    --source "$SOURCE" \
-    --output "$SOURCE_1024"
 
 # ---------- 2. 生成 10 个标准尺寸 iconset ----------
 echo "  [2/3] 生成 iconset ..."
@@ -63,7 +92,6 @@ rm -rf "$ICONSET_DIR"
 
 if [ -f "$ICNS_OUT" ]; then
     echo "  ✓ 完成: $ICNS_OUT"
-    sips -g pixelWidth -g pixelHeight "$ICNS_OUT" 2>/dev/null | sed 's/^/    /'
 else
     echo "  ✗ iconutil 失败" >&2
     exit 1
