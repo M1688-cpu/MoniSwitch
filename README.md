@@ -9,7 +9,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue" alt="platform">
   <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey" alt="arch">
-  <img src="https://img.shields.io/badge/version-0.1.3-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-0.2.0-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
 
@@ -18,11 +18,14 @@
 - 🖥️ **菜单栏常驻**：点击菜单栏图标即弹出气泡卡片面板（悬浮毛玻璃圆角卡片）
 - 🔀 **一键切主屏**：在面板里点任意显示器，立即把它设为主显示器（白条所在屏）
 - ↔️ **左右移动外接屏**：展开外接屏行，把外接屏放到主屏的左边或右边
-- 🪞 **扩展 / 镜像切换**：把外接屏在「扩展显示」和「镜像主屏」之间一键切换
+- 🪞 **扩展 / 镜像切换**：把外接屏在「扩展显示」和「镜像主屏」之间一键切换（面板标注镜像目标屏）
+- ✨ **一键自动排列**：所有屏横向排开、消除重叠，镜像组保持完整不被拆散
 - 📦 **布局预设**：把整套显示器配置（主屏+位置+镜像）保存为预设，一键切换（如「办公」「演示」）
-- 🔄 **菜单切换刷新率**：面板内直接切换外接屏刷新率（如 60Hz ↔ 120Hz）
+- 🛟 **预设防漂移**：显示器重插拔导致 persistent id 变化时，自动按分辨率/屏数重映射，预设不再失效
+- 🔄 **菜单切换刷新率/分辨率**：面板内直接切换外接屏刷新率（如 60Hz ↔ 120Hz）与分辨率
 - ⌨️ **全局快捷键**：给每个预设绑定一个全局快捷键（Carbon `RegisterEventHotKey`，零权限依赖），按下即应用对应布局
-- 🗺️ **布局预览**：面板内按真实比例绘制显示器位置示意图，一眼看清当前排列
+- 🗺️ **交互式布局预览**：按真实比例绘制显示器位置，点击屏块选中、悬停列表行时对应屏块高亮
+- ⏳ **操作反馈**：切换进行中显示进度条并防连点，失败弹系统通知不再静默
 - 🎨 **跟随系统强调色**：面板与设置窗口随「系统设置 → 外观 → 强调色」实时刷新，无固定品牌色
 - ⚙️ **设置窗口**：中英双语、开机自启动、自动刷新列表（可选刷新间隔）、切换后通知
 - 🌐 **中英双语**：界面语言一键切换，重启后保持
@@ -138,26 +141,30 @@ displayplacer 二进制随 App 一起打包，**开箱即用，无需额外安�
 MoniSwitch/
 ├── Package.swift                  # SPM 构建配置
 ├── Sources/MoniSwitch/
-│   ├── MoniSwitchApp.swift        # 菜单栏 UI 入口 + 面板宿主（MenuBarExtra .window）
-│   ├── PanelView.swift            # 菜单栏气泡卡片面板（主屏/排列/预设/布局预览）
+│   ├── MoniSwitchApp.swift        # @main 入口（MenuBarExtra .window + 菜单栏模板图标）
+│   ├── AppState.swift             # UI 状态对象（显示器列表 + 全部切换操作 + 进行中状态）
+│   ├── PanelView.swift            # 菜单栏气泡卡片面板（主屏/排列/预设/交互式布局预览）
+│   ├── Components.swift           # 全站共享视觉组件（BubbleCard/RowButton/ActivePill 等）
+│   ├── BubbleMetrics.swift        # 圆角/字号/间距刻度 + 气泡背景色
 │   ├── Models.swift               # 显示器数据模型
 │   ├── ShellRunner.swift          # displayplacer 调用封装
-│   ├── DisplayManager.swift       # 解析 + 切换算法（含镜像组检测）
+│   ├── DisplayManager.swift       # 解析 + 切换算法（镜像组检测/自动排列/id 漂移重映射/稳定检测）
 │   ├── AppSettings.swift          # 用户偏好单例（自启动/通知/自动刷新）
 │   ├── PresetManager.swift        # 显示器布局预设管理（保存/应用/删除/快捷键绑定）
 │   ├── HotkeyManager.swift        # 全局快捷键（Carbon RegisterEventHotKey，零权限）
-│   ├── ScreenCaptureProvider.swift # 屏幕捕获接口（画面预览预留，暂未启用）
-│   ├── DockPolicyManager.swift    # Dock 策略 + 设置窗口（NSWindow + NSToolbar）
-│   ├── SettingsView.swift         # 设置窗口 SwiftUI 视图（通用/预设/关于）
+│   ├── DockPolicyManager.swift    # Dock 策略 + 设置窗口宿主（NSWindow）
+│   ├── SettingsView.swift         # 设置窗口骨架（边栏 + 悬浮标题 + 滚动毛玻璃）
+│   ├── SettingsTabs.swift         # 设置窗口三个标签页（通用/预设/关于）
 │   └── Localization.swift         # 中英双语（L10n 类 + TextKey 枚举）
 ├── Resources/
 │   ├── displayplacer              # 打包的显示控制二进制（不入库）
 │   ├── AppIcon.icns               # 应用图标
-│   └── AppIcon-source.png         # 图标源图
+│   └── AppIcon-source.png         # 图标源图（make-app-icon-design.swift 自绘产物）
 ├── Support/
 │   ├── Info.plist                 # App 元信息（LSUIElement 等）
-│   └── build-app.sh               # 一键打包脚本
-├── screenshots/                   # README 截图（zh/ 与 en/ 各一套）
+│   ├── build-app.sh               # 一键打包脚本
+│   └── make-app-icon.sh           # 重建 AppIcon.icns（默认纯代码自绘）
+├── screenshots/                   # README 截图
 ├── README.md                      # 本文件
 └── GITHUB_GUIDE.md                # 维护者的 GitHub 操作手册
 ```
@@ -180,6 +187,10 @@ MoniSwitch/
 - [x] 气泡卡片面板 UI（替换原生文字菜单）
 - [x] 面板内布局预览（按真实比例绘制显示器位置）
 - [x] 跟随系统强调色
+- [x] 纯代码自绘应用图标（Liquid Glass 风格显示器）
+- [x] 操作进行中反馈（进度条 + 防连点）与失败通知
+- [x] 一键自动排列（横向排开、消除重叠、保持镜像组）
+- [x] 预设 id 漂移自动重映射
 - [ ] 适配 Intel 芯片
 - [ ] 多屏（>2）场景优化
 - [ ] Apple 公证

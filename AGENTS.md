@@ -26,23 +26,33 @@ bash Support/build-app.sh      # 一键打包（编译 → .app → 签名 → .
 
 ```
 Sources/MoniSwitch/
-  MoniSwitchApp.swift      # 菜单栏 UI 入口
-  Models.swift              # 显示器数据模型
-  ShellRunner.swift         # displayplacer 调用封装
-  DisplayManager.swift     # 解析 + 切换算法
-  DockPolicyManager.swift   # Dock 策略管理 + 设置窗口（NSWindow + NSToolbar）
-  SettingsView.swift        # 设置窗口 SwiftUI 视图（NavigationSplitView）
-  Localization.swift        # 中英双语（L10n 类 + TextKey 枚举）
+  MoniSwitchApp.swift      # @main 入口（MenuBarExtra .window + 菜单栏模板图标）+ AppState 状态层
+  AppState.swift           # UI 状态对象：显示器列表 + 全部切换操作 + isOperating 进行中状态
+  PanelView.swift          # 菜单栏气泡卡片面板（主屏/排列/预设/交互式布局预览）
+  Components.swift         # 全站共享视觉组件（BrandColor/BubbleBackground/BubbleCard/
+                           #   SettingsCard/RowButton/ActivePill/IndeterminateBar/PlainIcon…）
+  BubbleMetrics.swift      # 圆角/字号/间距刻度 + 气泡深色填充色 + bubbleShadow()
+  Models.swift             # 显示器数据模型（DisplayInfo/HotkeyBinding/Preset）
+  ShellRunner.swift        # displayplacer 调用封装
+  DisplayManager.swift     # 解析 + 切换算法 + 稳定检测 + 自动排列 + id 漂移重映射
+  AppSettings.swift        # 用户偏好单例（自启动/通知/自动刷新）+ 通知发送
+  PresetManager.swift      # 预设管理（保存/应用/删除/快捷键绑定，isApplying）
+  HotkeyManager.swift      # 全局快捷键（Carbon RegisterEventHotKey，零权限）
+  DockPolicyManager.swift  # Dock 策略管理 + 设置窗口宿主（NSWindow）
+  SettingsView.swift       # 设置窗口骨架（边栏 + 悬浮标题 + 滚动毛玻璃 + ScrollOffsetReader）
+  SettingsTabs.swift       # 设置窗口三个标签页（GeneralTab/PresetsTab/AboutTab/PresetRow）
+  Localization.swift       # 中英双语（L10n 类 + TextKey 枚举，t() 支持 %d 与 %@）
 Resources/
   AppIcon.icns              # 应用图标（make-app-icon.sh 产物）
-  AppIcon-source.png        # 图标源图（make-app-icon-square.swift 产物，1024×1024）
+  AppIcon-source.png        # 图标源图（make-app-icon-design.swift 自绘产物，1024×1024）
   dmg-background.png        # DMG 安装包背景图（make-dmg-background.swift 产物，1320×800 @2x）
   displayplacer             # 不入库（.gitignore 排除）
 Support/
   Info.plist                # App 元信息
   build-app.sh              # 打包脚本（编译 → .app → 签名 → .dmg，DMG 段会写 Finder 视图元数据）
   make-dmg-background.swift # 生成 DMG 背景图（裁波浪源图中部 + 绘箭头）
-  make-app-icon.sh          # 从源图重建 AppIcon.icns（调用 make-app-icon-square.swift + sips + iconutil）
+  make-app-icon.sh          # 重建 AppIcon.icns（默认调自绘脚本；传源图路径走旧外部图流程）
+  make-app-icon-design.swift# 纯代码自绘图标（Liquid Glass 风格显示器，6 主题×2 红绿灯摆法，--all 出预览）
   make-app-icon-square.swift# 把任意尺寸图标源规整为 1024×1024 正方形（采样背景色填充，避免黑边）
   make-dmg-preview.swift    # 合成 README 用的 DMG 安装窗口预览图（背景 + app 图标 + Applications 图标）
 ```
@@ -76,20 +86,18 @@ Support/
 - 排列卡片表单化（v0.1.4）：排列行改为「系统设置表单风」——位置行（`位置` 标题 + 左/右分段控件 `sideSegmented`，当前侧强调色实心，替代原两个小胶囊按钮）+ 分辨率行 + 刷新率行，标题靠左、控件靠右统一对齐；标题行右侧 ◀/▶ 小指示因与分段控件状态重复已删
 - 分辨率/刷新率行内展开（v0.1.4）：`SelectionRow` 弃用原生 `Menu`，改自绘「点击整行 → 面板内向下展开选项列表」（当前项 ✓、行 hover 高亮、选项多时 ScrollView 限高 216pt、浅灰圆角底）。**根因：SwiftUI `Menu` 在 `MenuBarExtra(.window)` 的 borderless 弹出面板内会弹成分离的空白窗口（macOS 系统级渲染 bug，实测必现，非特定屏才触发）**，行内展开结构性绕开该 bug；右侧 chevron 双箭头图标也一并移除
 - 单内置屏可调节分辨率/刷新率（v0.1.4）：无外接屏时「排列与镜像」卡不再整体隐藏，退化为「显示器调节」卡（`panelDisplayAdjust` 键 + slider.horizontal.3 图标）：只保留内置屏的分辨率/刷新率行（`ArrangementRow.showsPosition=false` 隐藏位置行），镜像/扩展行与分隔线一并隐藏
+- **通知 bug 根治（v0.2.0）**：`DisplayManager.waitForStableDisplays()` 轮询 `displayplacer list`（0.25s 间隔，最多 3s），连续两次输出签名一致（id/res/origin/hz/isMain）判定系统重配完成，替代「按 OpKind 分类盲等 2s 提交通知 + runOp 盲等 0.4s 重读列表」的旧写法。一个检测同时解决「读列表太早读到旧值（面板高亮不跟随）」和「通知提交被重配窗口中断丢弃」两个问题。**时序契约：sendSwitchNotification 的调用方必须已在稳定后调用**（runOp 与 PresetManager.apply 都先 waitForStableDisplays）
+- 面板交互升级（v0.2.0）：操作进行中 `AppState.isOperating`/`PresetManager.isApplying` 禁用卡片区 + 顶部 overlay 流动进度条 `IndeterminateBar`（防连点重复触发）；runOp 失败发系统通知（不再静默 fputs）；SelectionRow 展开态提升为面板级 `expandedRowID` 互斥（同屏/跨屏同时只展开一个）；卡片区包 ScrollView（超 600pt 封顶滚动）；布局图交互化（点击屏块选中 ✓、主显示器行/排列行 hover 时对应块高亮）；镜像/扩展区显示目标屏名（`mirrorTarget` + t() %@ 替换）；退出按钮从工具栏移到底部低视觉权重小字行（防与「设置」相邻误触）
+- 一键自动排列（v0.2.0）：`DisplayManager.autoArrange`——所有屏横向排开消除重叠，主屏所在单元归 (0,0)，其余按原 origin.x 排右侧。**镜像组感知**：组内保持 `id:基准+副` 合并 arg（与 currentSnapshotArgs 同理），不会意外拆散镜像
+- 预设 id 漂移兜底（v0.2.0）：`DisplayManager.remappedArgsIfDrifted`——旧 persistent id 全部有效则原样应用；屏数一致且能按分辨率 1:1 映射时改写 id 段（镜像合并条目逐段替换）；无法完整映射回退旧行为（宁缺毋滥）。PresetManager.apply 在后台队列里先做此检测
+- 自绘应用图标（v0.2.0）：`make-app-icon.sh` 默认调 `make-app-icon-design.swift` 纯代码渲染（选定 blue 主题 + screen 红绿灯摆法），不再依赖外部参考图；传源图路径仍走旧规整流程
+- 架构清理（v0.2.0）：AppState 拆出独立文件；Components.swift 集中共享组件（RowButton/ActivePill/BubbleBackground/BubbleCard/SettingsCard…）；SettingsTabs.swift 拆三个标签页；BubbleMetrics 扩充字号/间距刻度 + bubbleShadow()；死代码清理（DisplayInfo 的 enabled/menuLabel/aspectRatio/mirroredPeerID、ScreenCaptureProvider 整文件、3 个死 L10n key）
+- PresetManager.apply 完成后广播 `Notification.Name.moniswitchPresetApplied`（userInfo 携带稳定后的屏幕列表），AppState 订阅刷新面板——修复热键应用预设后面板停留旧布局的隐患
 - Release v0.1.1 产物在 dist/
 
 ## 已知 bug（待修复）
 
-### 通知 bug：镜像/扩展操作的通知不弹出
-- 现象：切主屏/左右移动/改刷新率的通知正常弹出；但镜像、扩展、预设应用这三类操作的通知不弹出。
-- 根因（已诊断，非猜测）：这三类操作会让 displayplacer 触发系统级显示器重新配置（display mode 切换），全程约 1.2~1.5 秒。期间 UNUserNotificationCenter 的投递被系统中断/丢弃。代码层面 sendSwitchNotification 已被正确调用（日志证实 enabled=true），问题在 macOS 通知投递时机。
-- 已尝试但无效的方案：
-  - UNTimeIntervalNotificationTrigger 延迟投递（延迟只决定何时显示，不解决提交时机问题）
-  - DispatchQueue.main.asyncAfter 延迟 0.8s 提交（displayplacer 重配要 1.2s，0.8s 时仍在重配窗口内）
-- 待尝试的方案：
-  - 延迟 2s+ 提交（需验证 2s 是否足够）
-  - 改用 NSUserNotification（旧 API，对运行时状态不敏感）
-  - 用 Process 完成回调而非固定延迟来判定重配结束
+（当前无——原「镜像/扩展操作通知不弹出」已在 v0.2.0 根治，见上「通知 bug 根治」条目）
 
 ## 暂缓功能（下个版本）
 
@@ -131,6 +139,9 @@ Support/
 - **`Support/MoniSwitch.app` / `Support/MoniSwitch.dmg` 是 `build-app.sh` 的产物，不是源码镜像**：改完代码必须重新 `bash Support/build-app.sh` 才会更新；光 `swift build` 只更新 `.build/debug|release/MoniSwitch` 裸二进制，不会进 .app。本地验证最新 UI 的两种方式：①直接跑 `Support/MoniSwitch.app`（双击或 `open Support/MoniSwitch.app`，能验证完整 .app 包结构含 displayplacer）；②跑 `.build/debug/MoniSwitch`（最快迭代，但无 .app 包结构、无 displayplacer 依赖）。注意 `build-app.sh` 用的是 release 构建产物。
 - **同 bundle id 的多份 .app 会污染 LaunchServices 缓存**：`open -a MoniSwitch` / Spotlight / Launchpad 都按 bundle id 查 LaunchServices 数据库，会解析到任意一份已登记的 .app（包括挂载中的 DMG、废纸篓、`dmg-staging/` 临时目录里的），导致「启动的是旧版」。曾出现的真实场景：开发期间双击挂载过 `Support/MoniSwitch.dmg` 且没卸载，LaunchServices 就一直登记着 DMG 里那份旧 app，`open -a` 永远启动旧版。排查：`lsregister -dump | grep -i moniswitch` 看所有登记路径；登记指定那份：`lsregister -f <path>`；注销过时那份：`lsregister -u <path>`（仅动数据库，不删文件，对废纸篓里的也安全）。发布/验证前确保只剩目标那一份登记。
 - **自动化验证面板 UI 的可行路径与坑**（2026-08 实测，macOS 15）：菜单栏图标坐标可由 `CGWindowListCopyWindowInfo` 取（owner=MoniSwitch、layer=25、name=Item-0 的小窗口）；面板窗口是 layer=101 的 380 宽窗口。CGEvent 合成点击**能点开/点关菜单栏图标**，但**对面板内容的控件无效**（Button 不触发，原因未深究）——面板内交互只能人肉验证。另注意：其他菜单栏 App 的面板开着时会吞掉第一次图标点击，先点一下桌面收起它；视觉分析截图必须用**唯一文件名**，CDN 按文件名缓存、重名图会拿到旧内容。
+- **自动化验证的 2026-09 增补（macOS 26 实测）**：① 菜单栏图标窗口**不再出现在 CGWindowList 里**（owner/layer 都查不到，但图标实际显示）——定位改用「裁剪菜单栏区域放大 + 视觉读图」推算坐标；② CGEvent 合成点击对**普通 NSWindow 里的 SwiftUI `onTapGesture` 同样无效**（设置窗口边栏行点不切 tab），不只限 MenuBarExtra 面板；③ **合成 ⌘, 键盘事件有效**（`CGEvent keyboardEventSource + .maskCommand`，virtualKey 0x2F）：面板打开时可触发 `.commands` 打开设置窗口——这是唯一可自动打开设置窗口的路径；④ **裸二进制 `.build/debug/MoniSwitch` 从终端后台启动不创建任何窗口**（进程活着但无菜单栏图标），验证 UI 必须走 `.app`（build-app.sh 产物 + lsregister 登记 + open）。
+- **通知时序契约（v0.2.0 起）**：`AppSettings.sendSwitchNotification` 要求调用方已在显示器配置稳定后调用（先经 `DisplayManager.waitForStableDisplays`）。新增发通知的代码路径若绕过此契约，镜像/扩展类操作会复现「通知不弹出」bug。
+- **PanelView 的展开互斥/联动状态都是面板级 @State**：`expandedRowID`（SelectionRow 互斥）、`selectedDisplayID`/`hoveredDisplayID`（布局图联动）挂在 PanelView 上经参数传入 ArrangementRow/SelectionRow——新增联动屏相关的行时记得挂 onHover 上报 hoveredDisplayID，否则布局图不联动。
 
 ## 风格约定
 
