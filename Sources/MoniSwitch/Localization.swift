@@ -95,12 +95,15 @@ enum TextKey: String {
 
     // 菜单 - 分辨率
     case resolutionMenu         = "resolutionMenu"         // 分辨率
+    case hidpiTag               = "hidpiTag"               // HiDPI 变体标注
+    case lowResolutionTag       = "lowResolutionTag"       // 非 HiDPI 变体标注
 
     // 面板气泡卡片（.window 样式专用）
     case panelArrange           = "panelArrange"           // 排列与镜像
     case panelDisplayAdjust     = "panelDisplayAdjust"     // 显示器调节（单内置屏时的卡片标题）
     case panelLayoutPreview     = "panelLayoutPreview"     // 布局预览
     case panelPrimaryBadge      = "panelPrimaryBadge"      // 主屏
+    case currentLayoutBadge     = "currentLayoutBadge"     // 当前（预设与当前布局一致的角标）
     case mirrorTarget           = "mirrorTarget"           // 镜像目标：@
     case autoArrange            = "autoArrange"            // 自动排列按钮
 }
@@ -206,11 +209,14 @@ final class L10n: ObservableObject {
         .refreshRateMenu:  [.zh: "刷新率",                        .en: "Refresh Rate"],
         .hertzLabel:       [.zh: "Hz",                            .en: "Hz"],
         .resolutionMenu:   [.zh: "分辨率",                        .en: "Resolution"],
+        .hidpiTag:         [.zh: "HiDPI",                        .en: "HiDPI"],
+        .lowResolutionTag: [.zh: "低分辨率",                     .en: "Low resolution"],
 
         .panelArrange:     [.zh: "排列与镜像",                    .en: "Arrange & Mirror"],
         .panelDisplayAdjust: [.zh: "显示器调节",                  .en: "Display Adjustment"],
         .panelLayoutPreview:[.zh: "布局预览",                     .en: "Layout"],
         .panelPrimaryBadge:[.zh: "主屏",                          .en: "Main"],
+        .currentLayoutBadge:[.zh: "当前",                        .en: "Current"],
         .mirrorTarget:     [.zh: "镜像目标：%@",                  .en: "Mirror target: %@"],
         .autoArrange:      [.zh: "自动排列（横向排开，消除重叠）",  .en: "Auto-arrange (line up, fix overlap)"],
     ]

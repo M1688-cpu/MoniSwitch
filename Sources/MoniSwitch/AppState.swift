@@ -132,8 +132,8 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// 切换某屏分辨率。
-    func setResolution(_ res: (width: Int, height: Int), for display: DisplayInfo) {
+    /// 切换某屏分辨率（res.hidpi 决定目标屏 scaling，见 DisplayManager.setResolution）。
+    func setResolution(_ res: ResolutionOption, for display: DisplayInfo) {
         runOp(kind: .resolution) { [self, displays] in
             manager.setResolution(res, for: display, in: displays)
         }

@@ -1,12 +1,13 @@
 import SwiftUI
 import AppKit
 
-/// 菜单栏下拉面板（`.window` 样式）：按参考图做成分栏「气泡卡片」。
+/// 菜单栏下拉面板（宿主为 PanelController 的 NSPopover）：按参考图做成分栏「气泡卡片」。
 ///
-/// 与原 `.menu` 样式相比，这里是一块可完全自定义的 SwiftUI 视图：
+/// 这里是一块可完全自定义的 SwiftUI 视图：
 ///   - 每个功能分栏是一张圆角气泡卡片（`BubbleCard`，Components.swift）；
 ///   - 强调色跟随系统（`BrandColor.accent`，Components.swift）；
-///   - 所有切换操作复用 `AppState` / `PresetManager` 的现有逻辑，只改触发控件形态。
+///   - 所有切换操作复用 `AppState` / `PresetManager` 的现有逻辑，只改触发控件形态；
+///   - 箭头/居中对齐/展开动画由 NSPopover 系统 chrome 提供（圆角贴顶同理）。
 ///
 /// 卡片顺序：主显示器 → 排列与镜像 → 布局预设 → 布局预览 → 底部工具栏 → 退出。
 /// 交互：操作进行中（isOperating）禁用卡片区并显示顶部流动进度条；
@@ -25,6 +26,10 @@ struct PanelView: View {
     /// 跨屏的各行同时只展开一个，避免面板高度反复跳动）。nil=全部收起。
     @State private var expandedRowID: String?
 
+    /// 排列卡内展开参数组的屏 id（面板级互斥：同时只展开一块屏，默认全收起；
+    /// 点击布局图选中某屏时联动展开该组）。nil=全部收起。
+    @State private var expandedDisplayID: String?
+
     /// 布局图中点击选中的屏（描边加粗 + ✓ 角标，再次点击取消）。
     @State private var selectedDisplayID: String?
 
@@ -35,9 +40,11 @@ struct PanelView: View {
     /// 卡片区内容实测高度（PreferenceKey 上报），驱动 ScrollView 的明确高度。
     ///
     /// 背景（2026-09 实测）：屏幕重配（切主屏/自动排列等触发系统级 relayout）时，
-    /// MenuBarExtra(.window) 面板被系统重新求解尺寸，ScrollView 在无确定高度
-    /// proposal 的求解轮里 ideal 高度塌为 0——面板瞬间只剩底部工具栏与退出行，
-    /// 且不再自愈。改为测内容实高后显式 frame：任何重求解都拿到确定值，不再塌。
+    /// 面板被系统重新求解尺寸，ScrollView 在无确定高度 proposal 的求解轮里
+    /// ideal 高度塌为 0——面板瞬间只剩底部工具栏与退出行，且不再自愈。
+    /// （当时宿主是 MenuBarExtra(.window)；迁移 NSPopover 后保留同一防御，
+    /// 显式高度对 popover 的 preferredContentSize 同样是确定值。）
+    /// 改为测内容实高后显式 frame：任何重求解都拿到确定值，不再塌。
     /// 初值取典型四卡高度，防首帧闪变。
     @State private var scrollContentHeight: CGFloat = 480
 
@@ -152,10 +159,12 @@ struct PanelView: View {
 
     // MARK: - 排列与镜像卡片
 
-    /// 外接屏排列（每屏一行，可展开左/右移 + 刷新率）+ 镜像/扩展切换。
+    /// 显示器排列与调节（每屏一组行：位置/分辨率/刷新率）+ 镜像/扩展切换。
     ///
-    /// 单内置屏（无外接）时卡片退化为「显示器调节」：只保留内置屏的分辨率/刷新率行，
-    /// 隐藏无意义的「位置」分段控件与镜像/扩展切换（标题与图标随之切换）。
+    /// 每块屏（含主屏）都有调节行：非主屏多一个位置行（左右移），
+    /// 主屏只保留分辨率/刷新率——主屏参数不必先切主屏身份即可调。
+    /// 单内置屏（无外接）时卡片退化为「显示器调节」：隐藏位置分段与镜像/扩展
+    /// 切换（标题与图标随之切换）。
     private var arrangeCard: some View {
         let externals = state.displays.filter { !$0.isBuiltIn }
         let hasExternals = !externals.isEmpty
@@ -164,28 +173,18 @@ struct PanelView: View {
                           accent: accent) {
             VStack(spacing: BubbleMetrics.rowSpacing) {
                 if hasExternals {
-                    // 排列对象随主屏身份切换（与原 menu 逻辑一致）：
-                    //   外接是主屏 → 排列内置屏；否则逐个排列外接屏。
-                    if state.externalIsMain, let builtIn = state.builtInDisplay {
-                        ArrangementRow(display: builtIn,
+                    ForEach(state.displays) { d in
+                        ArrangementRow(display: d,
                                        state: state,
                                        accent: accent,
-                                       label: builtIn.localizedTypeName(l10n: l10n),
+                                       label: d.localizedTypeName(l10n: l10n),
+                                       showsPosition: !d.isMain,
+                                       foldable: true,
+                                       expandedDisplayID: $expandedDisplayID,
                                        expandedRowID: $expandedRowID,
                                        onHoverDisplay: { hovering in
-                                           hoveredDisplayID = hovering ? builtIn.id : nil
+                                           hoveredDisplayID = hovering ? d.id : nil
                                        })
-                    } else {
-                        ForEach(externals) { ext in
-                            ArrangementRow(display: ext,
-                                           state: state,
-                                           accent: accent,
-                                           label: ext.localizedTypeName(l10n: l10n),
-                                           expandedRowID: $expandedRowID,
-                                           onHoverDisplay: { hovering in
-                                               hoveredDisplayID = hovering ? ext.id : nil
-                                           })
-                        }
                     }
 
                     Divider().padding(.vertical, 4)
@@ -200,11 +199,14 @@ struct PanelView: View {
                     autoArrangeRow
                 } else if let builtIn = state.builtInDisplay {
                     // 单内置屏：无位置可排、无镜像对象，仅分辨率/刷新率。
+                    // 内容只有两行，折叠反而多一次点击——foldable=false 常展开。
                     ArrangementRow(display: builtIn,
                                    state: state,
                                    accent: accent,
                                    label: builtIn.localizedTypeName(l10n: l10n),
                                    showsPosition: false,
+                                   foldable: false,
+                                   expandedDisplayID: .constant(nil),
                                    expandedRowID: $expandedRowID,
                                    onHoverDisplay: { hovering in
                                        hoveredDisplayID = hovering ? builtIn.id : nil
@@ -243,7 +245,7 @@ struct PanelView: View {
             }
 
             HStack(spacing: 8) {
-                ActivePill(active: isMirroring, verticalPadding: 6) {
+                ActivePill(active: isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
                     HStack(spacing: 5) {
                         Image(systemName: "rectangle.on.rectangle").font(.system(size: BubbleMetrics.fontCaption))
                         Text(l10n.t(.mirrorMain)).font(.system(size: BubbleMetrics.fontControl, weight: isMirroring ? .semibold : .regular))
@@ -255,7 +257,7 @@ struct PanelView: View {
                 }
                 .disabled(peer == nil)
 
-                ActivePill(active: !isMirroring, verticalPadding: 6) {
+                ActivePill(active: !isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
                     HStack(spacing: 5) {
                         Image(systemName: "rectangle.dashed").font(.system(size: BubbleMetrics.fontCaption))
                         Text(l10n.t(.extendDisplay)).font(.system(size: BubbleMetrics.fontControl, weight: !isMirroring ? .semibold : .regular))
@@ -316,6 +318,17 @@ struct PanelView: View {
                                     .padding(.vertical, 2)
                                     .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: BubbleMetrics.keycapCornerRadius))
                             }
+                            // 与当前布局一致的预设给「当前」角标（忽略 id 的签名对比，
+                            // 免疫 persistent id 漂移；纯计算不跑 shell）。
+                            if DisplayManager.shared.presetMatchesCurrentLayout(preset.screenArgs,
+                                                                               displays: state.displays) {
+                                Text(l10n.t(.currentLayoutBadge))
+                                    .font(.system(size: BubbleMetrics.fontMini, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(accent, in: Capsule())
+                            }
                             Image(systemName: "play.fill")
                                 .font(.system(size: BubbleMetrics.fontMini))
                                 .foregroundStyle(accent)
@@ -339,7 +352,14 @@ struct PanelView: View {
                 highlightedID: hoveredDisplayID,
                 onSelect: { d in
                     // 点击同一块屏取消选中。
-                    selectedDisplayID = (selectedDisplayID == d.id) ? nil : d.id
+                    let same = selectedDisplayID == d.id
+                    selectedDisplayID = same ? nil : d.id
+                    // 选中即定位：联动展开排列卡中该屏的参数组（取消选中不收起）。
+                    if !same {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            expandedDisplayID = d.id
+                        }
+                    }
                 }
             )
             .frame(maxWidth: .infinity)
@@ -358,6 +378,8 @@ struct PanelView: View {
             }
             Divider().frame(height: 18)
             toolbarButton(l10n.t(.settingsTitle), systemImage: "gearshape") {
+                // openSettings 会切 activation policy 并激活 App，先收面板防悬空。
+                PanelController.shared.close()
                 DockPolicyManager.shared.openSettings()
             }
         }
@@ -380,6 +402,9 @@ struct PanelView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
             .contentShape(Rectangle())
+            // 与全站行控件统一 hover 反馈；外扩传 0——按钮已占满半宽，
+            // 再外扩会盖过中间分隔线。
+            .hoverRowHighlight(horizontalExpansion: 0)
         }
         .buttonStyle(.plain)
     }
@@ -415,88 +440,140 @@ private struct PanelContentHeightKey: PreferenceKey {
 
 // MARK: - 排列行（常驻左/右移 + 刷新率 + 分辨率）
 
-/// 单个屏的排列行：标题行 + 位置分段控件、刷新率与分辨率「当前值 + 点击展开」选择。
-/// `showsPosition` 为 false 时隐藏位置行（单内置屏无左右可排）。
-/// `expandedRowID` 由 PanelView 持有，实现全面板展开互斥。
+/// 单个屏的排列行：可折叠标题行 + 位置分段控件、刷新率与分辨率「当前值 + 点击展开」选择。
+/// `showsPosition` 为 false 时隐藏位置行（单内置屏无左右可排）；
+/// `foldable` 为 true（多屏）时点击标题行展开/收起参数组（默认收起），
+/// false（单内置屏）常展开。
+/// `expandedDisplayID` / `expandedRowID` 均由 PanelView 持有：组间互斥 + 选项行互斥。
 private struct ArrangementRow: View {
     let display: DisplayInfo
     @ObservedObject var state: AppState
     let accent: Color
     let label: String
     var showsPosition: Bool = true
+    /// 是否可折叠（多屏 true：标题行是折叠头；单内置屏 false：参数常展开）。
+    var foldable: Bool = true
+    /// 当前面板内展开参数组的屏 id（面板级互斥，等于本屏 id 时展开）。
+    @Binding var expandedDisplayID: String?
     /// 当前面板内展开的 SelectionRow 标识（互斥收起其他）。
     @Binding var expandedRowID: String?
     /// 标题行 hover 上报（布局图联动高亮该屏）。
     var onHoverDisplay: (Bool) -> Void = { _ in }
 
+    /// 本屏参数组是否展开（不可折叠时恒 true）。
+    private var isExpanded: Bool { !foldable || expandedDisplayID == display.id }
+
     var body: some View {
         VStack(spacing: 0) {
-            // 标题行
-            HStack(spacing: 10) {
-                Image(systemName: display.isBuiltIn ? "laptopcomputer" : "display")
-                    .font(.system(size: BubbleMetrics.fontControl))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 14)
-                Text(label)
-                    .font(.system(size: BubbleMetrics.fontBody))
-                    .foregroundStyle(.primary)
-                Spacer()
+            // 标题行（可折叠时是折叠头）：图标 + 屏名 + 参数概要 + 旋转 chevron。
+            RowButton(action: toggleExpanded) {
+                HStack(spacing: 10) {
+                    Image(systemName: display.isBuiltIn ? "laptopcomputer" : "display")
+                        .font(.system(size: BubbleMetrics.fontControl))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 14)
+                    Text(label)
+                        .font(.system(size: BubbleMetrics.fontBody))
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 8)
+                    if foldable {
+                        // 概要：收起时也能一眼看到当前档位（位置已知才带前缀）。
+                        Text(parameterSummary)
+                            .font(.system(size: BubbleMetrics.fontCaption))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    }
+                }
             }
-            .padding(.vertical, 5)
-            .padding(.horizontal, 4)
-            .contentShape(Rectangle())
             .onHover(perform: onHoverDisplay)
 
             // 表单风三行：位置（分段控件）/ 分辨率 / 刷新率，标题靠左、控件靠右对齐。
-            VStack(spacing: BubbleMetrics.rowSpacing) {
-                if showsPosition {
-                    HStack {
-                        Text(state.localized(.positionLabel))
-                            .font(.system(size: BubbleMetrics.fontCaption))
-                            .foregroundStyle(.secondary)
-                        Spacer(minLength: 12)
-                        sideSegmented
+            // 折叠态下整块隐藏（foldable=false 恒显示）。
+            if isExpanded {
+                VStack(spacing: BubbleMetrics.rowSpacing) {
+                    if showsPosition {
+                        HStack {
+                            Text(state.localized(.positionLabel))
+                                .font(.system(size: BubbleMetrics.fontCaption))
+                                .foregroundStyle(.secondary)
+                            Spacer(minLength: 12)
+                            sideSegmented
+                        }
+                        .padding(.vertical, 3)
                     }
-                    .padding(.vertical, 3)
-                }
-                // 分辨率选择：多于一个可选分辨率时才显示。
-                if display.availableResolutions.count > 1 {
-                    SelectionRow(
-                        rowID: "\(display.id)-resolution",
-                        title: state.localized(.resolutionMenu),
-                        currentValue: "\(display.resolution.width)×\(display.resolution.height)",
-                        accent: accent,
-                        expandedRowID: $expandedRowID,
-                        options: display.availableResolutions.map { res in
-                            .init(text: "\(res.width)×\(res.height)",
-                                  isActive: (res.width == display.resolution.width
-                                             && res.height == display.resolution.height)) {
-                                state.setResolution(res, for: display)
+                    // 分辨率选择：多于一个可选分辨率时才显示。
+                    // 数字是逻辑分辨率（HiDPI 条目由 2 倍物理像素渲染，更锐利），
+                    // 条目尾部标注变体、当前值带 HiDPI 后缀——避免「4K 屏选 4K 数字
+                    // 却得到小图标」的误解（逻辑分辨率才是观感档位）。
+                    if display.availableResolutions.count > 1 {
+                        SelectionRow(
+                            rowID: "\(display.id)-resolution",
+                            title: state.localized(.resolutionMenu),
+                            currentValue: "\(display.resolution.width)×\(display.resolution.height)"
+                                + (display.scalingOn ? " · \(state.localized(.hidpiTag))" : ""),
+                            accent: accent,
+                            expandedRowID: $expandedRowID,
+                            options: display.availableResolutions.map { res in
+                                .init(text: "\(res.width)×\(res.height) "
+                                      + state.localized(res.hidpi ? .hidpiTag : .lowResolutionTag),
+                                      isActive: (res.width == display.resolution.width
+                                                     && res.height == display.resolution.height)) {
+                                    state.setResolution(res, for: display)
+                                }
                             }
-                        }
-                    )
-                }
-                // 刷新率选择：当前分辨率下多于一个可选刷新率时才显示。
-                if display.availableRefreshRates.count > 1 {
-                    SelectionRow(
-                        rowID: "\(display.id)-refresh",
-                        title: state.localized(.refreshRateMenu),
-                        currentValue: "\(display.hertz) \(state.localized(.hertzLabel))",
-                        accent: accent,
-                        expandedRowID: $expandedRowID,
-                        options: display.availableRefreshRates.map { hz in
-                            .init(text: "\(hz) \(state.localized(.hertzLabel))",
-                                  isActive: hz == display.hertz) {
-                                state.setRefreshRate(hz, for: display)
+                        )
+                    }
+                    // 刷新率选择：当前分辨率下多于一个可选刷新率时才显示。
+                    if display.availableRefreshRates.count > 1 {
+                        SelectionRow(
+                            rowID: "\(display.id)-refresh",
+                            title: state.localized(.refreshRateMenu),
+                            currentValue: "\(display.hertz) \(state.localized(.hertzLabel))",
+                            accent: accent,
+                            expandedRowID: $expandedRowID,
+                            options: display.availableRefreshRates.map { hz in
+                                .init(text: "\(hz) \(state.localized(.hertzLabel))",
+                                      isActive: hz == display.hertz) {
+                                    state.setRefreshRate(hz, for: display)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
+                .padding(.leading, 24)   // 与标题行文字对齐：图标 frame 14 + spacing 10
+                .padding(.trailing, 4)
+                .padding(.bottom, 6)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .padding(.leading, 24)   // 与标题行文字对齐：图标 frame 14 + spacing 10
-            .padding(.trailing, 4)
-            .padding(.bottom, 6)
         }
+    }
+
+    /// 折叠头点击：切换本组展开态。组间互斥（面板级单值）：展开本组自动收起其他组；
+    /// 任何组折叠/切换都会让组内的选项列表不可见，统一清空 expandedRowID 防止
+    /// 下次展开时残留旧的选项展开态。
+    private func toggleExpanded() {
+        guard foldable else { return }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            expandedRowID = nil
+            expandedDisplayID = isExpanded ? nil : display.id
+        }
+    }
+
+    /// 折叠头右侧的参数概要：位置（可排且已知时）· 分辨率 · 刷新率。
+    /// 位置未知（镜像中/重叠布局）时省略前缀，与 sideSegmented 两段均不高亮的判定一致。
+    private var parameterSummary: String {
+        var parts: [String] = []
+        if showsPosition, let side = state.side(of: display) {
+            parts.append(side == .left ? state.localized(.sideLeft) : state.localized(.sideRight))
+        }
+        parts.append("\(display.resolution.width)×\(display.resolution.height)")
+        parts.append("\(display.hertz) \(state.localized(.hertzLabel))")
+        return parts.joined(separator: " · ")
     }
 
     /// 位置分段控件：「◀ 左侧 | 右侧 ▶」，玻璃槽 + 染色玻璃激活段。
@@ -508,9 +585,9 @@ private struct ArrangementRow: View {
             sideSegment(.right, active: current == .right)
         }
         .padding(2)
-        // 外壳从描边胶囊升级为中性玻璃槽：与激活段的染色玻璃形成液态玻璃分层
-        //（槽 = 磨砂容器，段 = 槽内玻璃块）。恒定高光，不随 hover 闪烁。
-        .liquidGlass(hoverBoost: 0)
+        .background(
+            Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+        )
     }
 
     /// 分段控件的单段：箭头指向移动方向，激活段强调色实心。
@@ -574,6 +651,12 @@ private struct SelectionRow: View {
                     Text(currentValue)
                         .font(.system(size: BubbleMetrics.fontCaption, weight: .medium))
                         .foregroundStyle(.primary)
+                    // 展开状态指示：chevron 随展开旋转向下（旋转在触发行的
+                    // withAnimation 里一起动），补上「点击可展开」的视觉提示。
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
                 }
             }
 

@@ -1,5 +1,20 @@
 import Foundation
 
+/// 一个可选分辨率条目：逻辑分辨率 + 该条目优先生效的变体是否 HiDPI。
+///
+/// displayplacer 模式行的 `res:` 是**逻辑分辨率**（HiDPI 模式的物理像素是 2 倍，
+/// 如 `res:1920x1080 scaling:on` 在 4K 屏上由 3840x2160 像素渲染）。同一逻辑分辨率
+/// 常同时存在 HiDPI 与非 HiDPI 两个模式，菜单按分辨率去重合并时优先生效 HiDPI
+/// 变体（与系统设置默认一致）——`hidpi` 记录的就是这个合并决策，切换时按它
+/// 决定 `scaling:on/off`，不再照抄屏当前模式的 scaling（那正是
+/// 「切分辨率后丢 HiDPI、图标变小」事故的根因）。
+struct ResolutionOption: Equatable {
+    let width: Int
+    let height: Int
+    /// 该分辨率条目优先生效的变体是否 HiDPI（决定切换时 scaling:on/off）。
+    let hidpi: Bool
+}
+
 /// 一个显示器的完整状态信息（解析自 `displayplacer list` 的输出）。
 struct DisplayInfo: Identifiable, Equatable {
     /// displayplacer 的持久化屏幕 ID（通常跨插拔保持稳定）
@@ -28,9 +43,10 @@ struct DisplayInfo: Identifiable, Equatable {
     /// 只保留与当前分辨率相同的模式的 hz。空数组表示无多选项（或未解析）。
     var availableRefreshRates: [Int]
 
-    /// 该屏所有可选分辨率（去重、保持 displayplacer 输出顺序），用于菜单切换分辨率。
+    /// 该屏所有可选分辨率（按 "WxH" 去重、保持 displayplacer 输出顺序，
+    /// 同分辨率的 HiDPI 变体优先生效），用于菜单切换分辨率。
     /// 从 displayplacer list 的 "Resolutions for rotation" 段解析。空数组表示无多选项（或未解析）。
-    var availableResolutions: [(width: Int, height: Int)]
+    var availableResolutions: [ResolutionOption]
 
     /// 是否为笔记本内置屏（displayplacer 的 Type 里包含 "built in"）
     var isBuiltIn: Bool {

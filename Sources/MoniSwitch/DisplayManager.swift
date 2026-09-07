@@ -191,15 +191,19 @@ final class DisplayManager {
         )
     }
 
-    /// 解析屏块里出现的所有分辨率（去重，保持 displayplacer 输出顺序）。
-    /// 解析 "mode N: res:WxH hz:X" 行，收集全部 (W,H)，不去重为单维度，按 "WxH" 字符串去重。
-    private func parseResolutions(in block: String) -> [(width: Int, height: Int)] {
-        // 与 parseRefreshRates 共用正则，但不过滤当前分辨率。
-        let pattern = #"res:(\d+)x(\d+)\s+hz:(\d+)"#
+    /// 解析屏块里出现的所有分辨率（按 "WxH" 去重，保持 displayplacer 输出顺序）。
+    ///
+    /// 解析 "mode N: res:WxH hz:X [scaling:on]" 行。注意 `res:` 是**逻辑分辨率**
+    /// （HiDPI 模式物理像素为 2 倍），同一逻辑分辨率常同时存在 HiDPI 与非 HiDPI
+    /// 两个模式（如 4K 屏的 res:1920x1080 与 res:3840x2160 各有双变体）。合并成
+    /// 一条菜单项时优先生效 HiDPI 变体（与系统设置默认一致），`hidpi` 标志随后
+    /// 由 setResolution 用于决定 scaling:on/off。
+    private func parseResolutions(in block: String) -> [ResolutionOption] {
+        let pattern = #"res:(\d+)x(\d+)\s+hz:(\d+)(\s+scaling:on)?"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
         let range = NSRange(block.startIndex..., in: block)
-        var seen = Set<String>()
-        var result: [(width: Int, height: Int)] = []
+        var order: [String] = []              // 分辨率首次出现顺序
+        var hidpiByRes: [String: Bool] = [:]  // "WxH" → 是否存在 HiDPI 变体
         regex.enumerateMatches(in: block, options: [], range: range) { match, _, _ in
             guard let match,
                   let wRange = Range(match.range(at: 1), in: block),
@@ -208,11 +212,21 @@ final class DisplayManager {
             let h = Int(block[hRange]) ?? 0
             guard w > 0, h > 0 else { return }
             let key = "\(w)x\(h)"
-            guard !seen.contains(key) else { return }
-            seen.insert(key)
-            result.append((width: w, height: h))
+            let isHiDPI = match.range(at: 4).location != NSNotFound
+            if hidpiByRes[key] == nil {
+                order.append(key)
+                hidpiByRes[key] = false
+            }
+            // HiDPI 变体出现即升级该条目（无论两个变体谁先被扫到）。
+            if isHiDPI { hidpiByRes[key] = true }
         }
-        return result
+        return order.compactMap { key -> ResolutionOption? in
+            let parts = key.split(separator: "x")
+            guard parts.count == 2,
+                  let w = Int(parts[0]), let h = Int(parts[1]),
+                  let hidpi = hidpiByRes[key] else { return nil }
+            return ResolutionOption(width: w, height: h, hidpi: hidpi)
+        }
     }
 
     /// 从屏块里解析与指定分辨率匹配的所有刷新率。
@@ -394,6 +408,85 @@ final class DisplayManager {
             .split(separator: "+", omittingEmptySubsequences: false)
             .map { mapping[String($0)] ?? String($0) }
         return "id:" + newIDs.joined(separator: "+") + tail
+    }
+
+    // MARK: - 预设与当前布局比对
+
+    /// 判断一份预设的 args 是否与当前布局一致（面板预设行的「当前」角标用）。
+    ///
+    /// 纯计算、不跑 shell：把两侧都归一成「忽略 persistent id」的条目签名再整体比较，
+    /// 天然免疫 id 漂移（外接屏唤醒/重插拔后 id 变化不影响判定）。签名条目 =
+    /// res|hz|color_depth|scaling|origin|degree|屏数（镜像合并条目的屏数 = 组内屏数，
+    /// 扩展态每条 1——镜像态与扩展态由此天然区分）。当前侧按 currentSnapshotArgs
+    /// 同款归并（镜像组一条、基准屏主屏优先），但直接由 displays + mirrorGroups
+    /// 推导，避免在面板渲染路径上调用 displayplacer。
+    /// 解析失败的预设按「不匹配」处理（宁缺毋滥，不误标）。
+    func presetMatchesCurrentLayout(_ presetArgs: [String], displays: [DisplayInfo]) -> Bool {
+        guard !presetArgs.isEmpty, !displays.isEmpty else { return false }
+        let presetSignatures = presetArgs.compactMap { argSignature($0) }
+        guard presetSignatures.count == presetArgs.count else { return false }
+        let currentSignatures = currentLayoutSignatures(displays)
+        guard !currentSignatures.isEmpty else { return false }
+        return presetSignatures.sorted() == currentSignatures.sorted()
+    }
+
+    /// 当前布局的条目签名（与 currentSnapshotArgs 同构：镜像组合并、基准屏主屏优先）。
+    private func currentLayoutSignatures(_ displays: [DisplayInfo]) -> [String] {
+        // 只统计真镜像组（size >= 2，与 detectMirrorGroups 的记录口径一致）。
+        let groups = mirrorGroups.filter { $0.count > 1 }
+        var mirroredIDs = Set<String>()
+        for group in groups {
+            mirroredIDs.formUnion(group)
+        }
+
+        var signatures: [String] = []
+        for group in groups {
+            let members = displays.filter { group.contains($0.id) }
+            guard let base = members.first(where: { $0.isMain }) ?? members.first else { continue }
+            signatures.append(layoutSignature(
+                res: base.resolution, hz: base.hertz, depth: base.colorDepth,
+                scaling: base.scalingOn, origin: base.origin,
+                degree: base.degree, count: members.count))
+        }
+        for d in displays where !mirroredIDs.contains(d.id) {
+            signatures.append(layoutSignature(
+                res: d.resolution, hz: d.hertz, depth: d.colorDepth,
+                scaling: d.scalingOn, origin: d.origin,
+                degree: d.degree, count: 1))
+        }
+        return signatures
+    }
+
+    /// 解析单条 displayplacer arg 为条目签名（id 段只取屏数，具体 id 忽略）。
+    /// 与 makeScreenArg 的字段一一对应；关键字段（id/res）解析失败返回 nil。
+    private func argSignature(_ arg: String) -> String? {
+        guard let ids = idTokens(of: arg),
+              let res = resToken(of: arg) else { return nil }
+        let hz = Int(token("hz:", in: arg) ?? "") ?? 60
+        let depth = Int(token("color_depth:", in: arg) ?? "") ?? 8
+        let scaling = (token("scaling:", in: arg) ?? "off") == "on"
+        // parseOrigin 吃 "(x,y)" 形态（含 list 输出的 "… - main display" 后缀），直接可用。
+        let origin = parseOrigin(token("origin:", in: arg))
+        let degree = Int(token("degree:", in: arg) ?? "") ?? 0
+        return layoutSignature(res: res, hz: hz, depth: depth,
+                               scaling: scaling, origin: origin,
+                               degree: degree, count: ids.count)
+    }
+
+    /// 条目签名的统一拼装格式（currentLayoutSignatures 与 argSignature 共用）。
+    private func layoutSignature(res: (width: Int, height: Int),
+                                 hz: Int, depth: Int, scaling: Bool,
+                                 origin: (x: Int, y: Int), degree: Int,
+                                 count: Int) -> String {
+        "res:\(res.width)x\(res.height)|hz:\(hz)|depth:\(depth)"
+        + "|scaling:\(scaling ? "on" : "off")"
+        + "|origin:\(origin.x),\(origin.y)|degree:\(degree)|n:\(count)"
+    }
+
+    /// 取 arg 中 `key:value` 段的 value（到下一个空格为止）。idTokens/resToken 的通用版。
+    private func token(_ key: String, in arg: String) -> String? {
+        guard let range = arg.range(of: key) else { return nil }
+        return String(arg[range.upperBound...].prefix(while: { $0 != " " }))
     }
 
     // MARK: - 操作
@@ -653,21 +746,24 @@ final class DisplayManager {
     /// 切换某块屏的分辨率，其余屏保持不变。
     ///
     /// 实现方式：遍历所有屏生成 args，仅目标屏用新的 res（刷新率/位置等不变）。
+    /// 目标屏的 scaling 跟随**所选档位的变体**（`res.hidpi`），而不是照抄屏当前
+    /// 模式的 scalingOn——照抄曾导致屏一旦落入非 HiDPI 模式后，重选任何分辨率
+    /// （包括 4K）都带着 scaling:off 发出，图标变小且 UI 无法自愈（v0.2.0 事故）。
     /// 注意：切换分辨率后该屏的可用刷新率集合可能变化，UI 刷新会通过 currentDisplays() 重读得到。
     /// - Parameters:
-    ///   - res: 目标分辨率。
+    ///   - res: 目标分辨率条目（含该条目优先生效的变体是否 HiDPI）。
     ///   - display: 要切换分辨率的屏。
     ///   - displays: 当前完整屏幕列表。
     /// - Returns: 是否执行成功。
     @discardableResult
-    func setResolution(_ res: (width: Int, height: Int), for display: DisplayInfo, in displays: [DisplayInfo]) -> Bool {
+    func setResolution(_ res: ResolutionOption, for display: DisplayInfo, in displays: [DisplayInfo]) -> Bool {
         let args = displays.map { d -> String in
             makeScreenArg(
                 id: d.id,
-                res: d.id == display.id ? res : d.resolution,
+                res: d.id == display.id ? (res.width, res.height) : d.resolution,
                 hz: d.hertz,
                 colorDepth: d.colorDepth,
-                scaling: d.scalingOn,
+                scaling: d.id == display.id ? res.hidpi : d.scalingOn,
                 origin: d.origin,
                 degree: d.degree
             )

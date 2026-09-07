@@ -160,6 +160,9 @@ struct RowButton<Content: View>: View {
     /// 行内边距：主行默认 (5, 4)，展开选项等紧凑行可调小。
     var verticalPadding: CGFloat = 5
     var horizontalPadding: CGFloat = 4
+    /// hover 高亮向两侧外扩点数（透传 hoverRowHighlight）。展开列表内的选项行
+    /// 传 0：其自带 h:6 内边距已足够，再外扩会溢出浅灰圆角容器。
+    var highlightExpansion: CGFloat = 6
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -168,7 +171,7 @@ struct RowButton<Content: View>: View {
                 .contentShape(Rectangle())
                 .padding(.vertical, verticalPadding)
                 .padding(.horizontal, horizontalPadding)
-                .hoverRowHighlight()
+                .hoverRowHighlight(horizontalExpansion: highlightExpansion)
         }
         .buttonStyle(.plain)
     }
@@ -177,9 +180,13 @@ struct RowButton<Content: View>: View {
 extension View {
     /// 类原生菜单的行 hover 高亮：鼠标悬停时给一层柔和的强调色叠加，
     /// 提升可点性与「鲜活/原生」感。修饰在已带 .contentShape 的行上。
+    /// - Parameter horizontalExpansion: 高亮向左右两侧外扩的点数。行内容的水平
+    ///   内边距普遍很窄（SelectionRow 触发行为 0），不外扩时高亮边界贴着文字
+    ///   显得局促，默认外扩 6pt；空间受限的调用方（工具栏按钮、展开列表选项行）
+    ///   传 0。
     @ViewBuilder
-    func hoverRowHighlight() -> some View {
-        modifier(HoverRowHighlightModifier())
+    func hoverRowHighlight(horizontalExpansion: CGFloat = 6) -> some View {
+        modifier(HoverRowHighlightModifier(horizontalExpansion: horizontalExpansion))
     }
 
     /// 把任意视图包装成 plain Button（保留视图原样，仅接管整块命中区点击）。
@@ -190,28 +197,62 @@ extension View {
     }
 }
 
-/// 激活态玻璃胶囊：active 时强调色染色玻璃 + 白字，非激活时中性玻璃 + 主色字
-/// （悬停高光提亮）。镜像/扩展切换按钮与位置分段控件的段共用，激活态视觉由此统一。
-/// 玻璃质感见 LiquidGlass.swift 的 liquidGlass 修饰器。
+/// 激活态胶囊：active 时强调色实心 + 白字，非激活时透明底 + 主色字。
+/// 镜像/扩展切换按钮与位置分段控件的段共用，激活态视觉由此统一。
+/// - `strokeWhenInactive`：非激活时是否给整胶囊加淡描边（镜像/扩展按钮用；
+///   位置分段的描边由外层分段容器统一承担，传 false）。
+/// - 未激活态悬停时给一层 14% 强调色胶囊底（与行高亮同款），两类控件一并获得
+///   悬停反馈；激活态本就是强调色实心，不再叠加。
 struct ActivePill<Content: View>: View {
     let active: Bool
     var verticalPadding: CGFloat = 3
+    var strokeWhenInactive = false
     @ViewBuilder let content: Content
+
+    /// 悬停态跟踪。显式 init：加 @State 后默认成员构造器会变 private，
+    /// 手写保持 PanelView 侧调用签名不变。
+    @State private var isHovered = false
+
+    init(active: Bool,
+         verticalPadding: CGFloat = 3,
+         strokeWhenInactive: Bool = false,
+         @ViewBuilder content: () -> Content) {
+        self.active = active
+        self.verticalPadding = verticalPadding
+        self.strokeWhenInactive = strokeWhenInactive
+        self.content = content()
+    }
 
     var body: some View {
         content
             .padding(.vertical, verticalPadding)
-            // 染色玻璃（激活）恒定高光；中性玻璃（未激活）悬停提亮，提示可点。
-            .liquidGlass(tint: active ? Color.accentColor : nil,
-                         hoverBoost: active ? 0 : 0.5)
+            .background {
+                if active {
+                    Capsule().fill(BrandColor.accent)
+                } else {
+                    // hover 底色在下、描边在上，静止态层次不变。
+                    ZStack {
+                        if isHovered {
+                            Capsule().fill(BrandColor.accent.opacity(0.14))
+                        }
+                        if strokeWhenInactive {
+                            Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                        }
+                    }
+                }
+            }
             .foregroundStyle(active ? Color.white : Color.primary)
             .contentShape(Rectangle())
+            .onHover { isHovered = $0 }
+            .animation(.easeInOut(duration: 0.12), value: isHovered)
     }
 }
 
 /// 行 hover 高亮修饰器：用局部 @State 跟踪悬停态，叠加半透明强调色背景。
 /// 强调色直接读 BrandColor.accent（桥接的动态色，系统强调色切换时自动更新）。
 private struct HoverRowHighlightModifier: ViewModifier {
+    /// 高亮向两侧外扩点数（见 hoverRowHighlight 注释）。
+    var horizontalExpansion: CGFloat = 6
     @State private var isHovered = false
 
     func body(content: Content) -> some View {
@@ -220,6 +261,9 @@ private struct HoverRowHighlightModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: BubbleMetrics.hoverCornerRadius)
                     .fill(BrandColor.accent.opacity(isHovered ? 0.14 : 0))
                     .animation(.easeInOut(duration: 0.12), value: isHovered)
+                    // 负 padding 让高亮矩形向两侧外扩：只扩视觉、不占布局空间，
+                    // 文字与行内其他元素的位置不受影响。
+                    .padding(.horizontal, -horizontalExpansion)
             )
             .onHover { isHovered = $0 }
     }
