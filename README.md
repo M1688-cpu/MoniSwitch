@@ -13,7 +13,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue" alt="platform">
   <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey" alt="arch">
-  <img src="https://img.shields.io/badge/version-0.1.4-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-0.1.5-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
 
@@ -23,6 +23,7 @@
 - Click any display in the panel to make it the main display (the one with the menu bar)
 - Unfold a screen's parameter group to place an external screen to the left or right of the main display
 - Collapsible arrangement card: each screen's position/resolution/refresh-rate rows fold under its name row, collapsed by default with only one expanded at a time; click a block in the layout preview to jump straight to that screen
+- The panel resizes with its content instead of scrolling inside; expand/collapse plays a smooth spring animation, and cards lift softly on hover
 - Toggle an external screen between "extended desktop" and "mirroring" in one click; the panel labels the mirror target screen
 - One-click auto-arrange lays all screens out side by side, removes overlaps, and keeps mirror groups intact
 - Layout presets: save a whole display configuration (main + position + mirroring) as a preset and restore it in one click (e.g. "Desk", "Presentation")

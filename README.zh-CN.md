@@ -13,7 +13,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue" alt="platform">
   <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey" alt="arch">
-  <img src="https://img.shields.io/badge/version-0.1.4-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-0.1.5-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
 
@@ -23,6 +23,7 @@
 - 在面板里点任意显示器，即可把它设为主显示器（白条所在屏）
 - 展开某块屏的参数组，可把外接屏放到主屏的左边或右边
 - 排列卡可折叠：每块屏的 位置/分辨率/刷新率 折叠在屏名行下，默认收起、同时只展开一块屏；点击布局图中的屏块可直接定位展开
+- 面板高度随内容自适应（不再内部滚动）；展开/收起为平滑弹簧动画，卡片悬停时轻微浮起
 - 一键把外接屏在「扩展显示」和「镜像主屏」之间切换，面板会标注镜像目标屏
 - 一键自动排列：所有屏横向排开、消除重叠，镜像组保持完整
 - 布局预设：把整套显示器配置（主屏+位置+镜像）保存为预设，一键恢复（如「办公」「演示」）
