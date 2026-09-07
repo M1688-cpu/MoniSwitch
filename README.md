@@ -9,22 +9,25 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue" alt="platform">
   <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey" alt="arch">
-  <img src="https://img.shields.io/badge/version-0.2.0-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-0.1.4-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
 
 ## 功能
 
-- 🖥️ **菜单栏常驻**：点击菜单栏图标即弹出气泡卡片面板（悬浮毛玻璃圆角卡片）
+- 🖥️ **菜单栏常驻**：点击菜单栏图标弹出气泡卡片面板——原生 popover 观感（箭头指向图标、在图标上居中、展开动画），点面板外任意位置即收起
 - 🔀 **一键切主屏**：在面板里点任意显示器，立即把它设为主显示器（白条所在屏）
-- ↔️ **左右移动外接屏**：展开外接屏行，把外接屏放到主屏的左边或右边
+- ↔️ **左右移动外接屏**：展开该屏的参数组，把外接屏放到主屏的左边或右边
+- 🗂️ **排列卡折叠交互**：每块屏的 位置/分辨率/刷新率 折叠在屏名行下，默认收起、同时只展开一块屏；点击布局图中的屏块可直接定位展开
 - 🪞 **扩展 / 镜像切换**：把外接屏在「扩展显示」和「镜像主屏」之间一键切换（面板标注镜像目标屏）
 - ✨ **一键自动排列**：所有屏横向排开、消除重叠，镜像组保持完整不被拆散
 - 📦 **布局预设**：把整套显示器配置（主屏+位置+镜像）保存为预设，一键切换（如「办公」「演示」）
+- 🏷️ **预设「当前」角标**：与当前布局一致的预设自动显示「当前」角标（按分辨率/刷新率/位置/镜像态比对，不受屏幕 id 漂移影响）
 - 🛟 **预设防漂移**：显示器重插拔导致 persistent id 变化时，自动按分辨率/屏数重映射，预设不再失效
-- 🔄 **菜单切换刷新率/分辨率**：面板内直接切换外接屏刷新率（如 60Hz ↔ 120Hz）与分辨率
+- 🔄 **菜单切换刷新率/分辨率**：面板内直接切换任意屏（含主屏）的刷新率（如 60Hz ↔ 120Hz）与分辨率
+- 🖼️ **HiDPI 保真切换**：分辨率选项标注 HiDPI / 低分辨率变体，重选分辨率不再丢失 HiDPI 缩放（4K 屏不再出现「选完分辨率图标变小」）
 - ⌨️ **全局快捷键**：给每个预设绑定一个全局快捷键（Carbon `RegisterEventHotKey`，零权限依赖），按下即应用对应布局
-- 🗺️ **交互式布局预览**：按真实比例绘制显示器位置，点击屏块选中、悬停列表行时对应屏块高亮
+- 🗺️ **交互式布局预览**：按真实比例绘制显示器位置，点击屏块选中并联动展开该屏参数组，悬停列表行时对应屏块高亮
 - ⏳ **操作反馈**：切换进行中显示进度条并防连点，失败弹系统通知不再静默
 - 🎨 **跟随系统强调色**：面板与设置窗口随「系统设置 → 外观 → 强调色」实时刷新，无固定品牌色
 - ⚙️ **设置窗口**：中英双语、开机自启动、自动刷新列表（可选刷新间隔）、切换后通知
@@ -45,8 +48,8 @@
   <tr>
     <td align="center">
       <img src="screenshots/zh/panel-arrange.png" alt="排列展开">
-      <br><b>排列展开</b> · 左/右移动 + 刷新率切换 + 镜像/扩展
-      <br><sub>展开外接屏行，露出胶囊按钮</sub>
+      <br><b>排列展开</b> · 位置/分辨率/刷新率参数组 + 镜像/扩展
+      <br><sub>点击屏名行展开参数组，分辨率行可再展开选项列表（含 HiDPI 标注）</sub>
     </td>
   </tr>
   <tr>
@@ -108,9 +111,11 @@ bash Support/build-app.sh
 ## 使用
 
 1. 打开 MoniSwitch 后，菜单栏会出现一个显示器图标
-2. 点击图标，看到当前所有显示器列表
-3. **点击任意显示器名称** → 立即设为主屏
-4. 展开「外接显示器」子菜单 → 左/右移动、镜像、扩展
+2. 点击图标弹出面板，看到当前所有显示器与布局预览
+3. **主屏卡**：点击任意显示器名称 → 立即设为主屏
+4. **排列与镜像卡**：点击屏名行展开该屏的参数组，可调整左右位置、分辨率、刷新率；外接屏在此切换镜像/扩展，或一键自动排列
+5. **预设卡**：点击预设名一键恢复整套布局，与当前布局一致的预设带「当前」角标
+6. 点击面板外任意位置即可收起面板
 
 ## 关于未公证提示
 
@@ -130,7 +135,7 @@ displayplacer 二进制随 App 一起打包，**开箱即用，无需额外安�
 ## 技术栈
 
 - **语言**：Swift 6
-- **UI**：SwiftUI `MenuBarExtra`（macOS 13+ 原生菜单栏 API）
+- **UI**：SwiftUI + AppKit（`NSStatusItem` + `NSPopover` 菜单栏面板，macOS 13+）
 - **构建**：Swift Package Manager（纯文本 `Package.swift`，命令行即可编译）
 - **类型**：纯菜单栏 App（`LSUIElement = YES`，无 Dock 图标）
 - **分发**：非沙盒，本地 ad-hoc 签名，DMG 直链
@@ -141,7 +146,8 @@ displayplacer 二进制随 App 一起打包，**开箱即用，无需额外安�
 MoniSwitch/
 ├── Package.swift                  # SPM 构建配置
 ├── Sources/MoniSwitch/
-│   ├── MoniSwitchApp.swift        # @main 入口（MenuBarExtra .window + 菜单栏模板图标）
+│   ├── MoniSwitchApp.swift        # @main 入口（AppDelegate 启动菜单栏图标 + ⌘, 命令）
+│   ├── PanelController.swift      # 菜单栏面板控制器（NSStatusItem + NSPopover 承载 PanelView）
 │   ├── AppState.swift             # UI 状态对象（显示器列表 + 全部切换操作 + 进行中状态）
 │   ├── PanelView.swift            # 菜单栏气泡卡片面板（主屏/排列/预设/交互式布局预览）
 │   ├── Components.swift           # 全站共享视觉组件（BubbleCard/RowButton/ActivePill 等）
@@ -191,6 +197,10 @@ MoniSwitch/
 - [x] 操作进行中反馈（进度条 + 防连点）与失败通知
 - [x] 一键自动排列（横向排开、消除重叠、保持镜像组）
 - [x] 预设 id 漂移自动重映射
+- [x] HiDPI 分辨率保真切换（变体标注，不再误入低分辨率模式）
+- [x] 排列卡折叠交互（屏参数组折叠、布局图点击联动展开）
+- [x] 预设「当前」角标
+- [x] 面板 NSPopover 化（箭头/居中/展开动画/点外部收起）
 - [ ] 适配 Intel 芯片
 - [ ] 多屏（>2）场景优化
 - [ ] Apple 公证
