@@ -72,6 +72,8 @@ struct BubbleCard<Content: View>: View {
         .modifier(BubbleBackground())
         // 四周悬浮阴影：气泡与原生毛玻璃背景拉开层次，呈现「浮于桌面之上」的观感。
         .bubbleShadow()
+        // hover 整卡微放大 + 上浮 + 阴影增强（最外层，全仿射保原生锐度）。仅菜单栏面板使用。
+        .bubbleHoverLift()
     }
 }
 
@@ -95,8 +97,8 @@ struct SettingsCard<Content: View>: View {
         }
         .padding(16)
         .modifier(BubbleBackground())
-        // 悬浮阴影略浅（与菜单栏 BubbleCard 同款、透明度稍低）。
-        .bubbleShadow(opacity: 0.10)
+        // 悬浮阴影稍浅（强度系数 0.85，与菜单栏 BubbleCard 同款双层弥散）。
+        .bubbleShadow(opacity: 0.85)
     }
 }
 
@@ -266,6 +268,43 @@ private struct HoverRowHighlightModifier: ViewModifier {
                     .padding(.horizontal, -horizontalExpansion)
             )
             .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - 气泡 hover 浮起
+
+/// 气泡悬浮交互：hover 时整卡微放大 + 上浮 + 阴影增强（「浮起的小板」质感），离开弹簧落回。
+///
+/// **全部用 2D 仿射变换实现（scaleEffect/offset/shadow）**——仿射变换走 CALayer
+/// 路径不栅格化，HiDPI 下保持系统原生渲染分辨率。曾用 rotation3DEffect 做
+/// Atoll 式 3D 倾斜，3D 透视变换会把卡片栅格化重采样、悬停时整卡文字明显变糊
+/// （用户实测反馈），已整体移除；含文字的卡片禁用 3D 透视效果（详见 AGENTS 风格约定）。
+/// 幅度/弹簧常量收在 BubbleMetrics（liftScale/liftOffset/liftShadow*/liftSpring）。
+/// 系统开启「减弱动态效果」时自动关闭。挂在卡片阴影链最外层（bubbleShadow 之后），
+/// 增强阴影叠在双层弥散阴影之上。
+struct BubbleHoverLiftModifier: ViewModifier {
+    /// 悬停态跟踪（全站 hover 范式：@State + onHover）。
+    @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        let lifting = isHovered && !reduceMotion
+        content
+            .scaleEffect(lifting ? BubbleMetrics.liftScale : 1)
+            .offset(y: lifting ? -BubbleMetrics.liftOffset : 0)
+            .shadow(color: .black.opacity(lifting ? BubbleMetrics.liftShadowOpacity : 0),
+                    radius: BubbleMetrics.liftShadowRadius,
+                    x: 0, y: BubbleMetrics.liftShadowY)
+            .onHover { isHovered = $0 }
+            .animation(BubbleMetrics.liftSpring, value: isHovered)
+    }
+}
+
+extension View {
+    /// 气泡 hover 浮起：整卡微放大 + 上浮 + 阴影增强（见 BubbleHoverLiftModifier，全仿射保锐度）。
+    /// 用于菜单栏面板的全部大气泡（BubbleCard 各卡片 + 底部工具栏两气泡）。
+    func bubbleHoverLift() -> some View {
+        modifier(BubbleHoverLiftModifier())
     }
 }
 

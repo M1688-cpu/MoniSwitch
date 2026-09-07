@@ -1,6 +1,10 @@
 import SwiftUI
 import AppKit
 
+/// 面板展开/收起动画：平滑弹簧（先加速后减速、末端轻柔收敛不回弹），
+/// 配合 .move(edge: .top) 过渡呈现「由上向下拉伸」，popover 高度随内容联动。
+private let panelReveal = Animation.spring(response: 0.32, dampingFraction: 0.86)
+
 /// 菜单栏下拉面板（宿主为 PanelController 的 NSPopover）：按参考图做成分栏「气泡卡片」。
 ///
 /// 这里是一块可完全自定义的 SwiftUI 视图：
@@ -9,9 +13,9 @@ import AppKit
 ///   - 所有切换操作复用 `AppState` / `PresetManager` 的现有逻辑，只改触发控件形态；
 ///   - 箭头/居中对齐/展开动画由 NSPopover 系统 chrome 提供（圆角贴顶同理）。
 ///
-/// 卡片顺序：主显示器 → 排列与镜像 → 布局预设 → 布局预览 → 底部工具栏 → 退出。
+/// 卡片顺序：主显示器 → 排列与镜像 → 布局预设 → 布局预览 → 底部操作栏。
 /// 交互：操作进行中（isOperating）禁用卡片区并显示顶部流动进度条；
-/// 卡片区可滚动（多屏/多预设时封顶 600pt）；排列行 hover 与布局图互相联动。
+/// 面板高度随内容自适应（展开参数/切换语言变长都不出滚动条）；排列行 hover 与布局图互相联动。
 struct PanelView: View {
 
     @ObservedObject var state: AppState
@@ -37,17 +41,6 @@ struct PanelView: View {
     /// 解决"不知道排列/镜像操作的是哪块屏"的歧义）。
     @State private var hoveredDisplayID: String?
 
-    /// 卡片区内容实测高度（PreferenceKey 上报），驱动 ScrollView 的明确高度。
-    ///
-    /// 背景（2026-09 实测）：屏幕重配（切主屏/自动排列等触发系统级 relayout）时，
-    /// 面板被系统重新求解尺寸，ScrollView 在无确定高度 proposal 的求解轮里
-    /// ideal 高度塌为 0——面板瞬间只剩底部工具栏与退出行，且不再自愈。
-    /// （当时宿主是 MenuBarExtra(.window)；迁移 NSPopover 后保留同一防御，
-    /// 显式高度对 popover 的 preferredContentSize 同样是确定值。）
-    /// 改为测内容实高后显式 frame：任何重求解都拿到确定值，不再塌。
-    /// 初值取典型四卡高度，防首帧闪变。
-    @State private var scrollContentHeight: CGFloat = 480
-
     /// 是否有操作在后台执行（含预设回放）：禁用卡片区 + 显示进度条。
     private var busy: Bool { state.isOperating || presetManager.isApplying }
 
@@ -63,42 +56,31 @@ struct PanelView: View {
                         .padding(.vertical, 16)
                 }
             } else {
-                // 卡片区可滚动：高度 = min(内容实高, 600)，显式 frame 的原因见
-                // scrollContentHeight 注释（屏幕重配时防 ScrollView 塌 0）。
-                ScrollView {
-                    VStack(spacing: BubbleMetrics.cardSpacing) {
-                        primaryCard
-                        // 单内置屏时也显示：卡片退化为内置屏的分辨率/刷新率调节。
-                        arrangeCard
-                        if !presetManager.presets.isEmpty {
-                            presetsCard
-                        }
-                        layoutPreviewCard
+                // 卡片区直接排列：面板高度随内容自适应，无 ScrollView 封顶——
+                // 展开参数组、切换语言文本变长都不会出滚动条。不包 ScrollView
+                // 也顺带消除两处历史问题（详见 AGENTS.md）：它对子视图 bounds 的
+                // 裁切会把卡片阴影切出直线边界；屏幕重配时理想高度会塌 0。
+                VStack(spacing: BubbleMetrics.cardSpacing) {
+                    primaryCard
+                    // 单内置屏时也显示：卡片退化为内置屏的分辨率/刷新率调节。
+                    arrangeCard
+                    if !presetManager.presets.isEmpty {
+                        presetsCard
                     }
-                    .background(
-                        // 测内容固有高度（GeometryReader 铺在内容 background 上，
-                        // 读到的是内容布局高度，不受滚动视口影响）
-                        GeometryReader { geo in
-                            Color.clear.preference(key: PanelContentHeightKey.self,
-                                                   value: geo.size.height)
-                        }
-                    )
+                    layoutPreviewCard
                 }
-                .onPreferenceChange(PanelContentHeightKey.self) { scrollContentHeight = $0 }
-                .frame(height: min(scrollContentHeight, 600))
                 .disabled(busy)
             }
             bottomToolbar
-            quitRow
         }
-        .padding(14)
+        .padding(16)
         // 只锁宽度，高度按内容自适应。
         .frame(minWidth: 380, idealWidth: 380, maxWidth: 380)
         // 操作进行中：顶部悬浮一条流动进度条（overlay 不占布局空间，内容不下移）。
         .overlay(alignment: .top) {
             if busy {
                 IndeterminateBar(accent: accent)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.top, 6)
                     .transition(.opacity)
             }
@@ -356,7 +338,7 @@ struct PanelView: View {
                     selectedDisplayID = same ? nil : d.id
                     // 选中即定位：联动展开排列卡中该屏的参数组（取消选中不收起）。
                     if !same {
-                        withAnimation(.easeInOut(duration: 0.15)) {
+                        withAnimation(panelReveal) {
                             expandedDisplayID = d.id
                         }
                     }
@@ -367,74 +349,58 @@ struct PanelView: View {
         }
     }
 
-    // MARK: - 底部工具栏
+    // MARK: - 底部操作栏
 
-    /// 刷新 / 设置：轻量图标行。退出刻意不放在这里（与"设置"相邻易误触），
-    /// 单独挪到下方低视觉权重的小字行。
+    /// 底部一排两气泡：左气泡「刷新 | 设置」内容自适应宽（双图标天然居中），
+    /// 右气泡「退出」占满剩余宽度（电源图标居中、整泡可点）——左收短右拉长，
+    /// 两端视觉平衡且退出区足够醒目。纯图标 + 原生 tooltip（.help 悬停停留后显示，
+    /// 文案走 L10n 随语言切换）；按钮本身不做 hover 高亮，悬浮反馈由整泡的
+    /// bubbleHoverLift（微放大 + 上浮 + 阴影增强）承担；误触风险由气泡间距承担。
     private var bottomToolbar: some View {
-        HStack(spacing: 0) {
-            toolbarButton(l10n.t(.refreshList), systemImage: "arrow.clockwise") {
-                state.refresh()
+        HStack(spacing: BubbleMetrics.cardSpacing) {
+            HStack(spacing: 2) {
+                toolbarIconButton(l10n.t(.refreshList), systemImage: "arrow.clockwise") {
+                    state.refresh()
+                }
+                Divider().frame(height: 18)
+                toolbarIconButton(l10n.t(.settingsTitle), systemImage: "gearshape") {
+                    // openSettings 会切 activation policy 并激活 App，先收面板防悬空。
+                    PanelController.shared.close()
+                    DockPolicyManager.shared.openSettings()
+                }
             }
-            Divider().frame(height: 18)
-            toolbarButton(l10n.t(.settingsTitle), systemImage: "gearshape") {
-                // openSettings 会切 activation policy 并激活 App，先收面板防悬空。
-                PanelController.shared.close()
-                DockPolicyManager.shared.openSettings()
+            .padding(.vertical, 6)
+            .padding(.horizontal, 12)
+            // 与气泡统一材质（BubbleBackground）+ 阴影，使整列观感一致。
+            .modifier(BubbleBackground())
+            .bubbleShadow()
+            .bubbleHoverLift()
+
+            // 退出占满剩余宽度：触区横贯整泡（fullWidth 拉开触区 + contentShape）。
+            toolbarIconButton(l10n.t(.quit), systemImage: "power", fullWidth: true) {
+                NSApplication.shared.terminate(nil)
             }
+            .padding(.vertical, 6)
+            .modifier(BubbleBackground())
+            .bubbleShadow()
+            .bubbleHoverLift()
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 6)
-        // 与气泡统一材质（BubbleBackground）+ 阴影，使整列观感一致。
-        .modifier(BubbleBackground())
-        .bubbleShadow()
     }
 
-    private func toolbarButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    /// 底部纯图标按钮：固定触区 34×26（fullWidth 时触区横向拉满、图标居中）；
+    /// 功能名称由 .help 原生 tooltip 呈现。刻意不做 hover 行高亮——
+    /// 悬浮反馈统一由所在气泡的 bubbleHoverLift 整体承担（高亮会与整泡浮起打架）。
+    private func toolbarIconButton(_ tooltip: String, systemImage: String, fullWidth: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 3) {
-                Image(systemName: systemImage)
-                    .font(.system(size: BubbleMetrics.fontTitle))
-                Text(title)
-                    .font(.system(size: BubbleMetrics.fontMini))
-            }
-            .foregroundStyle(.primary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
-            // 与全站行控件统一 hover 反馈；外扩传 0——按钮已占满半宽，
-            // 再外扩会盖过中间分隔线。
-            .hoverRowHighlight(horizontalExpansion: 0)
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// 底部独立的退出小字行：低视觉权重（secondary 色小字）+ 与工具栏拉开距离，
-    /// 与"设置"的相邻误触问题由此消除。
-    private var quitRow: some View {
-        Button {
-            NSApplication.shared.terminate(nil)
-        } label: {
-            Text(l10n.t(.quit))
-                .font(.system(size: BubbleMetrics.fontCaption))
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 2)
-                .padding(.horizontal, 12)
+            Image(systemName: systemImage)
+                .font(.system(size: BubbleMetrics.fontTitle))
+                .foregroundStyle(.primary)
+                .frame(width: fullWidth ? nil : 34, height: 26)
+                .frame(maxWidth: fullWidth ? .infinity : nil)
                 .contentShape(Rectangle())
-                .hoverRowHighlight()
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - 卡片区内容高度上报
-
-/// 面板卡片区内容固有高度上报（GeometryReader 铺在滚动内容 background 上）。
-/// PanelView 用它给 ScrollView 显式 frame，避免屏幕重配时高度塌 0。
-private struct PanelContentHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
+        .help(tooltip)
     }
 }
 
@@ -465,91 +431,110 @@ private struct ArrangementRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标题行（可折叠时是折叠头）：图标 + 屏名 + 参数概要 + 旋转 chevron。
+            // 折叠头（两行式）：图标 + [名称行 / 参数概要副行] + 旋转 chevron。
+            // 名称与概要各占一行——挤一行时长名称 + 长参数会换行/截断（可读性差）；
+            // 展开后副行淡出（详情行已展示同信息，不重复），高度随 toggleExpanded 的弹簧一起动。
             RowButton(action: toggleExpanded) {
                 HStack(spacing: 10) {
                     Image(systemName: display.isBuiltIn ? "laptopcomputer" : "display")
                         .font(.system(size: BubbleMetrics.fontControl))
                         .foregroundStyle(.secondary)
                         .frame(width: 14)
-                    Text(label)
-                        .font(.system(size: BubbleMetrics.fontBody))
-                        .foregroundStyle(.primary)
-                    Spacer(minLength: 8)
-                    if foldable {
-                        // 概要：收起时也能一眼看到当前档位（位置已知才带前缀）。
-                        Text(parameterSummary)
-                            .font(.system(size: BubbleMetrics.fontCaption))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 8) {
+                            Text(label)
+                                .font(.system(size: BubbleMetrics.fontBody))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            if foldable {
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                            }
+                        }
+                        // 概要副行：收起时也能一眼看到当前档位（位置已知才带前缀）。
+                        if foldable && !isExpanded {
+                            Text(parameterSummary)
+                                .font(.system(size: BubbleMetrics.fontCaption))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .transition(.opacity)
+                        }
                     }
                 }
+                // 撑满行宽：整行可点 + 副行截断基准与卡片一致。
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .onHover(perform: onHoverDisplay)
 
             // 表单风三行：位置（分段控件）/ 分辨率 / 刷新率，标题靠左、控件靠右对齐。
             // 折叠态下整块隐藏（foldable=false 恒显示）。
-            if isExpanded {
-                VStack(spacing: BubbleMetrics.rowSpacing) {
-                    if showsPosition {
-                        HStack {
-                            Text(state.localized(.positionLabel))
-                                .font(.system(size: BubbleMetrics.fontCaption))
-                                .foregroundStyle(.secondary)
-                            Spacer(minLength: 12)
-                            sideSegmented
+            // 外包顶部对齐的 ZStack + clipped：.move(edge:.top) 过渡期间内容从上方滑入，
+            // 无裁切时会越过折叠头「凭空出现」；裁切边界即折叠头下边缘，
+            // 视觉呈从标题行下方「抽拉」出来，收起时对称滑回其下消失。
+            ZStack(alignment: .top) {
+                if isExpanded {
+                    VStack(spacing: BubbleMetrics.rowSpacing) {
+                        if showsPosition {
+                            HStack {
+                                Text(state.localized(.positionLabel))
+                                    .font(.system(size: BubbleMetrics.fontCaption))
+                                    .foregroundStyle(.secondary)
+                                Spacer(minLength: 12)
+                                sideSegmented
+                            }
+                            .padding(.vertical, 3)
                         }
-                        .padding(.vertical, 3)
-                    }
-                    // 分辨率选择：多于一个可选分辨率时才显示。
-                    // 数字是逻辑分辨率（HiDPI 条目由 2 倍物理像素渲染，更锐利），
-                    // 条目尾部标注变体、当前值带 HiDPI 后缀——避免「4K 屏选 4K 数字
-                    // 却得到小图标」的误解（逻辑分辨率才是观感档位）。
-                    if display.availableResolutions.count > 1 {
-                        SelectionRow(
-                            rowID: "\(display.id)-resolution",
-                            title: state.localized(.resolutionMenu),
-                            currentValue: "\(display.resolution.width)×\(display.resolution.height)"
-                                + (display.scalingOn ? " · \(state.localized(.hidpiTag))" : ""),
-                            accent: accent,
-                            expandedRowID: $expandedRowID,
-                            options: display.availableResolutions.map { res in
-                                .init(text: "\(res.width)×\(res.height) "
-                                      + state.localized(res.hidpi ? .hidpiTag : .lowResolutionTag),
-                                      isActive: (res.width == display.resolution.width
-                                                     && res.height == display.resolution.height)) {
-                                    state.setResolution(res, for: display)
+                        // 分辨率选择：多于一个可选分辨率时才显示。
+                        // 数字是逻辑分辨率（HiDPI 条目由 2 倍物理像素渲染，更锐利），
+                        // 条目尾部标注变体、当前值带 HiDPI 后缀——避免「4K 屏选 4K 数字
+                        // 却得小图标」的误解（逻辑分辨率才是观感档位）。
+                        if display.availableResolutions.count > 1 {
+                            SelectionRow(
+                                rowID: "\(display.id)-resolution",
+                                title: state.localized(.resolutionMenu),
+                                currentValue: "\(display.resolution.width)×\(display.resolution.height)"
+                                    + (display.scalingOn ? " · \(state.localized(.hidpiTag))" : ""),
+                                accent: accent,
+                                expandedRowID: $expandedRowID,
+                                options: display.availableResolutions.map { res in
+                                    .init(text: "\(res.width)×\(res.height) "
+                                          + state.localized(res.hidpi ? .hidpiTag : .lowResolutionTag),
+                                          isActive: (res.width == display.resolution.width
+                                                         && res.height == display.resolution.height)) {
+                                        state.setResolution(res, for: display)
+                                    }
                                 }
-                            }
-                        )
-                    }
-                    // 刷新率选择：当前分辨率下多于一个可选刷新率时才显示。
-                    if display.availableRefreshRates.count > 1 {
-                        SelectionRow(
-                            rowID: "\(display.id)-refresh",
-                            title: state.localized(.refreshRateMenu),
-                            currentValue: "\(display.hertz) \(state.localized(.hertzLabel))",
-                            accent: accent,
-                            expandedRowID: $expandedRowID,
-                            options: display.availableRefreshRates.map { hz in
-                                .init(text: "\(hz) \(state.localized(.hertzLabel))",
-                                      isActive: hz == display.hertz) {
-                                    state.setRefreshRate(hz, for: display)
+                            )
+                        }
+                        // 刷新率选择：当前分辨率下多于一个可选刷新率时才显示。
+                        if display.availableRefreshRates.count > 1 {
+                            SelectionRow(
+                                rowID: "\(display.id)-refresh",
+                                title: state.localized(.refreshRateMenu),
+                                currentValue: "\(display.hertz) \(state.localized(.hertzLabel))",
+                                accent: accent,
+                                expandedRowID: $expandedRowID,
+                                options: display.availableRefreshRates.map { hz in
+                                    .init(text: "\(hz) \(state.localized(.hertzLabel))",
+                                          isActive: hz == display.hertz) {
+                                        state.setRefreshRate(hz, for: display)
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
+                    .padding(.leading, 24)   // 与标题行文字对齐：图标 frame 14 + spacing 10
+                    .padding(.trailing, 4)
+                    .padding(.bottom, 6)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-                .padding(.leading, 24)   // 与标题行文字对齐：图标 frame 14 + spacing 10
-                .padding(.trailing, 4)
-                .padding(.bottom, 6)
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
+            .clipped()
         }
     }
 
@@ -558,7 +543,7 @@ private struct ArrangementRow: View {
     /// 下次展开时残留旧的选项展开态。
     private func toggleExpanded() {
         guard foldable else { return }
-        withAnimation(.easeInOut(duration: 0.15)) {
+        withAnimation(panelReveal) {
             expandedRowID = nil
             expandedDisplayID = isExpanded ? nil : display.id
         }
@@ -636,10 +621,26 @@ private struct SelectionRow: View {
 
     private var expanded: Bool { expandedRowID == rowID }
 
+    /// 选项列表自然高度（含 padding(3)），由内容 background 内的 GeometryReader 实测，
+    /// 选项数变化时自动重测。
+    @State private var listHeight: CGFloat = 0
+
+    /// 列表视觉揭示高度（0 → 实高随弹簧插值）。只作用于 mask，不参与布局。
+    /// 为什么不直接动画布局高度：NSPopover 对内容增高的窗口 resize 不做动画
+    /// （一步跳到目标，收起方向才有系统动画），若布局高度中途插值变小，
+    /// 内容会在已增高的窗口里被居中→整块下沉再弹回（顶部伪影）。
+    /// 故展开方向布局高度二值跳变（理想尺寸瞬间到位），视觉揭示交给 mask。
+    @State private var revealHeight: CGFloat = 0
+
+    /// 列表可见高度：自然高度封顶 216（选项极多时 ScrollView 内部滚动）。
+    private var listVisibleHeight: CGFloat {
+        min(listHeight, BubbleMetrics.selectionListMaxHeight)
+    }
+
     var body: some View {
         VStack(spacing: BubbleMetrics.rowSpacing) {
             RowButton(action: {
-                withAnimation(.easeInOut(duration: 0.15)) {
+                withAnimation(panelReveal) {
                     expandedRowID = expanded ? nil : rowID
                 }
             }, verticalPadding: 3, horizontalPadding: 0) {
@@ -660,22 +661,62 @@ private struct SelectionRow: View {
                 }
             }
 
-            if expanded {
-                // 展开列表：浅灰圆角底呈现「菜单浮层」感；选项多时内部滚动并限高，面板高度可控。
-                ScrollView {
-                    VStack(spacing: BubbleMetrics.rowSpacing) {
-                        ForEach(options.indices, id: \.self) { idx in
-                            optionRow(options[idx])
-                        }
+            // 选项列表：浅灰圆角底呈现「菜单浮层」感，选项多时内部滚动限高。
+            // 常驻挂载（不条件插入）：贪婪 ScrollView 的条件插入高度跳变不参与
+            // 动画，是旧版「展开瞬时拉长」的根源；实测高度后显式 frame 驱动。
+            // 展开方向用 .animation(nil) 让布局高度二值切换（防居中下沉，见
+            // revealHeight 注释），mask 按弹簧从 0 揭示到实高；收起方向保留
+            // 弹簧插值（窗口收起自带系统动画，与内容同步缩小无下沉问题），
+            // frame 回抽 + clipped 呈现「收回触发行下」的动画。
+            ScrollView {
+                VStack(spacing: BubbleMetrics.rowSpacing) {
+                    ForEach(options.indices, id: \.self) { idx in
+                        optionRow(options[idx])
                     }
-                    .padding(3)
                 }
-                .frame(maxHeight: 216)
+                .padding(3)
                 .background(
-                    RoundedRectangle(cornerRadius: BubbleMetrics.hoverCornerRadius)
-                        .fill(Color.secondary.opacity(0.08))
+                    // 测自然高度：挂在内容（含 padding）的 background 上。
+                    GeometryReader { geo in
+                        Color.clear
+                            .onAppear { listHeight = geo.size.height }
+                            .onChange(of: geo.size.height) { listHeight = $0 }
+                    }
                 )
-                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            .frame(height: expanded ? listVisibleHeight : 0, alignment: .top)
+            // 展开方向剥离动画（含显式 withAnimation 事务——.animation(nil) 挡不住
+            // 显式事务，必须用 transaction 改写）：布局高度二值跳变，理想尺寸瞬间
+            // 到位（防居中下沉，见 revealHeight 注释）；收起方向保留弹簧回抽。
+            .transaction { t in
+                if expanded { t.animation = nil }
+            }
+            .opacity(expanded ? 1 : 0)
+            .background(
+                RoundedRectangle(cornerRadius: BubbleMetrics.hoverCornerRadius)
+                    .fill(Color.secondary.opacity(0.08))
+            )
+            .mask(alignment: .top) {
+                Color.white.frame(height: revealHeight)
+            }
+            .clipped()
+            .onAppear {
+                // 兜底：挂载时已处于展开态（理论上不会发生），直接全揭示。
+                if expanded { revealHeight = listVisibleHeight }
+            }
+            .onChange(of: expanded) { isOn in
+                if isOn {
+                    // 揭示动画：从 0 弹簧拉到实高（纯视觉，不参与布局）。
+                    revealHeight = 0
+                    withAnimation(panelReveal) { revealHeight = listVisibleHeight }
+                }
+                // 收起时不动 revealHeight：frame 弹簧回抽 + clipped 即收起动画。
+            }
+            .onChange(of: listHeight) { _ in
+                // 选项数变化（如刷新后）同步校正揭示高度与布局目标。
+                if expanded {
+                    withAnimation(panelReveal) { revealHeight = listVisibleHeight }
+                }
             }
         }
     }
@@ -684,7 +725,7 @@ private struct SelectionRow: View {
     private func optionRow(_ option: Option) -> some View {
         RowButton(action: {
             option.action()
-            withAnimation(.easeInOut(duration: 0.15)) { expandedRowID = nil }
+            withAnimation(panelReveal) { expandedRowID = nil }
         }, verticalPadding: 3, horizontalPadding: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark")

@@ -46,13 +46,36 @@ enum BubbleMetrics {
     static let cardSpacing: CGFloat = 14
     /// 卡内列表行间距。
     static let rowSpacing: CGFloat = 2
+
+    // MARK: 气泡 hover 浮起（bubbleHoverLift()，全仿射变换保原生锐度）
+
+    /// hover 时整卡放大倍率（仿射 scaleEffect，不栅格化，HiDPI 下保持原生分辨率）。
+    /// 注意：不要改用 rotation3DEffect 做 3D 效果——3D 透视变换会栅格化重采样，
+    /// HiDPI 下有效分辨率减半（hover 模糊事故的根因，2026-09 实测）。
+    static let liftScale: CGFloat = 1.02
+    /// hover 时整卡上浮点数（offset 仿射）。
+    static let liftOffset: CGFloat = 2
+    /// hover 增强阴影（叠在 bubbleShadow 双层之上，营造「浮起」层次）。
+    static let liftShadowOpacity: Double = 0.10
+    static let liftShadowRadius: CGFloat = 16
+    static let liftShadowY: CGFloat = 8
+    /// 浮起/落回弹簧。
+    static let liftSpring = Animation.spring(response: 0.3, dampingFraction: 0.7)
+
+    // MARK: 面板内嵌套滚动
+
+    /// SelectionRow 选项列表限高：超过则列表内部滚动，面板高度可控（面板级 ScrollView 已废弃，勿混淆）。
+    static let selectionListMaxHeight: CGFloat = 216
 }
 
 extension View {
-    /// 气泡悬浮阴影：BubbleCard / 面板底部工具栏 / SettingsCard 共用，
-    /// 呈现「浮于背景之上」的层次。设置页卡片可用稍浅的 opacity。
-    func bubbleShadow(opacity: Double = 0.12) -> some View {
-        shadow(color: .black.opacity(opacity), radius: 6, x: 0, y: 2)
+    /// 气泡悬浮阴影：BubbleCard / 面板底部操作栏 / SettingsCard 共用，
+    /// 呈现「浮于背景之上」的层次。双层弥散（ambient 大半径低透明铺开 +
+    /// key 小半径贴边勾勒），与底色的过渡比单层阴影更柔和、无硬边界感。
+    /// - Parameter opacity: 整体强度系数（1 = 面板标准；设置页卡片 0.85 稍浅）。
+    func bubbleShadow(opacity: Double = 1) -> some View {
+        shadow(color: .black.opacity(0.06 * opacity), radius: 11, x: 0, y: 5)
+            .shadow(color: .black.opacity(0.09 * opacity), radius: 3.5, x: 0, y: 1.5)
     }
 }
 

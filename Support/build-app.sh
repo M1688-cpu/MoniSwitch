@@ -26,6 +26,39 @@ echo ""
 
 # ---------- 1. 编译 ----------
 echo "▶ [1/6] 编译 release 版本..."
+
+# ---- SDK 自动探测：挑 CLT 与 Xcode 两处最新的 MacOSX*.sdk 显式指定 ----
+# 背景：系统 chrome（NSPopover 背景板、NSSwitch 开关等）的 Liquid Glass
+# 新观感只有用 macOS 26 SDK 编译才会被系统采用；xcode-select 默认指向的
+# 工具链可能停在旧 SDK。这里不动系统默认，仅给本次 swift build 设 SDKROOT：
+# 在 CLT（/Library/Developer/CommandLineTools/SDKs）与 Xcode
+# （/Applications/Xcode.app/.../SDKs）两处找版本号最大的 SDK；找不到再回退
+# xcrun 默认。直接 `swift build`（不经本脚本）不受影响。
+NEWEST_SDK=""
+NEWEST_VER=""
+for SDK_CAND_DIR in \
+    "/Library/Developer/CommandLineTools/SDKs" \
+    /Applications/Xcode*.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs; do
+    for SDK_CAND in "$SDK_CAND_DIR"/MacOSX*.sdk; do
+        [ -d "$SDK_CAND" ] || continue
+        SDK_VER="$(basename "$SDK_CAND" | sed -E 's/^MacOSX([0-9]+(\.[0-9]+)?)\.sdk$/\1/')"
+        case "$SDK_VER" in
+            *[!0-9.]*) continue ;;  # 解析不出版本号的（如 MacOSX.sdk）跳过
+        esac
+        # sort -V 全版本比较（15.5 > 15.2，26 > 15.5），空值时直接当选
+        if [ -z "$NEWEST_VER" ] || [ "$(printf '%s\n%s\n' "$SDK_VER" "$NEWEST_VER" | sort -V | tail -1)" = "$SDK_VER" ]; then
+            NEWEST_VER="$SDK_VER"
+            NEWEST_SDK="$SDK_CAND"
+        fi
+    done
+done
+if [ -n "$NEWEST_SDK" ]; then
+    export SDKROOT="$NEWEST_SDK"
+    echo "  SDK: $SDKROOT (自动探测的最新版)"
+else
+    echo "  SDK: $(xcrun --show-sdk-path 2>/dev/null || echo 'xcrun 默认')"
+fi
+
 cd "$PROJECT_DIR"
 swift build -c release 2>&1 | tail -5
 
