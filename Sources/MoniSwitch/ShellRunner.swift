@@ -56,15 +56,33 @@ enum ShellRunner {
         process.standardError = errPipe
 
         try process.run()
-        process.waitUntilExit()
 
-        let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
-        let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+        // 并发读两个管道、读完再等退出。管道缓冲区约 64KB，若「先 waitUntilExit
+        // 再顺序读」，子进程输出超过缓冲区时 write() 阻塞、进程永远退不出，
+        // 与等待退出的线程互锁（调用方串行队列随之卡死）。displayplacer 的
+        // list 输出随屏的模式数增长，多模式屏可能逼近/超过缓冲区。
+        // DataBox 用 class 包装：闭包跨线程写各自实例的属性，信号量同步后读取。
+        final class DataBox { var data = Data() }
+        let outBox = DataBox()
+        let errBox = DataBox()
+        let semaphore = DispatchSemaphore(value: 0)
+        let ioQueue = DispatchQueue.global(qos: .utility)
+        ioQueue.async {
+            outBox.data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            semaphore.signal()
+        }
+        ioQueue.async {
+            errBox.data = errPipe.fileHandleForReading.readDataToEndOfFile()
+            semaphore.signal()
+        }
+        semaphore.wait()
+        semaphore.wait()
+        process.waitUntilExit()
 
         return ShellResult(
             exitCode: process.terminationStatus,
-            stdout: String(data: outData, encoding: .utf8) ?? "",
-            stderr: String(data: errData, encoding: .utf8) ?? ""
+            stdout: String(data: outBox.data, encoding: .utf8) ?? "",
+            stderr: String(data: errBox.data, encoding: .utf8) ?? ""
         )
     }
 }

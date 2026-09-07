@@ -145,6 +145,8 @@ Support/
 - **通知时序契约（v0.2.0 起）**：`AppSettings.sendSwitchNotification` 要求调用方已在显示器配置稳定后调用（先经 `DisplayManager.waitForStableDisplays`）。新增发通知的代码路径若绕过此契约，镜像/扩展类操作会复现「通知不弹出」bug。
 - **PanelView 的展开互斥/联动状态都是面板级 @State**：`expandedRowID`（SelectionRow 互斥）、`selectedDisplayID`/`hoveredDisplayID`（布局图联动）挂在 PanelView 上经参数传入 ArrangementRow/SelectionRow——新增联动屏相关的行时记得挂 onHover 上报 hoveredDisplayID，否则布局图不联动。
 - **液态玻璃是手工绘制，不是系统 glassEffect**（2026-09 实测）：本机工具链 SDK 为 15.5，`glassEffect`/`Glass` 需要 macOS 26 SDK 才能编译（`xcrun --show-sdk-version` 可查）。`LiquidGlass.swift` 用「染色基底 + 上缘镜面高光（白渐变）+ 边缘亮线（白描边）+ 下缘内阴影 + 落影」手工模拟，四要素对应 Apple Liquid Glass 视觉语言，macOS 13~26 观感一致。设置页 4 个 Toggle 用 `LiquidGlassToggleStyle`（`.toggleStyle(.liquidGlass)`，尺寸对齐 NSSwitch）；面板互斥胶囊（ActivePill）激活=染色玻璃、非激活=中性玻璃悬停提亮；位置分段=中性玻璃槽内嵌染色激活段。玻璃 tint 用 SwiftUI 原生 `Color.accentColor`（非桥接 NSColor——AGENTS 既有教训：桥接动态色在系统合成路径有渲染风险）。
+- **屏幕重配时 MenuBarExtra 面板的 ScrollView 会塌缩为 0**（2026-09 实测，v0.2.0 曾现严重 bug）：面板开着时发生系统级显示器重配（切主屏/自动排列/镜像等），`.window` 面板被系统重新求解尺寸，ScrollView 在无确定高度 proposal 的求解轮里 ideal 高度塌 0——面板瞬间只剩 ScrollView 外的底部工具栏与退出行，且不自愈（冷启动首开正常，重配才触发）。**修法：GeometryReader+PreferenceKey 测滚动内容固有高度（挂内容 background，与视口无关），`ScrollView.frame(height: min(内容实高, 600))` 显式给高**，任何重求解都拿到确定值；`@State scrollContentHeight` 初值 480 防首帧闪变。不要用 `.frame(maxHeight:)` 依赖 ideal 求解。注意此处 PreferenceKey 测高与设置页滚动偏移的禁忌不冲突（那是因为静止偏移含安全区 inset 才改用 NSClipView；测内容高度不受影响）。
+- **ShellRunner 必须并发读管道**（2026-09 防御修复）：原实现「先 waitUntilExit 再顺序 readDataToEndOfFile」有经典死锁隐患——管道缓冲区约 64KB，子进程输出超缓冲时 write() 阻塞、进程退不出，与等待线程互锁，调用方串行队列（AppState.queue/PresetManager.queue）整体卡死、isOperating 永久 true。现改为两个并发块各读一根管道、信号量汇合后再 waitUntilExit。displayplacer list 输出随屏的模式数增长（27 寸 1080p 双屏实测约 21KB，4K/多模式屏更大），开发时要记住这条底线。
 
 ## 风格约定
 

@@ -32,6 +32,15 @@ struct PanelView: View {
     /// 解决"不知道排列/镜像操作的是哪块屏"的歧义）。
     @State private var hoveredDisplayID: String?
 
+    /// 卡片区内容实测高度（PreferenceKey 上报），驱动 ScrollView 的明确高度。
+    ///
+    /// 背景（2026-09 实测）：屏幕重配（切主屏/自动排列等触发系统级 relayout）时，
+    /// MenuBarExtra(.window) 面板被系统重新求解尺寸，ScrollView 在无确定高度
+    /// proposal 的求解轮里 ideal 高度塌为 0——面板瞬间只剩底部工具栏与退出行，
+    /// 且不再自愈。改为测内容实高后显式 frame：任何重求解都拿到确定值，不再塌。
+    /// 初值取典型四卡高度，防首帧闪变。
+    @State private var scrollContentHeight: CGFloat = 480
+
     /// 是否有操作在后台执行（含预设回放）：禁用卡片区 + 显示进度条。
     private var busy: Bool { state.isOperating || presetManager.isApplying }
 
@@ -47,7 +56,8 @@ struct PanelView: View {
                         .padding(.vertical, 16)
                 }
             } else {
-                // 卡片区可滚动：内容不足时按内容高度收缩，超出 600pt 封顶滚动。
+                // 卡片区可滚动：高度 = min(内容实高, 600)，显式 frame 的原因见
+                // scrollContentHeight 注释（屏幕重配时防 ScrollView 塌 0）。
                 ScrollView {
                     VStack(spacing: BubbleMetrics.cardSpacing) {
                         primaryCard
@@ -58,8 +68,17 @@ struct PanelView: View {
                         }
                         layoutPreviewCard
                     }
+                    .background(
+                        // 测内容固有高度（GeometryReader 铺在内容 background 上，
+                        // 读到的是内容布局高度，不受滚动视口影响）
+                        GeometryReader { geo in
+                            Color.clear.preference(key: PanelContentHeightKey.self,
+                                                   value: geo.size.height)
+                        }
+                    )
                 }
-                .frame(maxHeight: 600)
+                .onPreferenceChange(PanelContentHeightKey.self) { scrollContentHeight = $0 }
+                .frame(height: min(scrollContentHeight, 600))
                 .disabled(busy)
             }
             bottomToolbar
@@ -380,6 +399,17 @@ struct PanelView: View {
                 .hoverRowHighlight()
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - 卡片区内容高度上报
+
+/// 面板卡片区内容固有高度上报（GeometryReader 铺在滚动内容 background 上）。
+/// PanelView 用它给 ScrollView 显式 frame，避免屏幕重配时高度塌 0。
+private struct PanelContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
