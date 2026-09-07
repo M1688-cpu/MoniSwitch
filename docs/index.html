@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoniSwitch — Menu-bar display switching for macOS</title>
+  <meta name="description" content="MoniSwitch is a macOS menu-bar utility: switch the main display, move external screens left or right, and toggle extend/mirror — without a trip to System Settings.">
+  <meta property="og:title" content="MoniSwitch — Menu-bar display switching for macOS">
+  <meta property="og:description" content="Switch the main display, move external screens, toggle extend/mirror — all from the menu bar.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://m1688-cpu.github.io/MoniSwitch/icon.png">
+  <link rel="icon" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <style>
+    /* ============ 设计令牌（mole.fit 羊皮纸色系 + 用户指定底色 #f3f2ea） ============ */
+    :root {
+      --paper: #f3f2ea;        /* 页面底色（用户指定） */
+      --ivory: #faf9f5;        /* 卡片/浮层 */
+      --ink: #26241e;          /* 暖黑墨色 */
+      --muted: #6b6a64;        /* 次级文字（stone） */
+      --accent: #0066cc;       /* Apple 系统蓝，呼应 App「跟随系统强调色」 */
+      --accent-deep: #004fa8;
+      --line: #d8d5c8;         /* 卡片描边 */
+      --line-faint: #edebe1;   /* 分隔线 */
+      --shadow-card: 0 1px 2px rgba(38, 36, 30, .04), 0 8px 24px -16px rgba(38, 36, 30, .10);
+      --shadow-card-hover: 0 2px 4px rgba(38, 36, 30, .05), 0 18px 40px -18px rgba(38, 36, 30, .18);
+      --shadow-float: 0 10px 20px -8px rgba(38, 36, 30, .12), 0 36px 72px -24px rgba(38, 36, 30, .20);
+      --serif: Charter, Georgia, "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", Palatino, serif;
+      --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      --wrap: 1120px;
+      --section-gap: 84px;
+      --radius: 16px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--serif);
+      font-size: 17px;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    /* 中文正文行高放宽（mole.fit 同款刻度） */
+    html[lang="zh-CN"] body { line-height: 1.8; }
+    html[lang="zh-CN"] .hero-h1 { letter-spacing: -0.5px; }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+    img { display: block; max-width: 100%; }
+    .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 32px; }
+    .sans { font-family: var(--sans); }
+
+    /* ============ 顶部导航 ============ */
+    .site-head {
+      position: sticky; top: 0; z-index: 50;
+      background: transparent;
+      transition: background .3s ease, border-color .3s ease, backdrop-filter .3s ease;
+      border-bottom: 1px solid transparent;
+    }
+    .site-head.scrolled {
+      background: rgba(243, 242, 234, .82);
+      -webkit-backdrop-filter: saturate(1.4) blur(14px);
+      backdrop-filter: saturate(1.4) blur(14px);
+      border-bottom-color: var(--line-faint);
+    }
+    .head-inner {
+      display: flex; align-items: center; gap: 28px;
+      height: 60px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+    .brand:hover { text-decoration: none; }
+    .brand img { width: 26px; height: 26px; border-radius: 6.5px; box-shadow: 0 1px 3px rgba(38,36,30,.18); }
+    .brand .name { font-family: var(--sans); font-weight: 600; font-size: 15.5px; letter-spacing: -.01em; }
+    .head-nav { display: flex; gap: 22px; margin-left: 8px; }
+    .head-nav a {
+      font-family: var(--sans); font-size: 14px; color: var(--muted);
+      padding: 4px 2px; transition: color .2s;
+    }
+    .head-nav a:hover { color: var(--ink); text-decoration: none; }
+    .head-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+
+    /* 语言切换（deckclip 式 EN/中） */
+    .lang {
+      display: inline-flex; align-items: center;
+      border: 1px solid var(--line); border-radius: 999px;
+      overflow: hidden; background: var(--ivory);
+    }
+    .lang button {
+      font-family: var(--sans); font-size: 12.5px; font-weight: 600;
+      color: var(--muted); background: transparent; border: 0;
+      padding: 5px 12px; cursor: pointer; line-height: 1.4;
+      transition: background .2s, color .2s;
+    }
+    .lang button.active { background: var(--ink); color: var(--paper); }
+
+    /* 按钮 */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--sans); font-size: 15px; font-weight: 600;
+      border-radius: 999px; padding: 12px 24px; line-height: 1.3;
+      transition: transform .2s ease, box-shadow .2s ease, background .2s ease, border-color .2s;
+      cursor: pointer; border: 1px solid transparent;
+    }
+    .btn:hover { text-decoration: none; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 8px 20px -10px rgba(0, 102, 204, .55); }
+    .btn-primary:hover { background: var(--accent-deep); }
+    .btn-ghost { border-color: var(--line); color: var(--ink); background: var(--ivory); }
+    .btn-ghost:hover { border-color: #c4c1b2; box-shadow: var(--shadow-card); }
+    .btn-sm { padding: 8px 18px; font-size: 14px; }
+    .btn svg { flex: none; }
+
+    /* ============ Hero ============ */
+    .hero { padding: 88px 0 40px; text-align: center; }
+    .eyebrow {
+      font-family: var(--sans); font-size: 13px; font-weight: 600;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 18px;
+    }
+    .eyebrow .num { color: var(--muted); font-weight: 500; margin-right: 10px; letter-spacing: .08em; }
+    .hero-h1 {
+      font-size: clamp(44px, 7vw, 88px);
+      line-height: 1.06; letter-spacing: -1.4px;
+      font-weight: 700;
+      max-width: 15em; margin: 0 auto 22px;
+    }
+    .hero-sub {
+      color: var(--muted); font-size: clamp(16px, 2vw, 18.5px);
+      max-width: 620px; margin: 0 auto 34px;
+    }
+    .hero-cta { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+    .hero-pills { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 64px; }
+    .pill {
+      font-family: var(--sans); font-size: 12.5px; font-weight: 500;
+      color: var(--muted); background: var(--ivory);
+      border: 1px solid var(--line); border-radius: 999px;
+      padding: 4px 12px; line-height: 1.5;
+    }
+
+    /* Hero 三联海报：中央面板 + 两侧设置窗景深 */
+    .hero-shots {
+      position: relative;
+      display: grid; grid-template-columns: 1fr 1.25fr 1fr;
+      align-items: center; gap: 0;
+      max-width: 1020px; margin: 0 auto;
+    }
+    .shot { border-radius: 14px; position: relative; }
+    .shot img { width: 100%; height: auto; border-radius: 14px; }
+    .shot-side { z-index: 1; opacity: .96; }
+    .shot-side img { box-shadow: var(--shadow-float); border: 1px solid rgba(38, 36, 30, .08); }
+    .shot-side.left { transform: translateY(38px) rotate(-2deg) scale(.96); transform-origin: right center; }
+    .shot-side.right { transform: translateY(46px) rotate(2deg) scale(.96); transform-origin: left center; }
+    .shot-main { z-index: 2; padding: 0 26px; }
+    .shot-main img {
+      box-shadow: 0 14px 28px -10px rgba(38, 36, 30, .16),
+                  0 56px 110px -30px rgba(38, 36, 30, .28);
+      border: 1px solid rgba(38, 36, 30, .08);
+    }
+
+    /* ============ 小节通用 ============ */
+    section.block { padding: var(--section-gap) 0 0; }
+    section.block:last-of-type { padding-bottom: 96px; }
+    .sec-head { max-width: 640px; margin-bottom: 40px; }
+    .sec-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+    .sec-title { font-size: clamp(28px, 4vw, 34px); font-weight: 700; letter-spacing: -0.3px; line-height: 1.25; margin-bottom: 12px; }
+    .sec-sub { color: var(--muted); font-size: 16.5px; }
+    .anchor { scroll-margin-top: 76px; }
+
+    /* ============ 功能卡（deckclip 网格） ============ */
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card {
+      background: var(--ivory);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 26px 26px 24px;
+      box-shadow: var(--shadow-card);
+      transition: transform .25s ease, box-shadow .25s ease, border-color .25s;
+    }
+    .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); border-color: #cbc8b8; }
+    .card .icon {
+      width: 42px; height: 42px; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0, 102, 204, .09);
+      color: var(--accent); margin-bottom: 16px;
+    }
+    .card h3 { font-family: var(--sans); font-size: 16.5px; font-weight: 650; letter-spacing: -.005em; margin-bottom: 6px; }
+    .card p { font-size: 14.5px; line-height: 1.65; color: var(--muted); font-family: var(--sans); }
+
+    /* ============ 截图画廊 ============ */
+    .shots-note {
+      font-family: var(--sans); font-size: 13.5px; color: var(--muted);
+      margin-top: 26px; text-align: center;
+    }
+    .gallery {
+      display: grid;
+      grid-template-columns: 0.9fr 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 26px 22px;
+      align-items: start;
+    }
+    .g-item .frame {
+      border-radius: 14px; overflow: hidden;
+      border: 1px solid rgba(38, 36, 30, .08);
+      background: var(--ivory);
+      box-shadow: var(--shadow-card);
+      transition: box-shadow .25s ease, transform .25s ease;
+    }
+    .g-item:hover .frame { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
+    .g-item img { width: 100%; height: auto; }
+    .g-tall { grid-row: 1 / span 2; }
+    .g-wide { grid-column: 2 / span 2; }
+    .g-cap { margin-top: 12px; text-align: center; }
+    .g-cap .t { font-family: var(--sans); font-size: 14px; font-weight: 650; }
+    .g-cap .s { font-family: var(--sans); font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+
+    /* ============ 下载区 ============ */
+    .download-panel {
+      background: var(--ivory);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow-card);
+      padding: 56px 48px;
+      text-align: center;
+    }
+    .dl-cta { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin: 30px 0 18px; }
+    .dl-pills { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 34px; }
+    .dl-note {
+      max-width: 640px; margin: 0 auto;
+      border-top: 1px solid var(--line-faint);
+      padding-top: 26px;
+      font-family: var(--sans); font-size: 13.5px; color: var(--muted); line-height: 1.7;
+    }
+    .dl-note b { color: var(--ink); font-weight: 600; }
+    .credit { margin-top: 20px; font-family: var(--sans); font-size: 13px; color: var(--muted); }
+
+    /* ============ 页脚 ============ */
+    footer {
+      border-top: 1px solid var(--line-faint);
+      padding: 34px 0 44px;
+    }
+    .foot-inner {
+      display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+      font-family: var(--sans); font-size: 13px; color: var(--muted);
+    }
+    .foot-inner .sep { opacity: .5; }
+    .foot-inner .right { margin-left: auto; }
+
+    /* ============ 入场动效 ============ */
+    .reveal { opacity: 0; transform: translateY(20px); transition: opacity .7s cubic-bezier(.2, .6, .2, 1), transform .7s cubic-bezier(.2, .6, .2, 1); }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .btn, .card, .g-item .frame { transition: none; }
+    }
+
+    /* ============ 响应式 ============ */
+    @media (max-width: 880px) {
+      :root { --section-gap: 68px; }
+      .wrap { padding: 0 22px; }
+      .head-nav { display: none; }
+      .hero { padding-top: 64px; }
+      .feature-grid { grid-template-columns: repeat(2, 1fr); }
+      .gallery { grid-template-columns: 1fr 1fr; }
+      .g-tall { grid-row: auto; grid-column: 1 / span 2; max-width: 460px; margin: 0 auto; width: 100%; }
+      .g-wide { grid-column: 1 / span 2; }
+      .download-panel { padding: 42px 26px; }
+    }
+    @media (max-width: 640px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .hero-shots { grid-template-columns: 1fr; }
+      .shot-side { display: none; }
+      .shot-main { padding: 0; }
+      .gallery { grid-template-columns: 1fr; }
+      .g-tall, .g-wide { grid-column: auto; max-width: 440px; margin: 0 auto; width: 100%; }
+      .foot-inner { justify-content: center; text-align: center; }
+      .foot-inner .right { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ 导航 ============ -->
+  <header class="site-head" id="siteHead">
+    <div class="wrap head-inner">
+      <a class="brand" href="./">
+        <img src="icon.png" alt="MoniSwitch icon">
+        <span class="name">MoniSwitch</span>
+      </a>
+      <nav class="head-nav">
+        <a href="#features" data-i18n="nav.features">Features</a>
+        <a href="#screenshots" data-i18n="nav.screenshots">Screenshots</a>
+        <a href="#download" data-i18n="nav.download">Download</a>
+      </nav>
+      <div class="head-right">
+        <div class="lang" role="group" aria-label="Language">
+          <button type="button" id="langEn" aria-pressed="true">EN</button>
+          <button type="button" id="langZh" aria-pressed="false">中</button>
+        </div>
+        <a class="btn btn-primary btn-sm" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg" data-i18n="nav.cta">Download</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============ Hero ============ -->
+    <section class="hero wrap">
+      <p class="eyebrow" data-i18n="hero.eyebrow">macOS menu-bar display switcher</p>
+      <h1 class="hero-h1">
+        <span data-i18n="hero.h1a">MoniSwitch, the display</span><br>
+        <span data-i18n="hero.h1b">switcher for macOS.</span>
+      </h1>
+      <p class="hero-sub" data-i18n="hero.sub">Switch the main display, move external screens left or right, and toggle extend/mirror — all from the menu bar, without a trip to System Settings → Displays.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5v8m0 0L4.8 6.3M8 9.5l3.2-3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span data-i18n="hero.cta1">Download for macOS</span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/M1688-cpu/MoniSwitch">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .8a7.3 7.3 0 0 0-2.3 14.2c.36.07.5-.15.5-.35v-1.22c-2.02.44-2.45-.97-2.45-.97-.33-.84-.81-1.07-.81-1.07-.66-.45.05-.44.05-.44.73.05 1.11.75 1.11.75.65 1.11 1.7.79 2.12.6.06-.47.25-.79.46-.97-1.61-.18-3.3-.8-3.3-3.58 0-.79.28-1.44.74-1.95-.08-.18-.32-.91.07-1.9 0 0 .6-.2 1.98.74a6.9 6.9 0 0 1 3.6 0c1.37-.94 1.97-.74 1.97-.74.4.99.15 1.72.07 1.9.46.51.74 1.16.74 1.95 0 2.79-1.7 3.4-3.31 3.58.26.22.49.65.49 1.32v1.95c0 .2.13.43.5.35A7.3 7.3 0 0 0 8 .8Z"/></svg>
+          <span data-i18n="hero.cta2">View on GitHub</span>
+        </a>
+      </div>
+      <div class="hero-pills">
+        <span class="pill">macOS 13+</span>
+        <span class="pill">Apple Silicon · Intel</span>
+        <span class="pill">v0.1.4</span>
+        <span class="pill">MIT</span>
+      </div>
+      <div class="hero-shots reveal">
+        <div class="shot shot-side left">
+          <img src="screenshots/en/settings-general.png" alt="Settings window — General" data-shot loading="lazy">
+        </div>
+        <div class="shot shot-main">
+          <img src="screenshots/en/panel-overview.png" alt="MoniSwitch menu-bar panel" data-shot width="452" height="799">
+        </div>
+        <div class="shot shot-side right">
+          <img src="screenshots/en/settings-presets.png" alt="Settings window — Presets" data-shot loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 功能 ============ -->
+    <section class="block wrap anchor" id="features">
+      <div class="sec-head reveal">
+        <p class="eyebrow"><span class="num">00</span><span data-i18n="features.label">Features</span></p>
+        <h2 class="sec-title" data-i18n-html="features.title">Deep engineering,<br>surface simplicity.</h2>
+        <p class="sec-sub" data-i18n="features.sub">A native bubble-card panel living in your menu bar — every display action one or two clicks away.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="card reveal">
+          <div class="icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M9 20.5h6M12 17v3.5"/><path d="m12 7.4 1 2 2.2.3-1.6 1.55.4 2.2-2-1.05-2 1.05.4-2.2L8.8 9.7l2.2-.3z" fill="currentColor" stroke="none"/></svg>
+          </div>
+          <h3 data-i18n="f1.t">One-click main display</h3>
+          <p data-i18n="f1.d">Click any display in the panel to make it the main one — the screen the menu bar and Dock live on. No digging through System Settings.</p>
+        </div>
+        <div class="card reveal">
+          <div class="icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="8.5" height="11" rx="1.5"/><rect x="13" y="8" width="8.5" height="11" rx="1.5"/><path d="M6.75 19.5v1.5M17.25 3.5v1.5"/></svg>
+          </div>
+          <h3 data-i18n="f2.t">Arrange, mirror, auto-layout</h3>
+          <p data-i18n="f2.d">Place an external screen left or right, toggle extend/mirror in one click, or auto-arrange everything side by side — mirror groups stay intact.</p>
+        </div>
+        <div class="card reveal">
+          <div class="icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h9a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Z"/><path d="M9 14.5h4.5"/><path d="M10.7 6.8 11.6 8.7l2.1.3-1.5 1.5.35 2.1-1.85-1-1.85 1 .35-2.1-1.5-1.5 2.1-.3z" fill="currentColor" stroke="none"/><path d="M17.5 19.5c2.2-.5 4-2.3 4-4.6V10l-2 -.8"/></svg>
+          </div>
+          <h3 data-i18n="f3.t">Layout presets &amp; hotkeys</h3>
+          <p data-i18n="f3.d">Save a whole configuration — main display, positions, mirroring — as a preset, then restore it with one click or a global hotkey bound to it.</p>
+        </div>
+        <div class="card reveal">
+          <div class="icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5h12M19.5 6.5H21M3 17.5h1.5M9 17.5h12"/><circle cx="17" cy="6.5" r="2.2"/><circle cx="6.5" cy="17.5" r="2.2"/></svg>
+          </div>
+          <h3 data-i18n="f4.t">HiDPI-safe resolution &amp; refresh</h3>
+          <p data-i18n="f4.d">Switch any screen's resolution and refresh rate (60 ↔ 120Hz) right in the panel. HiDPI scaling is tagged and preserved — no tiny icons on 4K screens.</p>
+        </div>
+        <div class="card reveal">
+          <div class="icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="13.5" rx="2"/><rect x="5.5" y="7.5" width="6" height="7.5" rx="1"/><rect x="13.5" y="7.5" width="5" height="4.5" rx="1"/></svg>
+          </div>
+          <h3 data-i18n="f5.t">To-scale layout preview</h3>
+          <p data-i18n="f5.d">Displays are drawn to scale in a live mini-map. Click a block to jump straight to that screen's parameters; hovering a row highlights its block.</p>
+        </div>
+        <div class="card reveal">
+          <div class="icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a8.8 8.8 0 0 0 0 17.6c1.3 0 2.2-.9 2.2-2 0-.6-.25-1.05-.55-1.45-.32-.4-.55-.85-.55-1.4 0-1.1.9-2 2-2h1.65c2.05 0 3.7-1.6 3.7-3.65C20.9 5.95 16.8 3 12 3Z"/><circle cx="7.7" cy="11.5" r="1.15" fill="currentColor" stroke="none"/><circle cx="10.6" cy="7.6" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.4" cy="7.9" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </div>
+          <h3 data-i18n="f6.t">Native, bilingual, accent-aware</h3>
+          <p data-i18n="f6.d">A pure menu-bar app with no Dock icon. The panel tracks your system accent color live, and the UI switches between English and 简体中文 in one click.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 截图 ============ -->
+    <section class="block wrap anchor" id="screenshots">
+      <div class="sec-head center reveal">
+        <p class="eyebrow"><span class="num">01</span><span data-i18n="shots.label">Screenshots</span></p>
+        <h2 class="sec-title" data-i18n="shots.title">Small panel, every control.</h2>
+      </div>
+      <div class="gallery">
+        <figure class="g-item g-tall reveal">
+          <div class="frame"><img src="screenshots/en/panel-arrange.png" alt="Arrangement card expanded" data-shot loading="lazy"></div>
+          <figcaption class="g-cap">
+            <div class="t" data-i18n="s1.t">Arrangement expanded</div>
+            <div class="s" data-i18n="s1.d">Position, resolution and refresh rate fold under each screen's name; the resolution row expands into a HiDPI-tagged option list.</div>
+          </figcaption>
+        </figure>
+        <figure class="g-item reveal">
+          <div class="frame"><img src="screenshots/en/settings-general.png" alt="Settings — General" data-shot loading="lazy"></div>
+          <figcaption class="g-cap">
+            <div class="t" data-i18n="s2.t">Settings · General</div>
+            <div class="s" data-i18n="s2.d">Language, launch at login, auto-refresh, notifications.</div>
+          </figcaption>
+        </figure>
+        <figure class="g-item reveal">
+          <div class="frame"><img src="screenshots/en/settings-presets.png" alt="Settings — Presets" data-shot loading="lazy"></div>
+          <figcaption class="g-cap">
+            <div class="t" data-i18n="s3.t">Settings · Presets</div>
+            <div class="s" data-i18n="s3.d">Save / apply / delete, plus one recordable global hotkey per preset.</div>
+          </figcaption>
+        </figure>
+        <figure class="g-item g-wide reveal">
+          <div class="frame"><img src="screenshots/dmg-install.png" alt="DMG drag-and-drop install" loading="lazy"></div>
+          <figcaption class="g-cap">
+            <div class="t" data-i18n="s4.t">Drag-and-drop install</div>
+            <div class="s" data-i18n="s4.d">Open the DMG and drag MoniSwitch into Applications — that's the whole installer.</div>
+          </figcaption>
+        </figure>
+      </div>
+      <p class="shots-note" data-i18n="shots.note">The UI switches between English and 简体中文 in one click — these screenshots follow this page's language.</p>
+    </section>
+
+    <!-- ============ 下载 ============ -->
+    <section class="block wrap anchor" id="download">
+      <div class="download-panel reveal">
+        <p class="eyebrow"><span class="num">02</span><span data-i18n="dl.label">Download</span></p>
+        <h2 class="sec-title" data-i18n="dl.title">Get MoniSwitch</h2>
+        <p class="sec-sub" data-i18n="dl.sub">Free and open source. Direct DMG download — no App Store, no account.</p>
+        <div class="dl-cta">
+          <a class="btn btn-primary" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg">
+            <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5v8m0 0L4.8 6.3M8 9.5l3.2-3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span data-i18n="dl.cta1">Download MoniSwitch.dmg</span>
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/M1688-cpu/MoniSwitch/releases" data-i18n="dl.cta2">All releases</a>
+          <a class="btn btn-ghost" href="https://github.com/M1688-cpu/MoniSwitch#install" data-i18n="dl.cta3">Build from source</a>
+        </div>
+        <div class="dl-pills">
+          <span class="pill">macOS 13+</span>
+          <span class="pill">Apple Silicon · Intel</span>
+          <span class="pill">v0.1.4</span>
+          <span class="pill">MIT</span>
+        </div>
+        <p class="dl-note" data-i18n-html="dl.note"><b>First launch may warn</b> that the app is "from an unidentified developer". MoniSwitch ships as a direct DMG without Apple notarization — common for open-source freeware, and the code is fully open for review. Approve it once in System Settings → Privacy &amp; Security → Open Anyway, and you won't be prompted again.</p>
+        <p class="credit" data-i18n="dl.credit">Under the hood, MoniSwitch is a friendly GUI over displayplacer (MIT, © Jake Hilborn), bundled with the app — it works out of the box.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ 页脚 ============ -->
+  <footer>
+    <div class="wrap foot-inner">
+      <span data-i18n="footer.copy">MIT License © MoniSwitch author</span>
+      <span class="sep">·</span>
+      <a href="https://github.com/M1688-cpu/MoniSwitch">GitHub</a>
+      <span class="sep">·</span>
+      <a href="https://github.com/jakehilborn/displayplacer">displayplacer</a>
+      <span class="right" data-i18n="footer.hosted">Site hosted on GitHub Pages</span>
+    </div>
+  </footer>
+
+  <script>
+    // ============ 双语文案字典（默认英文，与 README 默认语言一致） ============
+    const I18N = {
+      en: {
+        _title: "MoniSwitch — Menu-bar display switching for macOS",
+        _desc: "MoniSwitch is a macOS menu-bar utility: switch the main display, move external screens left or right, and toggle extend/mirror — without a trip to System Settings.",
+        "nav.features": "Features", "nav.screenshots": "Screenshots", "nav.download": "Download", "nav.cta": "Download",
+        "hero.eyebrow": "macOS menu-bar display switcher",
+        "hero.h1a": "MoniSwitch, the display", "hero.h1b": "switcher for macOS.",
+        "hero.sub": "Switch the main display, move external screens left or right, and toggle extend/mirror — all from the menu bar, without a trip to System Settings → Displays.",
+        "hero.cta1": "Download for macOS", "hero.cta2": "View on GitHub",
+        "features.label": "Features",
+        "features.title": "Deep engineering,<br>surface simplicity.",
+        "features.sub": "A native bubble-card panel living in your menu bar — every display action one or two clicks away.",
+        "f1.t": "One-click main display",
+        "f1.d": "Click any display in the panel to make it the main one — the screen the menu bar and Dock live on. No digging through System Settings.",
+        "f2.t": "Arrange, mirror, auto-layout",
+        "f2.d": "Place an external screen left or right, toggle extend/mirror in one click, or auto-arrange everything side by side — mirror groups stay intact.",
+        "f3.t": "Layout presets & hotkeys",
+        "f3.d": "Save a whole configuration — main display, positions, mirroring — as a preset, then restore it with one click or a global hotkey bound to it.",
+        "f4.t": "HiDPI-safe resolution & refresh",
+        "f4.d": "Switch any screen's resolution and refresh rate (60 ↔ 120Hz) right in the panel. HiDPI scaling is tagged and preserved — no tiny icons on 4K screens.",
+        "f5.t": "To-scale layout preview",
+        "f5.d": "Displays are drawn to scale in a live mini-map. Click a block to jump straight to that screen's parameters; hovering a row highlights its block.",
+        "f6.t": "Native, bilingual, accent-aware",
+        "f6.d": "A pure menu-bar app with no Dock icon. The panel tracks your system accent color live, and the UI switches between English and 简体中文 in one click.",
+        "shots.label": "Screenshots", "shots.title": "Small panel, every control.",
+        "s1.t": "Arrangement expanded",
+        "s1.d": "Position, resolution and refresh rate fold under each screen's name; the resolution row expands into a HiDPI-tagged option list.",
+        "s2.t": "Settings · General", "s2.d": "Language, launch at login, auto-refresh, notifications.",
+        "s3.t": "Settings · Presets", "s3.d": "Save / apply / delete, plus one recordable global hotkey per preset.",
+        "s4.t": "Drag-and-drop install", "s4.d": "Open the DMG and drag MoniSwitch into Applications — that's the whole installer.",
+        "shots.note": "The UI switches between English and 简体中文 in one click — these screenshots follow this page's language.",
+        "dl.label": "Download", "dl.title": "Get MoniSwitch",
+        "dl.sub": "Free and open source. Direct DMG download — no App Store, no account.",
+        "dl.cta1": "Download MoniSwitch.dmg", "dl.cta2": "All releases", "dl.cta3": "Build from source",
+        "dl.note": "<b>First launch may warn</b> that the app is \"from an unidentified developer\". MoniSwitch ships as a direct DMG without Apple notarization — common for open-source freeware, and the code is fully open for review. Approve it once in System Settings → Privacy & Security → Open Anyway, and you won't be prompted again.",
+        "dl.credit": "Under the hood, MoniSwitch is a friendly GUI over displayplacer (MIT, © Jake Hilborn), bundled with the app — it works out of the box.",
+        "footer.copy": "MIT License © MoniSwitch author", "footer.hosted": "Site hosted on GitHub Pages"
+      },
+      zh: {
+        _title: "MoniSwitch — 菜单栏显示器切换工具",
+        _desc: "MoniSwitch 是一个 macOS 菜单栏小工具：切换主显示器、调整外接屏左右位置、切换扩展/镜像，不必再进「系统设置 → 显示器」。",
+        "nav.features": "功能", "nav.screenshots": "截图", "nav.download": "下载", "nav.cta": "下载",
+        "hero.eyebrow": "macOS 菜单栏显示器切换工具",
+        "hero.h1a": "MoniSwitch，菜单栏上的", "hero.h1b": "显示器切换工具。",
+        "hero.sub": "切换主显示器、调整外接屏左右位置、切换扩展/镜像——全在菜单栏完成，不必再进「系统设置 → 显示器」。",
+        "hero.cta1": "下载 macOS 版", "hero.cta2": "在 GitHub 查看",
+        "features.label": "功能",
+        "features.title": "工程做深，<br>界面做浅。",
+        "features.sub": "常驻菜单栏的原生气泡卡片面板，每个显示器操作都在一两次点击之内。",
+        "f1.t": "一键切换主屏",
+        "f1.d": "面板里点任意显示器即可设为主屏——白条和程序坞所在的那个。不必翻系统设置。",
+        "f2.t": "排列 · 镜像 · 自动布局",
+        "f2.d": "外接屏左右换位、一键切换扩展/镜像，或一键自动排列横向排开——镜像组始终保持完整。",
+        "f3.t": "布局预设与全局快捷键",
+        "f3.d": "把整套配置（主屏、位置、镜像态）存为预设，一键恢复，还能绑定一个全局快捷键，按下即达。",
+        "f4.t": "HiDPI 安全的分辨率与刷新率",
+        "f4.d": "面板内直接切换任意屏的分辨率与刷新率（60 ↔ 120Hz）。HiDPI 缩放有标注、切换不丢失——4K 屏不再出现小图标。",
+        "f5.t": "等比布局预览",
+        "f5.d": "按真实比例绘制的实时小地图：点击屏块直达该屏参数，悬停列表行时对应屏块高亮。",
+        "f6.t": "原生 · 双语 · 跟随强调色",
+        "f6.d": "纯菜单栏常驻、无程序坞图标。面板实时跟随系统强调色，界面在中英文间一键切换。",
+        "shots.label": "截图", "shots.title": "小面板，全掌控。",
+        "s1.t": "排列展开",
+        "s1.d": "位置、分辨率、刷新率折叠在每块屏的名称行下；分辨率行可再展开为带 HiDPI 标注的选项列表。",
+        "s2.t": "设置 · 通用", "s2.d": "语言 / 自启动 / 自动刷新 / 通知。",
+        "s3.t": "设置 · 预设", "s3.d": "保存 / 应用 / 删除，每个预设可录制一个全局快捷键。",
+        "s4.t": "拖拽安装", "s4.d": "打开 DMG，把 MoniSwitch 拖进 Applications——安装就完成了。",
+        "shots.note": "界面语言中英一键切换——上方截图跟随本页语言。",
+        "dl.label": "下载", "dl.title": "获取 MoniSwitch",
+        "dl.sub": "免费开源，DMG 直链下载——无需 App Store，无需账号。",
+        "dl.cta1": "下载 MoniSwitch.dmg", "dl.cta2": "全部版本", "dl.cta3": "自行编译",
+        "dl.note": "<b>首次打开可能提示</b>「无法打开，因为来自身份不明的开发者」。MoniSwitch 采用 DMG 直链分发、未做 Apple 公证——这是开源免费工具的常见做法，代码完全开源可审查。在「系统设置 → 隐私与安全性」点击「仍要打开」放行一次，之后不会再提示。",
+        "dl.credit": "MoniSwitch 底层调用 displayplacer（MIT，© Jake Hilborn）完成显示器配置，二进制随 App 一起打包，开箱即用。",
+        "footer.copy": "MIT License © MoniSwitch 作者", "footer.hosted": "网站由 GitHub Pages 托管"
+      }
+    };
+
+    const LANG_KEY = "moniswitch-site-lang";
+
+    function setLang(lang) {
+      const dict = I18N[lang];
+      document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+      document.title = dict._title;
+      document.querySelector('meta[name="description"]').setAttribute("content", dict._desc);
+
+      // 文本节点（textContent，防注入）
+      document.querySelectorAll("[data-i18n]").forEach(el => {
+        const key = el.getAttribute("data-i18n");
+        if (dict[key] !== undefined) el.textContent = dict[key];
+      });
+      // 含 <br>/<b> 标记的富文本（内容全部来自本文件内置字典，安全）
+      document.querySelectorAll("[data-i18n-html]").forEach(el => {
+        const key = el.getAttribute("data-i18n-html");
+        if (dict[key] !== undefined) el.innerHTML = dict[key];
+      });
+      // 截图跟随语言（en/zh 两套文件名一一对应；dmg-install 两语言共用，不带 data-shot）
+      document.querySelectorAll("img[data-shot]").forEach(img => {
+        img.src = img.src.replace(/\/screenshots\/(en|zh)\//, `/screenshots/${lang}/`);
+      });
+
+      document.getElementById("langEn").classList.toggle("active", lang === "en");
+      document.getElementById("langZh").classList.toggle("active", lang === "zh");
+      document.getElementById("langEn").setAttribute("aria-pressed", lang === "en");
+      document.getElementById("langZh").setAttribute("aria-pressed", lang === "zh");
+      try { localStorage.setItem(LANG_KEY, lang); } catch (e) { /* 隐私模式下静默降级 */ }
+    }
+
+    document.getElementById("langEn").addEventListener("click", () => setLang("en"));
+    document.getElementById("langZh").addEventListener("click", () => setLang("zh"));
+
+    // 启动语言：记忆偏好 > 默认英文（与 README 默认语言一致）
+    let initial = "en";
+    try {
+      const saved = localStorage.getItem(LANG_KEY);
+      if (saved === "zh" || saved === "en") initial = saved;
+    } catch (e) { /* 忽略 */ }
+    setLang(initial);
+
+    // ============ 入场动效 ============
+    const revealEls = document.querySelectorAll(".reveal");
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver(entries => {
+        entries.forEach((entry, i) => {
+          if (entry.isIntersecting) {
+            // 同批元素按 DOM 顺序错峰 60ms，避免齐步走
+            const delay = Array.from(revealEls).indexOf(entry.target) % 6 * 60;
+            entry.target.style.transitionDelay = delay + "ms";
+            entry.target.classList.add("in");
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+      revealEls.forEach(el => io.observe(el));
+    } else {
+      revealEls.forEach(el => el.classList.add("in"));
+    }
+
+    // ============ 导航滚动态 ============
+    const head = document.getElementById("siteHead");
+    const onScroll = () => head.classList.toggle("scrolled", window.scrollY > 8);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  </script>
+</body>
+</html>

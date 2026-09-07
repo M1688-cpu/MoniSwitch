@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  English · <a href="README.zh-CN.md">简体中文</a>
+  English · <a href="README.zh-CN.md">简体中文</a> · <a href="https://m1688-cpu.github.io/MoniSwitch/">Website</a>
 </p>
 
 <p align="center">

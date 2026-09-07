@@ -1,0 +1,54 @@
+# 项目宣传页部署：docs/index.html + screenshots/ + 应用图标 → GitHub Pages
+# 仓库 Pages 设置需选 Source: GitHub Actions（一次性）
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/index.html"
+      - "screenshots/**"
+      - "Resources/AppIcon-source.png"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 组装站点根目录：index.html 相对路径引用 screenshots/** 与 icon.png，
+      # 与 Support/preview-site.sh 的本地预览组装保持同构
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp docs/index.html _site/index.html
+          cp -R screenshots _site/screenshots
+          cp Resources/AppIcon-source.png _site/icon.png
+          touch _site/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
