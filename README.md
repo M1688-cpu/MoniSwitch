@@ -1,9 +1,9 @@
 <h1 align="center">
-  <img src="Resources/AppIcon-source.png" width="56" alt="MoniSwitch" align="middle"> MoniSwitch
+  <img src="Resources/AppIcon-source.png?v=0.1.4" width="56" alt="MoniSwitch" align="middle"> MoniSwitch
 </h1>
 
 <p align="center">
-  A clean macOS menu-bar utility: switch the main display, move external screens left or right, and toggle extend/mirror — without a trip to System Settings → Displays.
+  A macOS menu-bar utility: switch the main display, move external screens left or right, and toggle extend/mirror without a trip to System Settings → Displays.
 </p>
 
 <p align="center">
@@ -19,23 +19,23 @@
 
 ## Features
 
-- 🖥️ **Lives in the menu bar**: click the icon to open a bubble-card panel — native popover look (arrow pointing at the icon, centered above it, expand animation); click anywhere outside to dismiss
-- 🔀 **One-click main display**: click any display in the panel to make it the main display (the one with the menu bar)
-- ↔️ **Move external screens left/right**: unfold the screen's parameter group and place it to the left or right of the main display
-- 🗂️ **Collapsible arrangement card**: each screen's position/resolution/refresh-rate rows fold under its name row — collapsed by default, only one expanded at a time; click a block in the layout preview to jump straight to that screen
-- 🪞 **Extend / mirror toggle**: switch an external screen between "extended desktop" and "mirroring" in one click (target screen labeled in the panel)
-- ✨ **One-click auto-arrange**: lay all screens out side by side, remove overlaps, keep mirror groups intact
-- 📦 **Layout presets**: save a whole display configuration (main + position + mirroring) as a preset and restore it in one click (e.g. "Desk", "Presentation")
-- 🏷️ **"Current" preset badge**: presets matching the current layout get a badge automatically (compared by resolution/refresh rate/position/mirror state, immune to screen-id drift)
-- 🛟 **Drift-proof presets**: when persistent ids change after re-plugging a display, they are remapped automatically by resolution and screen count
-- 🔄 **Refresh rate / resolution switching**: switch any screen's refresh rate (60Hz ↔ 120Hz) and resolution right in the panel, main display included
-- 🖼️ **HiDPI-safe switching**: resolution options are tagged HiDPI / low-resolution; re-picking a resolution no longer loses HiDPI scaling (no more "tiny icons" on 4K screens)
-- ⌨️ **Global hotkeys**: bind one global hotkey per preset (Carbon `RegisterEventHotKey`, zero permissions) and apply a layout with a keystroke
-- 🗺️ **Interactive layout preview**: displays drawn to scale; click a block to select it (and unfold that screen's parameters); hovering a list row highlights the matching block
-- ⏳ **Operation feedback**: progress bar while a switch is in flight with double-click guard; failures raise a system notification instead of failing silently
-- 🎨 **Follows the system accent color**: the panel and settings window track the accent color from System Settings → Appearance live
-- ⚙️ **Settings window**: bilingual UI, launch at login, auto-refresh (with interval picker), post-switch notifications
-- 🌐 **Bilingual**: switch the UI language in one click, persisted across restarts
+- Lives in the menu bar: click the icon to open a bubble-card panel with a native popover look (arrow pointing at the icon, centered above it, expand animation); clicking anywhere outside dismisses it
+- Click any display in the panel to make it the main display (the one with the menu bar)
+- Unfold a screen's parameter group to place an external screen to the left or right of the main display
+- Collapsible arrangement card: each screen's position/resolution/refresh-rate rows fold under its name row, collapsed by default with only one expanded at a time; click a block in the layout preview to jump straight to that screen
+- Toggle an external screen between "extended desktop" and "mirroring" in one click; the panel labels the mirror target screen
+- One-click auto-arrange lays all screens out side by side, removes overlaps, and keeps mirror groups intact
+- Layout presets: save a whole display configuration (main + position + mirroring) as a preset and restore it in one click (e.g. "Desk", "Presentation")
+- Presets matching the current layout get a "Current" badge automatically; matching compares resolution/refresh rate/position/mirror state, so screen-id drift does not break it
+- When persistent ids change after re-plugging a display, presets are remapped automatically by resolution and screen count
+- Switch any screen's refresh rate (60Hz ↔ 120Hz) and resolution right in the panel, main display included
+- Resolution options are tagged HiDPI / low-resolution; re-picking a resolution no longer loses HiDPI scaling (no more "tiny icons" on 4K screens)
+- Bind one global hotkey per preset (Carbon `RegisterEventHotKey`, no permissions needed) and apply a layout with a keystroke
+- The layout preview draws displays to scale; click a block to select it and unfold that screen's parameters, and hovering a list row highlights the matching block
+- A progress bar covers each switch while it is in flight, with a double-click guard; failed switches raise a system notification
+- The panel and settings window track the accent color from System Settings → Appearance and update it live
+- The settings window covers bilingual UI, launch at login, auto-refresh (with interval picker), and post-switch notifications
+- Switch the UI language in one click; the choice persists across restarts
 
 ## Screenshots
 
@@ -58,22 +58,22 @@
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/en/settings-general.png" width="420" alt="Settings — General">
-      <br><b>Settings — General</b> · Language / launch at login / auto-refresh / notifications
+      <img src="screenshots/en/settings-general.png" width="420" alt="Settings · General">
+      <br><b>Settings · General</b> · Language / launch at login / auto-refresh / notifications
       <br><sub>The refresh-interval picker appears once auto-refresh is on</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/en/settings-presets.png" width="420" alt="Settings — Presets">
-      <br><b>Settings — Presets</b> · Save / apply / delete + global hotkey binding
+      <img src="screenshots/en/settings-presets.png" width="420" alt="Settings · Presets">
+      <br><b>Settings · Presets</b> · Save / apply / delete + global hotkey binding
       <br><sub>Each preset can record one hotkey (Esc to cancel)</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/en/settings-about.png" width="420" alt="Settings — About">
-      <br><b>Settings — About</b> · Icon / description / version
+      <img src="screenshots/en/settings-about.png" width="420" alt="Settings · About">
+      <br><b>Settings · About</b> · Icon / description / version
     </td>
   </tr>
 </table>
@@ -88,10 +88,10 @@
 </p>
 
 1. Go to the [Releases page](../../releases) and download the latest `MoniSwitch.dmg`
-2. Open it and drag **MoniSwitch** into the **Applications** folder
+2. Open it and drag MoniSwitch into the Applications folder
 3. On first launch, macOS may say it "can't be opened because it is from an unidentified developer"
    - The app is not Apple-notarized (see [the note below](#about-the-notarization-warning))
-   - To proceed: open **System Settings → Privacy & Security** and click **Open Anyway**
+   - To proceed: open System Settings → Privacy & Security and click Open Anyway
 
 ### Option 2: Build from source (developers)
 
@@ -114,23 +114,23 @@ bash Support/build-app.sh
 
 ## Usage
 
-1. Launch MoniSwitch — a display icon appears in the menu bar
+1. Launch MoniSwitch; a display icon appears in the menu bar
 2. Click the icon to open the panel with all displays and the layout preview
-3. **Main display card**: click any display name to make it the main display
-4. **Arrange & mirror card**: click a display row to unfold its parameter group — position, resolution, refresh rate; switch mirroring/extend for external screens here, or auto-arrange everything
-5. **Presets card**: click a preset to restore a whole layout; the one matching the current layout carries a "Current" badge
+3. Main display card: click any display name to make it the main display
+4. Arrange & mirror card: click a display row to unfold its parameter group (position, resolution, refresh rate); switch mirroring/extend for external screens here, or auto-arrange everything
+5. Presets card: click a preset to restore a whole layout; the one matching the current layout carries a "Current" badge
 6. Click anywhere outside the panel to dismiss it
 
 ## About the notarization warning
 
 MoniSwitch is distributed as a direct DMG download rather than through the Mac App Store, so it carries no Apple notarization.
 This is common for open-source freeware, and the app itself is safe (the code is fully open for review).
-Approve it once via **Privacy & Security** as described above and you won't be prompted again.
+Approve it once via Privacy & Security as described above and you won't be prompted again.
 
 ## How it works
 
-MoniSwitch is a friendly GUI on top of [displayplacer](https://github.com/jakehilborn/displayplacer) (MIT License, © Jake Hilborn), which performs the actual display configuration.
-The displayplacer binary is bundled with the app — **it works out of the box, no extra install**.
+MoniSwitch is a GUI on top of [displayplacer](https://github.com/jakehilborn/displayplacer) (MIT License, © Jake Hilborn), which performs the actual display configuration.
+The displayplacer binary is bundled with the app and works out of the box.
 
 - Switch main display: moves the target screen's `origin` to `(0,0)` and shifts the others by the same vector to keep left/right relations
 - Move left/right: adjusts the external screen's `origin.x`
@@ -138,11 +138,11 @@ The displayplacer binary is bundled with the app — **it works out of the box, 
 
 ## Tech stack
 
-- **Language**: Swift 6
-- **UI**: SwiftUI + AppKit (`NSStatusItem` + `NSPopover` menu-bar panel, macOS 13+)
-- **Build**: Swift Package Manager (plain-text `Package.swift`, builds from the command line)
-- **Type**: pure menu-bar app (`LSUIElement = YES`, no Dock icon)
-- **Distribution**: non-sandboxed, local ad-hoc signing, direct DMG download
+- Language: Swift 6
+- UI: SwiftUI + AppKit (`NSStatusItem` + `NSPopover` menu-bar panel, macOS 13+)
+- Build: Swift Package Manager (plain-text `Package.swift`, builds from the command line)
+- Type: pure menu-bar app (`LSUIElement = YES`, no Dock icon)
+- Distribution: non-sandboxed, local ad-hoc signing, direct DMG download
 
 ## Project structure
 
@@ -217,4 +217,4 @@ The bundled displayplacer © Jake Hilborn, also under the MIT License.
 
 ## Acknowledgements
 
-- [displayplacer](https://github.com/jakehilborn/displayplacer) — without this excellent command-line tool, the underlying display control in this project would not be possible.
+- [displayplacer](https://github.com/jakehilborn/displayplacer), the command-line tool that performs the underlying display control in this project.
