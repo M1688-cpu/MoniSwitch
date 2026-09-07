@@ -45,14 +45,14 @@
 <table>
   <tr>
     <td align="center">
-      <img src="screenshots/zh/panel-overview.png" alt="面板全貌">
+      <img src="screenshots/zh/panel-overview.png?v=0.1.5" alt="面板全貌">
       <br><b>面板全貌</b> · 主屏切换 / 排列与镜像 / 预设 / 布局预览 / 底部工具栏
       <br><sub>气泡卡片面板，跟随系统强调色</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/zh/panel-arrange.png" alt="排列展开">
+      <img src="screenshots/zh/panel-arrange.png?v=0.1.5" alt="排列展开">
       <br><b>排列展开</b> · 位置/分辨率/刷新率参数组 + 镜像/扩展
       <br><sub>点击屏名行展开参数组，分辨率行可再展开选项列表（含 HiDPI 标注）</sub>
     </td>
@@ -73,7 +73,7 @@
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/zh/settings-about.png" width="420" alt="设置-关于">
+      <img src="screenshots/zh/settings-about.png?v=0.1.5" width="420" alt="设置-关于">
       <br><b>设置 · 关于</b> · 图标 / 简介 / 版本号
     </td>
   </tr>

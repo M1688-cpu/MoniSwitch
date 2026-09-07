@@ -45,14 +45,14 @@
 <table>
   <tr>
     <td align="center">
-      <img src="screenshots/en/panel-overview.png" alt="Panel overview">
+      <img src="screenshots/en/panel-overview.png?v=0.1.5" alt="Panel overview">
       <br><b>Panel overview</b> · Main display / arrangement / presets / layout preview / toolbar
       <br><sub>Bubble-card panel that follows the system accent color</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/en/panel-arrange.png" alt="Arrangement expanded">
+      <img src="screenshots/en/panel-arrange.png?v=0.1.5" alt="Arrangement expanded">
       <br><b>Arrangement expanded</b> · Position / resolution / refresh rate + mirror & extend
       <br><sub>Click a display row to unfold its parameter group; the resolution row expands into an option list (HiDPI tagged)</sub>
     </td>
@@ -73,7 +73,7 @@
   </tr>
   <tr>
     <td align="center">
-      <img src="screenshots/en/settings-about.png" width="420" alt="Settings · About">
+      <img src="screenshots/en/settings-about.png?v=0.1.5" width="420" alt="Settings · About">
       <br><b>Settings · About</b> · Icon / description / version
     </td>
   </tr>
