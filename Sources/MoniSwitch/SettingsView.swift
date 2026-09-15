@@ -68,7 +68,8 @@ struct SettingsView: View {
                         SidebarRow(
                             title: l10n.t(tab.titleKey),
                             systemImage: tab.systemImage,
-                            isSelected: selectedTab == tab
+                            isSelected: selectedTab == tab,
+                            showsBetaBadge: tab == .presets
                         )
                         .onTapGesture { selectedTab = tab }
                     }
@@ -283,6 +284,9 @@ private struct SidebarRow: View {
     let title: String
     let systemImage: String
     let isSelected: Bool
+    /// 标题后追加「Beta」角标：功能尚未完善的分区（预设）用它向用户示意。
+    /// 「Beta」中英文同形，不走 L10n。
+    var showsBetaBadge = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -296,6 +300,15 @@ private struct SidebarRow: View {
             Text(title)
                 .font(.system(size: BubbleMetrics.fontBody, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(.primary)
+            // Beta 小胶囊：橙色字 + 浅橙底，与快捷键角标（secondary 底）同族但更醒目。
+            if showsBetaBadge {
+                Text("Beta")
+                    .font(.system(size: BubbleMetrics.fontMini, weight: .semibold))
+                    .foregroundStyle(Color.orange)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.orange.opacity(0.12), in: Capsule())
+            }
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)

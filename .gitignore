@@ -27,3 +27,6 @@ DerivedData/
 .vscode/
 .idea/
 .zcode/
+
+# ===== 插件运行时草稿（video-agent-kit 等，非项目内容） =====
+.video_agent/

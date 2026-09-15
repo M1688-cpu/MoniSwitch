@@ -5,6 +5,15 @@ import AppKit
 /// 配合 .move(edge: .top) 过渡呈现「由上向下拉伸」，popover 高度随内容联动。
 private let panelReveal = Animation.spring(response: 0.32, dampingFraction: 0.86)
 
+/// 面板内容理想高度上报（手动尺寸桥：PanelController 在 sizingOptions=[] 下
+/// 依赖此值回写 preferredContentSize，窗口高度由此驱动）。
+private struct PanelContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 /// 菜单栏下拉面板（宿主为 PanelController 的 NSPopover）：按参考图做成分栏「气泡卡片」。
 ///
 /// 这里是一块可完全自定义的 SwiftUI 视图：
@@ -48,7 +57,7 @@ struct PanelView: View {
         VStack(spacing: BubbleMetrics.cardSpacing) {
             if state.displays.isEmpty {
                 // 无显示器：只放一张提示卡。
-                BubbleCard(title: l10n.t(.displaysSection), systemImage: "display", accent: accent) {
+                BubbleCard(title: l10n.t(.displaysSection)) {
                     Text(l10n.t(.noDisplays))
                         .font(.system(size: BubbleMetrics.fontBody))
                         .foregroundStyle(.secondary)
@@ -76,6 +85,17 @@ struct PanelView: View {
         .padding(16)
         // 只锁宽度，高度按内容自适应。
         .frame(minWidth: 380, idealWidth: 380, maxWidth: 380)
+        // 内容理想高度上报（手动尺寸桥的 SwiftUI 侧）：sizingOptions=[] 后
+        // popover 不再自动跟随内容尺寸，由这里实测高度 → PanelController 回写
+        // preferredContentSize。挂 background 不占布局；宽度恒 380，只需上报高度。
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(key: PanelContentHeightKey.self, value: geo.size.height)
+            }
+        }
+        .onPreferenceChange(PanelContentHeightKey.self) { height in
+            PanelController.shared.updateContentHeight(height)
+        }
         // 操作进行中：顶部悬浮一条流动进度条（overlay 不占布局空间，内容不下移）。
         .overlay(alignment: .top) {
             if busy {
@@ -85,23 +105,26 @@ struct PanelView: View {
                     .transition(.opacity)
             }
         }
+        // 顶端钉死（配合 PanelController 的 sizingOptions=[] 手动尺寸桥，修「展开
+        // 参数时所有气泡先上跳再下拉」）：根视图按宿主视图边界布局时，此弹性 frame
+        // 让内容恒钉顶部——内容与窗口高度瞬态不一致（窗口跟随滞后 1-2 帧）时，
+        // 误差只落在底缘的微小裁切，整列内容不会垂直居中漂移。
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - 主显示器卡片
 
-    /// 主显示器列表：每块屏一行，点击即设为主屏，主屏行带强调色角标。
+    /// 主显示器列表：每块屏一行，点击即设为主屏。主从关系由图标圆框状态表达——
+    /// 主屏图标圆框填主题色，非主屏为深灰暗态（不再用圆点指示器与 "Main" 角标）。
     /// 行 hover 时布局图对应屏块高亮。
     private var primaryCard: some View {
-        BubbleCard(title: l10n.t(.displaysSection), systemImage: "display", accent: accent) {
+        BubbleCard(title: l10n.t(.displaysSection)) {
             VStack(spacing: BubbleMetrics.rowSpacing) {
                 ForEach(state.displays) { d in
                     RowButton(action: { state.setPrimary(d) }) {
                         HStack(spacing: 10) {
-                            // 主屏用实心强调色圆点，非主屏用空心圆。
-                            Image(systemName: d.isMain ? "circle.fill" : "circle")
-                                .font(.system(size: BubbleMetrics.fontMini))
-                                .foregroundStyle(d.isMain ? accent : Color.secondary.opacity(0.4))
-                                .frame(width: 14)
+                            // 主从状态由圆框颜色表达；名称字重（主屏 semibold）为第二线索。
+                            DeviceIconBadge(isBuiltIn: d.isBuiltIn, active: d.isMain, accent: accent)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(d.localizedTypeName(l10n: l10n))
                                     .font(.system(size: BubbleMetrics.fontBody, weight: d.isMain ? .semibold : .regular))
@@ -111,14 +134,6 @@ struct PanelView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            if d.isMain {
-                                Text(l10n.t(.panelPrimaryBadge))
-                                    .font(.system(size: BubbleMetrics.fontMini, weight: .medium))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(accent, in: Capsule())
-                            }
                         }
                     }
                     .onHover { hovering in
@@ -150,9 +165,7 @@ struct PanelView: View {
     private var arrangeCard: some View {
         let externals = state.displays.filter { !$0.isBuiltIn }
         let hasExternals = !externals.isEmpty
-        return BubbleCard(title: hasExternals ? l10n.t(.panelArrange) : l10n.t(.panelDisplayAdjust),
-                          systemImage: hasExternals ? "arrow.left.and.right" : "slider.horizontal.3",
-                          accent: accent) {
+        return BubbleCard(title: hasExternals ? l10n.t(.panelArrange) : l10n.t(.panelDisplayAdjust)) {
             VStack(spacing: BubbleMetrics.rowSpacing) {
                 if hasExternals {
                     ForEach(state.displays) { d in
@@ -172,13 +185,9 @@ struct PanelView: View {
                     Divider().padding(.vertical, 4)
 
                     // 镜像 / 扩展：两个互斥按钮，当前态强调色高亮。
-                    // 操作对端随主屏身份切换（与原 menu 逻辑一致，避免 mirror(ext==main) 退化）。
+                    // 操作对端随主屏身份切换（与原 menu 逻辑一致，避免 mirror(ext==main) 退化）；
+                    // 对端屏名不再静态占一行，改为 hover 镜像按钮时弹出的补充气泡（见下）。
                     mirrorExtendRow
-
-                    Divider().padding(.vertical, 4)
-
-                    // 一键自动排列：横向排开、消除重叠（镜像组保持完整）。
-                    autoArrangeRow
                 } else if let builtIn = state.builtInDisplay {
                     // 单内置屏：无位置可排、无镜像对象，仅分辨率/刷新率。
                     // 内容只有两行，折叠反而多一次点击——foldable=false 常展开。
@@ -198,9 +207,11 @@ struct PanelView: View {
         }
     }
 
-    /// 镜像 / 扩展切换区：目标屏说明行 + 并排胶囊按钮。
+    /// 镜像 / 扩展切换区：并排胶囊按钮。
     ///
-    /// 说明行明确写出镜像操作的对端屏名（多外接时消除"操作哪块屏"的歧义）。
+    /// 镜像操作的对端屏名不静态占行：hover 镜像按钮并停留片刻后，按钮上方弹出
+    /// 补充气泡说明对端屏（MirrorTargetTooltip，移开即收）——多外接时消除
+    /// "操作哪块屏"的歧义，同时省去常驻占位文字。
     private var mirrorExtendRow: some View {
         let externals = state.displays.filter { !$0.isBuiltIn }
         let isMirroring = externals.contains { state.isMirroring($0) }
@@ -210,75 +221,43 @@ struct PanelView: View {
             ? state.builtInDisplay
             : externals.first
 
-        return VStack(spacing: 6) {
-            if let peer {
+        return HStack(spacing: 8) {
+            ActivePill(active: isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
                 HStack(spacing: 5) {
-                    Image(systemName: "link")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                    Text(l10n.t(.mirrorTarget, peer.localizedTypeName(l10n: l10n)))
-                        .font(.system(size: BubbleMetrics.fontCaption))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Spacer(minLength: 0)
+                    Image(systemName: "rectangle.on.rectangle").font(.system(size: BubbleMetrics.fontCaption))
+                    Text(l10n.t(.mirrorMain)).font(.system(size: BubbleMetrics.fontControl, weight: isMirroring ? .semibold : .regular))
                 }
-                .padding(.horizontal, 4)
+                .frame(maxWidth: .infinity)
             }
-
-            HStack(spacing: 8) {
-                ActivePill(active: isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "rectangle.on.rectangle").font(.system(size: BubbleMetrics.fontCaption))
-                        Text(l10n.t(.mirrorMain)).font(.system(size: BubbleMetrics.fontControl, weight: isMirroring ? .semibold : .regular))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .asButton {
-                    if let peer { state.mirror(peer) }
-                }
-                .disabled(peer == nil)
-
-                ActivePill(active: !isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "rectangle.dashed").font(.system(size: BubbleMetrics.fontCaption))
-                        Text(l10n.t(.extendDisplay)).font(.system(size: BubbleMetrics.fontControl, weight: !isMirroring ? .semibold : .regular))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .asButton {
-                    if let peer { state.unmirror(peer) }
-                }
-                .disabled(peer == nil)
+            .asButton {
+                if let peer { state.mirror(peer) }
             }
+            .disabled(peer == nil)
+            // 对端屏名补充气泡：hover 停留触发（扩展按钮不需要——它不涉及对端选择）。
+            .modifier(MirrorTargetTooltip(
+                text: peer.map { l10n.t(.mirrorTarget, $0.localizedTypeName(l10n: l10n)) } ?? ""
+            ))
+
+            ActivePill(active: !isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
+                HStack(spacing: 5) {
+                    Image(systemName: "rectangle.dashed").font(.system(size: BubbleMetrics.fontCaption))
+                    Text(l10n.t(.extendDisplay)).font(.system(size: BubbleMetrics.fontControl, weight: !isMirroring ? .semibold : .regular))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .asButton {
+                if let peer { state.unmirror(peer) }
+            }
+            .disabled(peer == nil)
         }
         .padding(.top, 2)
     }
 
     // MARK: - 布局预设卡片
 
-    /// 一键自动排列行：全行可点的小按钮，横排所有屏并消除重叠。
-    private var autoArrangeRow: some View {
-        RowButton(action: { state.autoArrange() }) {
-            HStack(spacing: 8) {
-                Image(systemName: "wand.and.rays")
-                    .font(.system(size: BubbleMetrics.fontControl))
-                    .foregroundStyle(accent)
-                    .frame(width: 16)
-                Text(l10n.t(.autoArrange))
-                    .font(.system(size: BubbleMetrics.fontCaption))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
     /// 已保存预设：每条一行（名称 + 快捷键角标 + 应用按钮）。
     private var presetsCard: some View {
-        BubbleCard(title: l10n.t(.groupPresets), systemImage: "square.stack", accent: accent) {
+        BubbleCard(title: l10n.t(.groupPresets)) {
             VStack(spacing: BubbleMetrics.rowSpacing) {
                 ForEach(presetManager.presets) { preset in
                     RowButton(action: { presetManager.apply(preset) }) {
@@ -326,7 +305,7 @@ struct PanelView: View {
     /// 等比布局示意图（可交互）：按 origin + resolution 画出每块屏的相对位置与比例。
     /// 点击屏块选中（✓ 角标）；hover 主显示器行/排列行时对应块高亮。
     private var layoutPreviewCard: some View {
-        BubbleCard(title: l10n.t(.panelLayoutPreview), systemImage: "rectangle.split.2x1", accent: accent) {
+        BubbleCard(title: l10n.t(.panelLayoutPreview)) {
             LayoutDiagram(
                 displays: state.displays,
                 accent: accent,
@@ -337,10 +316,11 @@ struct PanelView: View {
                     let same = selectedDisplayID == d.id
                     selectedDisplayID = same ? nil : d.id
                     // 选中即定位：联动展开排列卡中该屏的参数组（取消选中不收起）。
+                    // 展开方向必须二值跳变（不带 withAnimation），与 toggleExpanded
+                    // 一致——带动画会让高度弹簧化，重新引入居中漂移（见
+                    // PanelController「容器闸门」注释）；视觉揭示由块内 mask 承担。
                     if !same {
-                        withAnimation(panelReveal) {
-                            expandedDisplayID = d.id
-                        }
+                        expandedDisplayID = d.id
                     }
                 }
             )
@@ -351,56 +331,170 @@ struct PanelView: View {
 
     // MARK: - 底部操作栏
 
-    /// 底部一排两气泡：左气泡「刷新 | 设置」内容自适应宽（双图标天然居中），
-    /// 右气泡「退出」占满剩余宽度（电源图标居中、整泡可点）——左收短右拉长，
-    /// 两端视觉平衡且退出区足够醒目。纯图标 + 原生 tooltip（.help 悬停停留后显示，
-    /// 文案走 L10n 随语言切换）；按钮本身不做 hover 高亮，悬浮反馈由整泡的
-    /// bubbleHoverLift（微放大 + 上浮 + 阴影增强）承担；误触风险由气泡间距承担。
+    /// 底部一排两气泡：左气泡「自动排列 | 刷新 | 设置」拉满剩余宽度（三按钮等宽均分，
+    /// Divider 分隔），右气泡「退出」内容自适应、刚好包住按钮——左宽右紧。
+    /// 自动排列从排列卡移入（单屏时无意义，禁用置灰防死点击）。
+    /// 悬浮反馈为按钮级：图标微放大 + 圆角底色高亮（见 ToolbarIconButton），
+    /// 两气泡不再挂整泡 bubbleHoverLift（用户要求单按钮反馈而非整体放大）；
+    /// 卡片级 hover 浮起不受影响。纯图标 + 原生 tooltip（.help 悬停停留后显示，
+    /// 文案走 L10n 随语言切换）。
     private var bottomToolbar: some View {
         HStack(spacing: BubbleMetrics.cardSpacing) {
             HStack(spacing: 2) {
-                toolbarIconButton(l10n.t(.refreshList), systemImage: "arrow.clockwise") {
+                ToolbarIconButton(tooltip: l10n.t(.autoArrange), systemImage: "wand.and.rays",
+                                  fullWidth: true, disabled: state.displays.count < 2) {
+                    state.autoArrange()
+                }
+                Divider().frame(height: 18)
+                ToolbarIconButton(tooltip: l10n.t(.refreshList), systemImage: "arrow.clockwise",
+                                  fullWidth: true) {
                     state.refresh()
                 }
                 Divider().frame(height: 18)
-                toolbarIconButton(l10n.t(.settingsTitle), systemImage: "gearshape") {
+                ToolbarIconButton(tooltip: l10n.t(.settingsTitle), systemImage: "gearshape",
+                                  fullWidth: true) {
                     // openSettings 会切 activation policy 并激活 App，先收面板防悬空。
                     PanelController.shared.close()
                     DockPolicyManager.shared.openSettings()
                 }
             }
             .padding(.vertical, 6)
-            .padding(.horizontal, 12)
-            // 与气泡统一材质（BubbleBackground）+ 阴影，使整列观感一致。
+            .padding(.horizontal, 8)
+            // 与气泡统一材质（BubbleBackground 不透明纯白）+ 阴影；拉满剩余宽度。
             .modifier(BubbleBackground())
             .bubbleShadow()
-            .bubbleHoverLift()
+            .frame(maxWidth: .infinity)
 
-            // 退出占满剩余宽度：触区横贯整泡（fullWidth 拉开触区 + contentShape）。
-            toolbarIconButton(l10n.t(.quit), systemImage: "power", fullWidth: true) {
+            // 退出：内容自适应小气泡，刚好适配按钮触区。
+            ToolbarIconButton(tooltip: l10n.t(.quit), systemImage: "power") {
                 NSApplication.shared.terminate(nil)
             }
             .padding(.vertical, 6)
+            .padding(.horizontal, 12)
             .modifier(BubbleBackground())
             .bubbleShadow()
-            .bubbleHoverLift()
         }
     }
+}
 
-    /// 底部纯图标按钮：固定触区 34×26（fullWidth 时触区横向拉满、图标居中）；
-    /// 功能名称由 .help 原生 tooltip 呈现。刻意不做 hover 行高亮——
-    /// 悬浮反馈统一由所在气泡的 bubbleHoverLift 整体承担（高亮会与整泡浮起打架）。
-    private func toolbarIconButton(_ tooltip: String, systemImage: String, fullWidth: Bool = false, action: @escaping () -> Void) -> some View {
+// MARK: - 面板私有小组件
+
+/// 显示器类型图标圆框：圆形填充底 + 类型图标（内置屏 laptopcomputer / 外接屏 display）。
+///
+/// `active` 决定底框状态：主屏卡传 `d.isMain`（主屏主题色、其余深灰暗态，用图标
+/// 颜色表达主从层级）；排列卡恒 true（统一主题色，仅作类型标识）。
+private struct DeviceIconBadge: View {
+    let isBuiltIn: Bool
+    let active: Bool
+    let accent: Color
+
+    var body: some View {
+        Circle()
+            .fill(active ? accent : Color.primary.opacity(BubbleMetrics.deviceIconInactiveFillOpacity))
+            .frame(width: BubbleMetrics.deviceIconDiameter, height: BubbleMetrics.deviceIconDiameter)
+            .overlay(
+                Image(systemName: isBuiltIn ? "laptopcomputer" : "display")
+                    .font(.system(size: BubbleMetrics.deviceIconFontSize, weight: .semibold))
+                    .foregroundStyle(active ? Color.white : Color.secondary)
+            )
+    }
+}
+
+/// 底部纯图标按钮：固定触区 34×26（fullWidth 时等宽均分、图标居中）；
+/// 功能名称由 .help 原生 tooltip 呈现。
+///
+/// 悬浮反馈为按钮级（区别于卡片整泡浮起）：图标 scaleEffect 微放大（仅图标本体，
+/// 2D 仿射不栅格化、触区与布局不动，无边缘振荡问题）+ 圆角底色高亮；
+/// reduceMotion 时仅保留底色高亮。
+private struct ToolbarIconButton: View {
+    let tooltip: String
+    let systemImage: String
+    var fullWidth: Bool = false
+    var disabled = false
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: BubbleMetrics.fontTitle))
                 .foregroundStyle(.primary)
+                .scaleEffect(isHovered && !reduceMotion ? BubbleMetrics.toolbarIconHoverScale : 1)
                 .frame(width: fullWidth ? nil : 34, height: 26)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(isHovered && !disabled
+                                                    ? BubbleMetrics.toolbarHoverFillOpacity : 0))
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.35 : 1)
         .help(tooltip)
+        .onHover { isHovered = $0 }
+        .animation(BubbleMetrics.buttonHoverSpring, value: isHovered)
+    }
+}
+
+/// 镜像对端屏补充气泡：hover 挂载目标并停留 `tooltipDwell` 后，在目标上方弹出
+/// 迷你气泡（缩小→放大的弹跳入场，近似系统 tooltip 的 dwell 手感 + Tutti 设置页
+/// 感叹号提示的弹性缓动）；移开立即快退收起。纯展示层：不参与布局、不挡交互。
+private struct MirrorTargetTooltip: ViewModifier {
+    let text: String
+
+    @State private var isShown = false
+    @State private var dwellTask: DispatchWorkItem?
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { hovering in
+                guard !text.isEmpty else { return }
+                if hovering {
+                    let task = DispatchWorkItem { isShown = true }
+                    dwellTask = task
+                    DispatchQueue.main.asyncAfter(deadline: .now() + BubbleMetrics.tooltipDwell, execute: task)
+                } else {
+                    dwellTask?.cancel()
+                    dwellTask = nil
+                    isShown = false
+                }
+            }
+            .overlay(alignment: .top) {
+                // 迷你气泡：与卡片同源的不透明填充 + 细描边 + 浅阴影。
+                HStack(spacing: 5) {
+                    Image(systemName: "link")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                    Text(text)
+                        .font(.system(size: BubbleMetrics.fontCaption))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(colorScheme == .light ? Color.white : BubbleMetrics.bubbleDarkFill)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.primary.opacity(colorScheme == .light ? 0.10 : 0.18), lineWidth: 1)
+                )
+                .bubbleShadow(opacity: 0.7)
+                .fixedSize()
+                // 上移到按钮上方（overlay .top 贴按钮顶边，再抬一个按钮高 + 间隙）；
+                // 缩放锚点 .bottom：从按钮上缘向上「生长」。
+                .offset(y: -36)
+                .scaleEffect(isShown || reduceMotion ? 1 : BubbleMetrics.tooltipPopScale, anchor: .bottom)
+                .opacity(isShown ? 1 : 0)
+                .animation(isShown ? BubbleMetrics.tooltipSpring : .easeOut(duration: 0.12), value: isShown)
+            }
     }
 }
 
@@ -429,6 +523,11 @@ private struct ArrangementRow: View {
     /// 本屏参数组是否展开（不可折叠时恒 true）。
     private var isExpanded: Bool { !foldable || expandedDisplayID == display.id }
 
+    /// 展开块实测高度（onAppear 时量一次，驱动 mask 揭示）。
+    @State private var blockHeight: CGFloat = 0
+    /// 展开块 mask 揭示高度（纯呈现层：布局已二值到终值，揭示高度从 0 弹簧拉满）。
+    @State private var revealHeight: CGFloat = 0
+
     var body: some View {
         VStack(spacing: 0) {
             // 折叠头（两行式）：图标 + [名称行 / 参数概要副行] + 旋转 chevron。
@@ -436,10 +535,8 @@ private struct ArrangementRow: View {
             // 展开后副行淡出（详情行已展示同信息，不重复），高度随 toggleExpanded 的弹簧一起动。
             RowButton(action: toggleExpanded) {
                 HStack(spacing: 10) {
-                    Image(systemName: display.isBuiltIn ? "laptopcomputer" : "display")
-                        .font(.system(size: BubbleMetrics.fontControl))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 14)
+                    // 显示器类型图标统一套主题色圆形底框（与主屏卡同一组件）。
+                    DeviceIconBadge(isBuiltIn: display.isBuiltIn, active: true, accent: accent)
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 8) {
                             Text(label)
@@ -473,9 +570,15 @@ private struct ArrangementRow: View {
 
             // 表单风三行：位置（分段控件）/ 分辨率 / 刷新率，标题靠左、控件靠右对齐。
             // 折叠态下整块隐藏（foldable=false 恒显示）。
-            // 外包顶部对齐的 ZStack + clipped：.move(edge:.top) 过渡期间内容从上方滑入，
-            // 无裁切时会越过折叠头「凭空出现」；裁切边界即折叠头下边缘，
-            // 视觉呈从标题行下方「抽拉」出来，收起时对称滑回其下消失。
+            // 外包顶部对齐的 ZStack + clipped：揭示期间内容不会越过折叠头「凭空出现」，
+            // 裁切边界即折叠头下边缘，视觉呈从标题行下方「抽拉」出来。
+            //
+            // 动画机制（2026-09 定型）：**展开方向布局二值跳变**（toggleExpanded 不带
+            // withAnimation，高度一步到位）——配合 PanelController 的容器闸门 +
+            // 同步高度桥，窗口/容器/布局同帧到终值，构造性零漂移（根治「所有气泡
+            // 先上跳再下拉」）；视觉平滑由 mask 揭示承担（revealHeight 从 0 弹簧
+            // 拉到实高，纯呈现层不参与布局）。**收起方向**布局随 withAnimation 弹簧
+            // 收短，块移除走 .move+.opacity 过渡（实测该方向无居中漂移）。
             ZStack(alignment: .top) {
                 if isExpanded {
                     VStack(spacing: BubbleMetrics.rowSpacing) {
@@ -528,10 +631,26 @@ private struct ArrangementRow: View {
                             )
                         }
                     }
-                    .padding(.leading, 24)   // 与标题行文字对齐：图标 frame 14 + spacing 10
+                    .padding(.leading, 38)   // 与标题行文字对齐：圆框 28 + spacing 10
                     .padding(.trailing, 4)
                     .padding(.bottom, 6)
+                    // 展开方向的视觉揭示：mask 高度弹簧拉开（自折叠头下缘向下「抽拉」）；
+                    // 收起方向不重置 mask（保持全开），让 .move+.opacity 移除过渡可见。
+                    .mask(alignment: .top) {
+                        Color.white.frame(height: revealHeight)
+                    }
+                    // 收起方向的移除过渡（展开是二值插入 + mask 揭示，不走此过渡）。
                     .transition(.opacity.combined(with: .move(edge: .top)))
+                    .background {
+                        // 量一次展开块实高，驱动 mask 揭示终点。
+                        GeometryReader { geo in
+                            Color.clear.onAppear {
+                                blockHeight = geo.size.height
+                                revealHeight = 0
+                                withAnimation(panelReveal) { revealHeight = blockHeight }
+                            }
+                        }
+                    }
                 }
             }
             .clipped()
@@ -541,11 +660,25 @@ private struct ArrangementRow: View {
     /// 折叠头点击：切换本组展开态。组间互斥（面板级单值）：展开本组自动收起其他组；
     /// 任何组折叠/切换都会让组内的选项列表不可见，统一清空 expandedRowID 防止
     /// 下次展开时残留旧的选项展开态。
+    /// 折叠头点击：切换本组展开态。组间互斥（面板级单值）：展开本组自动收起其他组；
+    /// 任何组折叠/切换都会让组内的选项列表不可见，统一清空 expandedRowID 防止
+    /// 下次展开时残留旧的选项展开态。
+    ///
+    /// 动画方向拆分（2026-09 实测定型）：
+    /// - **展开方向二值跳变**（无 withAnimation）：高度一步到位，配合 PanelController
+    ///   的容器闸门 + 同步高度桥，窗口/容器/布局同帧到终值，构造性零漂移；
+    ///   视觉平滑由展开块的 mask 揭示承担（onAppear 里弹簧拉起，纯呈现层）。
+    /// - **收起方向保留弹簧**：实测该方向无居中漂移（窗口收短时容器不超前）。
     private func toggleExpanded() {
         guard foldable else { return }
-        withAnimation(panelReveal) {
+        if isExpanded {
+            withAnimation(panelReveal) {
+                expandedRowID = nil
+                expandedDisplayID = nil
+            }
+        } else {
             expandedRowID = nil
-            expandedDisplayID = isExpanded ? nil : display.id
+            expandedDisplayID = display.id
         }
     }
 
@@ -747,7 +880,8 @@ private struct SelectionRow: View {
 /// 等比绘制所有屏的相对位置与尺寸（可交互）。
 ///
 /// 算法：取所有屏 origin + resolution 的包围盒，等比缩放到容器宽度，
-/// 用 ZStack 定位每块屏的圆角矩形。主屏用强调色实心浅底，外接用描边。
+/// 用 ZStack 定位每块屏的圆角矩形。所有屏块统一中性样式（主屏强调色标示
+/// 已于 2026-09-12 移除，主从关系由主屏卡的图标圆框表达）。
 /// 交互：点击屏块回调 onSelect（选中态 ✓ 角标 + 加粗描边）；
 /// highlightedID（hover 联动）对应块加深高亮。
 private struct LayoutDiagram: View {
@@ -773,20 +907,15 @@ private struct LayoutDiagram: View {
         }
     }
 
-    /// 单个屏块：填充/描边随 主屏态、选中态、hover 高亮态 变化。
+    /// 单个屏块：所有块统一中性样式（2026-09-12 移除主屏强调色标示——主从关系
+    /// 已由主屏卡的图标圆框颜色表达）；选中/hover 高亮态用强调色描边+浅底。
     private func screenBlock(_ item: PlacedRect) -> some View {
-        let isMain = item.display.isMain
         let isHighlighted = (item.id == highlightedID)
         let isSelected = (item.id == selectedID)
 
-        // 优先级：选中/高亮 > 主屏 > 普通。
-        let stroke: Color = (isSelected || isHighlighted)
-            ? accent
-            : (isMain ? accent : Color.secondary.opacity(0.4))
-        let lineWidth: CGFloat = (isSelected || isHighlighted) ? 2 : (isMain ? 1.5 : 1)
-        let fill = isHighlighted
-            ? accent.opacity(0.28)
-            : (isMain ? accent.opacity(0.18) : Color.gray.opacity(0.08))
+        let stroke: Color = (isSelected || isHighlighted) ? accent : Color.secondary.opacity(0.4)
+        let lineWidth: CGFloat = (isSelected || isHighlighted) ? 2 : 1
+        let fill = isHighlighted ? accent.opacity(0.28) : Color.gray.opacity(0.08)
 
         return RoundedRectangle(cornerRadius: 4)
             .fill(fill)
@@ -794,13 +923,6 @@ private struct LayoutDiagram: View {
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(stroke, lineWidth: lineWidth)
             )
-            .overlay(alignment: .topLeading) {
-                // 主屏标实心点，副屏标空心点
-                Image(systemName: isMain ? "circle.fill" : "circle")
-                    .font(.system(size: 7))
-                    .foregroundStyle(isMain ? accent : .secondary)
-                    .padding(3)
-            }
             .overlay(alignment: .topTrailing) {
                 // 选中角标（点击布局图中的屏块后出现，再次点击消失）
                 if isSelected {

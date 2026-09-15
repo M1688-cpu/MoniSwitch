@@ -38,37 +38,30 @@ struct BubbleBackground: ViewModifier {
     }
 }
 
-/// 菜单栏面板的圆角气泡卡片：顶部标题行（强调色图标方块 + 标题）+ 自定义内容。
+/// 菜单栏面板的圆角气泡卡片：顶部小型大写分区标题 + 自定义内容。
 ///
+/// 标题风格（2026-09 参考 Tutti 定型）：不带图标、全大写（中文无大小写不受影响）、
+/// 加宽字距、低饱和浅灰——纯文字微型标签，层级让位给内容区。
 /// 无边框：不加 stroke 描边，仅靠不透明填充（BubbleBackground）与圆角呈现气泡形态，
 /// 四周悬浮阴影与背景拉开层次。
 struct BubbleCard<Content: View>: View {
     let title: String
-    let systemImage: String
-    let accent: Color
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // 标题行：强调色圆角方块图标 + 标题
-            HStack(spacing: 9) {
-                RoundedRectangle(cornerRadius: BubbleMetrics.iconBadgeCornerRadius)
-                    .fill(accent)
-                    .frame(width: 22, height: 22)
-                    .overlay(
-                        Image(systemName: systemImage)
-                            .font(.system(size: BubbleMetrics.fontControl, weight: .semibold))
-                            .foregroundStyle(.white)
-                    )
-                Text(title)
-                    .font(.system(size: BubbleMetrics.fontTitle, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
-            }
+            Text(title)
+                .font(.system(size: BubbleMetrics.fontCaption, weight: .semibold))
+                .tracking(BubbleMetrics.sectionLabelTracking)
+                .textCase(.uppercase)
+                .foregroundStyle(BubbleMetrics.sectionLabelColor)
+                .lineLimit(1)
             content
         }
         .padding(16)
         // 不透明填充（浅色纯白 / 深色卡片色）+ 自适应淡描边（与设置卡片同源）。
+        // 2026-09 曾试改 thin/ultraThinMaterial「玻璃卡片」被用户否决：卡片发灰、
+        // 整板观感退化为类 macOS 15 毛玻璃——气泡必须保持纯白，不要再用材质填充。
         .modifier(BubbleBackground())
         // 四周悬浮阴影：气泡与原生毛玻璃背景拉开层次，呈现「浮于桌面之上」的观感。
         .bubbleShadow()
@@ -273,13 +266,22 @@ private struct HoverRowHighlightModifier: ViewModifier {
 
 // MARK: - 气泡 hover 浮起
 
-/// 气泡悬浮交互：hover 时整卡微放大 + 上浮 + 阴影增强（「浮起的小板」质感），离开弹簧落回。
+/// 气泡悬浮交互：hover 时整卡以底边为锚微放大 + 阴影增强（「浮起的小板」质感），离开弹簧落回。
 ///
-/// **全部用 2D 仿射变换实现（scaleEffect/offset/shadow）**——仿射变换走 CALayer
+/// **全部用 2D 仿射变换实现（scaleEffect/shadow）**——仿射变换走 CALayer
 /// 路径不栅格化，HiDPI 下保持系统原生渲染分辨率。曾用 rotation3DEffect 做
 /// Atoll 式 3D 倾斜，3D 透视变换会把卡片栅格化重采样、悬停时整卡文字明显变糊
 /// （用户实测反馈），已整体移除；含文字的卡片禁用 3D 透视效果（详见 AGENTS 风格约定）。
-/// 幅度/弹簧常量收在 BubbleMetrics（liftScale/liftOffset/liftShadow*/liftSpring）。
+///
+/// **为什么只有 scaleEffect、没有 offset 上浮（2026-09 跳动事故）**：SwiftUI 的
+/// hover 命中区域跟随几何变换——旧版 `scaleEffect(1.02) + offset(y:-2)` 会把卡片
+/// 底边向内拉 2pt（短卡必内拉；约 240pt 的排列卡仅外扩 0.4pt，弹簧 damping 0.7
+/// 过冲相位也会瞬间内拉），指针沿面板下扫、停在卡片边缘死区带时便
+/// 「hover 进入 → 底边离开指针 → 退出 → 落回 → 再进入」持续振荡，表现为
+/// 排列卡等板块在面板底部附近奇怪跳动。现改 `anchor: .bottom` 的纯缩放：
+/// 底边钉死不动（恰是指针巡扫的边界）、顶边/左右只向外扩，进出两方向都单调，
+/// 任何卡高、任何过冲相位都不可能振荡；上浮感由「底锚向上生长」+ 阴影下沉保留。
+/// 幅度/弹簧常量收在 BubbleMetrics（liftScale/liftShadow*/liftSpring）。
 /// 系统开启「减弱动态效果」时自动关闭。挂在卡片阴影链最外层（bubbleShadow 之后），
 /// 增强阴影叠在双层弥散阴影之上。
 struct BubbleHoverLiftModifier: ViewModifier {
@@ -290,8 +292,7 @@ struct BubbleHoverLiftModifier: ViewModifier {
     func body(content: Content) -> some View {
         let lifting = isHovered && !reduceMotion
         content
-            .scaleEffect(lifting ? BubbleMetrics.liftScale : 1)
-            .offset(y: lifting ? -BubbleMetrics.liftOffset : 0)
+            .scaleEffect(lifting ? BubbleMetrics.liftScale : 1, anchor: .bottom)
             .shadow(color: .black.opacity(lifting ? BubbleMetrics.liftShadowOpacity : 0),
                     radius: BubbleMetrics.liftShadowRadius,
                     x: 0, y: BubbleMetrics.liftShadowY)
