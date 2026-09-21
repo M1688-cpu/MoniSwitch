@@ -55,27 +55,6 @@ final class PanelController: NSObject, NSPopoverDelegate {
         // preferredContentSize 已是实际值（否则首开会以占位尺寸弹出再跳变）。
         hostingController.view.layoutSubtreeIfNeeded()
 
-        // [DEBUG-autoshow] 临时调试钩子（像素诊断用，收尾时删除）：
-        // AX 点击开面板在本机会把面板放到错误位置（内容与窗口框脱节），
-        // 自动展示走真实 show(from:) 路径，供 screencapture 差分取样。
-        // 必须等首次显示器刷新完成（displays 填充）后再展示——启动中途开面板
-        // 会撞上「空态→满态」的内容增高，容器布局卡在错位态（内容掉到屏幕下方）。
-        if UserDefaults.standard.bool(forKey: "MoniswitchDebugAutoShow") {
-            let state = self.state
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                func tryShow(attempt: Int) {
-                    guard let self, let button = self.statusItem?.button else { return }
-                    if state.displays.isEmpty, attempt < 40 {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { tryShow(attempt: attempt + 1) }
-                        return
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        self.show(from: button)
-                    }
-                }
-                tryShow(attempt: 0)
-            }
-        }
     }
 
     /// 面板宿主层级（2026-09 实测定型，修「展开参数时所有气泡先上跳再下拉」）：
@@ -137,6 +116,7 @@ final class PanelController: NSObject, NSPopoverDelegate {
         // ——即「点击展开显示器参数箭头后背板变白」的根因；expand 是用户可触发的
         // 唯一改高度交互，其余点击均无恙）。高度变化是面板全部 resize 路径的必经
         // 点，在此幂等补挂；系统重配可能落在本轮布局之后，再补一跳 async。
+        // （macOS 27 上 applyLiquidGlassBackdrop 内部为不干预分支，此补挂自然 no-op。）
         applyLiquidGlassBackdrop()
         DispatchQueue.main.async { [weak self] in self?.applyLiquidGlassBackdrop() }
     }
@@ -159,7 +139,7 @@ final class PanelController: NSObject, NSPopoverDelegate {
         hostingController.view.layoutSubtreeIfNeeded()
         // preferredEdge 取按钮的 maxY = 菜单栏图标下方（NSStatusBarButton 坐标系不翻转）。
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
-        // 背板定型（clear 玻璃 + 常驻 key），详见 applyLiquidGlassBackdrop 注释；
+        // 背板玻璃处理（26：clear+常驻 key；27+：不干预），详见 applyLiquidGlassBackdrop；
         // 窗口 resize 后的补挂在 updateContentHeight。
         applyLiquidGlassBackdrop()
         // 图标高亮反馈：模板 image 在高亮态自动反色（等价原 MenuBarExtra 行为）。
@@ -222,25 +202,32 @@ final class PanelController: NSObject, NSPopoverDelegate {
         applyLiquidGlassBackdrop()
     }
 
-    // MARK: - 背景板（液态玻璃 clear + 常驻 key，2026-09-14 像素实测定型）
+    // MARK: - 背景板玻璃（macOS 26：clear+常驻key；macOS 27+：不干预）
 
-    /// 背板定型方案（2026-09-14 实验矩阵，macOS 26）：
-    /// NSPopover 的系统玻璃（私有类 NSGlassView，继承公开类 NSGlassEffectView）
-    /// 内部有一层随窗口 key 态自适应的渲染：非 key 与 key 是两个观感变体。
-    /// 实测结论（边距带像素采样）：
-    ///   - 「点击变白」的驱动信号 = **窗口变 key**（makeKey 单独即可完整复现
-    ///     +78~+102 的加白；与 App 激活无关——_NSPopoverWindow 继承 NSPanel 且
-    ///     自带 .nonactivatingPanel，点击本就只变 key 不激活 App）；
-    ///   - `style = .clear` 只改变 key 态观感；**clear+key 是所有状态里最薄的
-    ///     玻璃**（对壁纸的雾度约为 regular 初始态的一半），仍保有模糊/边框/
-    ///     箭头 chrome；regular+key 则是最厚的白奶态（即原 bug 观感）；
-    ///   - `tintColor = .clear` 是彻底 no-op（与不设完全同值）。
-    /// 因此定型 = **clear + show 即 makeKey**：面板一出生就处于最薄的 keyed 态，
-    /// 点击时已无状态可切换，「点击变白」构造性不存在（真实合成点击实测零漂移、
-    /// 面板不收起）。makeKey 在非激活面板上不抢键盘焦点、不激活 App。
-    /// macOS 13~15 没有 NSGlassView，样式循环找不到视图即跳过；makeKey 无害保留。
+    /// 背板玻璃按系统分支（2026-09-14 macOS 26 矩阵 + 2026-09-20 macOS 27 矩阵实测定型）：
+    ///
+    /// - **macOS 27+：完全不干预。** 27 实测（2×2 矩阵：makeKey × style 覆盖，全部
+    ///   冷启动新建面板 + 边距带像素采样）：① 26 时代的两个旋钮全部失效——`.clear`
+    ///   强制对读数零影响（四档中两对逐位相同）；key 态差异仅 ≤1.4/255（26 时代为
+    ///   +50~102），肉眼不可辨；② 27 新增的外观「Liquid Glass 透明度」连续滑块
+    ///   作用于菜单栏/Dock 等系统玻璃，但 **NSPopover 背板玻璃不消费它**（滑块
+    ///   两端面板读数逐位相同，用户肉眼同证）。27 上 popover 玻璃观感是系统固有
+    ///   渲染，无任何公开旋钮可调。
+    /// - **macOS 26：clear + 常驻 key（2026-09-14 矩阵定型，机制在 26 真实有效）。**
+    ///   背板是私有类 NSGlassView（继承公开类 NSGlassEffectView；是 contentView
+    ///   的兄弟节点，须从 `window.contentView.superview` 起遍历才能找到），其内层
+    ///   随窗口 key 态自适应：点击 → 变 key → 加白 +50~102（原 bug 观感）；
+    ///   `style = .clear` + 出生即 makeKey = 全部状态里最薄的玻璃且点击时已无状态
+    ///   可切换，「点击变白」构造性不存在（合成点击实测零漂移）；`tintColor`
+    ///   是彻底 no-op。删除 26 分支会让 26 用户复发「点击变白」，勿动。
+    /// - **macOS 13~15：无 NSGlassView**，样式循环找不到视图即跳过；makeKey
+    ///   无害保留（不抢键盘焦点、不激活 App，与 v0.1.6 行为一致）。
+    ///
+    /// 完整实验矩阵与诊断方法论见 AGENTS.md「悬浮卡片背景板」条目、
+    /// HANDOFF-floating-panel.md 与 HANDOFF-glass-follow-slider.md。
     @MainActor
     private func applyLiquidGlassBackdrop() {
+        if #available(macOS 27.0, *) { return }
         guard let window = popover.contentViewController?.view.window else { return }
         window.makeKey()
         if #available(macOS 26.0, *) {

@@ -488,6 +488,9 @@ private struct MirrorTargetTooltip: ViewModifier {
                 )
                 .bubbleShadow(opacity: 0.7)
                 .fixedSize()
+                // 纯展示层不参与命中：透明态（opacity 0）的气泡悬在按钮上方 36pt 处
+                // 仍可命中的话，会拦截其覆盖区域内行的 hover（opacity 不摘除命中区）。
+                .allowsHitTesting(false)
                 // 上移到按钮上方（overlay .top 贴按钮顶边，再抬一个按钮高 + 间隙）；
                 // 缩放锚点 .bottom：从按钮上缘向上「生长」。
                 .offset(y: -36)
@@ -833,6 +836,12 @@ private struct SelectionRow: View {
                 Color.white.frame(height: revealHeight)
             }
             .clipped()
+            // 折叠态摘除整棵列表的命中区（含 hover）：frame(0)/clipped/mask 只裁「绘制」
+            // 不裁「命中测试」，折叠列表的选项行曾以自然高度在卡下方形成幽灵命中区，
+            // 指针落在面板未遮挡的缝隙（工具栏两气泡之间/上下空带）时命中幽灵行、
+            // 沿祖先链触发卡片级 hover 浮起（2026-09「缝隙触发显示器调节卡悬浮」bug）。
+            // 展开方向布局本就二值跳变，展开即恢复命中，无时序问题。
+            .allowsHitTesting(expanded)
             .onAppear {
                 // 兜底：挂载时已处于展开态（理论上不会发生），直接全揭示。
                 if expanded { revealHeight = listVisibleHeight }

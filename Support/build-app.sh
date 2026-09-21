@@ -37,6 +37,15 @@ echo "▶ [1/6] 编译 release 版本..."
 # 在 CLT（/Library/Developer/CommandLineTools/SDKs）与 Xcode
 # （/Applications/Xcode.app/.../SDKs）两处找版本号最大的 SDK；找不到再回退
 # xcrun 默认。直接 `swift build`（不经本脚本）不受影响。
+#
+# 环境变量 MONISWITCH_SDKROOT 可跳过自动探测、强制指定 SDK（2026-09-19 加）：
+# 本机装了 MacOSX27.0.sdk 但 CLT 工具链没有它需要的 SwiftUIMacros 宏插件
+# （SwiftUI 的 @State 在 27 SDK 改为宏展开），「最新获胜」会选到编译不了的
+# 27.0。用法：MONISWITCH_SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk bash Support/build-app.sh
+if [ -n "$MONISWITCH_SDKROOT" ] && [ -d "$MONISWITCH_SDKROOT" ]; then
+    export SDKROOT="$MONISWITCH_SDKROOT"
+    echo "  SDK: $SDKROOT (MONISWITCH_SDKROOT 指定)"
+else
 NEWEST_SDK=""
 NEWEST_VER=""
 for SDK_CAND_DIR in \
@@ -60,6 +69,7 @@ if [ -n "$NEWEST_SDK" ]; then
     echo "  SDK: $SDKROOT (自动探测的最新版)"
 else
     echo "  SDK: $(xcrun --show-sdk-path 2>/dev/null || echo 'xcrun 默认')"
+fi
 fi
 
 cd "$PROJECT_DIR"
