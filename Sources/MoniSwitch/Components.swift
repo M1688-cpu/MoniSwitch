@@ -63,8 +63,8 @@ struct BubbleCard<Content: View>: View {
         // 2026-09 曾试改 thin/ultraThinMaterial「玻璃卡片」被用户否决：卡片发灰、
         // 整板观感退化为类 macOS 15 毛玻璃——气泡必须保持纯白，不要再用材质填充。
         .modifier(BubbleBackground())
-        // 四周悬浮阴影：气泡与原生毛玻璃背景拉开层次，呈现「浮于桌面之上」的观感。
-        .bubbleShadow()
+        // 四周悬浮阴影（无背板语境：直接落在壁纸上，用壁纸承接参数）。
+        .bubbleFloatingShadow()
         // hover 整卡微放大 + 上浮 + 阴影增强（最外层，全仿射保原生锐度）。仅菜单栏面板使用。
         .bubbleHoverLift()
     }

@@ -55,6 +55,16 @@ final class PanelController: NSObject, NSPopoverDelegate {
         // preferredContentSize 已是实际值（否则首开会以占位尺寸弹出再跳变）。
         hostingController.view.layoutSubtreeIfNeeded()
 
+        // [DEBUG-autoshow]（临时调试，定型后删除）：启动后自动弹出面板，供像素采样验证
+        // 背板/阴影。macOS 27 上合成点击对面板不可靠、AX 开面板有命中区偏移，自动弹出
+        // 是唯一无副作用的机器验证入口。
+        if UserDefaults.standard.bool(forKey: "MoniswitchDebugAutoShow"),
+           let button = item.button {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.show(from: button)
+            }
+        }
+
     }
 
     /// 面板宿主层级（2026-09 实测定型，修「展开参数时所有气泡先上跳再下拉」）：
@@ -111,14 +121,11 @@ final class PanelController: NSObject, NSPopoverDelegate {
     func updateContentHeight(_ height: CGFloat) {
         guard abs(panelContainerController.preferredContentSize.height - height) > 0.5 else { return }
         panelContainerController.preferredContentSize = NSSize(width: 380, height: height)
-        // 窗口 resize 会触发系统重设玻璃配置（2026-09-14 实测复现+验证：纯高度
-        // 变化即可让 .clear 被打回 .regular，按 keyed 态渲染白奶变体且持久不恢复
-        // ——即「点击展开显示器参数箭头后背板变白」的根因；expand 是用户可触发的
-        // 唯一改高度交互，其余点击均无恙）。高度变化是面板全部 resize 路径的必经
-        // 点，在此幂等补挂；系统重配可能落在本轮布局之后，再补一跳 async。
-        // （macOS 27 上 applyLiquidGlassBackdrop 内部为不干预分支，此补挂自然 no-op。）
-        applyLiquidGlassBackdrop()
-        DispatchQueue.main.async { [weak self] in self?.applyLiquidGlassBackdrop() }
+        // 窗口 resize 会触发系统重设玻璃配置（历史实测 26：.clear 被打回 .regular；隐藏层
+        // 也可能被系统复活），高度变化是面板全部 resize 路径的必经点，在此幂等补挂；
+        // 系统重配可能落在本轮布局之后，再补一跳 async。
+        applyFloatingBackdrop()
+        DispatchQueue.main.async { [weak self] in self?.applyFloatingBackdrop() }
     }
 
     // MARK: - 开关面板
@@ -139,9 +146,9 @@ final class PanelController: NSObject, NSPopoverDelegate {
         hostingController.view.layoutSubtreeIfNeeded()
         // preferredEdge 取按钮的 maxY = 菜单栏图标下方（NSStatusBarButton 坐标系不翻转）。
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
-        // 背板玻璃处理（26：clear+常驻 key；27+：不干预），详见 applyLiquidGlassBackdrop；
-        // 窗口 resize 后的补挂在 updateContentHeight。
-        applyLiquidGlassBackdrop()
+        // 无背板悬浮处理（26+：隐藏玻璃层 + 关窗口投影；13~15：makeKey 保持系统背板），
+        // 详见 applyFloatingBackdrop；窗口 resize 后的补挂在 updateContentHeight。
+        applyFloatingBackdrop()
         // 图标高亮反馈：模板 image 在高亮态自动反色（等价原 MenuBarExtra 行为）。
         // 系统在 show 过程中会重置 cell 状态，异步到下一轮 runloop 再置位才稳。
         DispatchQueue.main.async {
@@ -199,41 +206,148 @@ final class PanelController: NSObject, NSPopoverDelegate {
     // MARK: - NSPopoverDelegate
 
     @MainActor func popoverDidShow(_ notification: Notification) {
-        applyLiquidGlassBackdrop()
+        applyFloatingBackdrop()
+        // [DEBUG-dump]（临时调试，定型后删除）：dump 窗口视图树到 /tmp，用于定位
+        // macOS 27 上背板视图的真实类名（玻璃隐藏是否命中）。
+        if UserDefaults.standard.bool(forKey: "MoniswitchDebugDumpTree"),
+           let window = popover.contentViewController?.view.window {
+            Self.dumpViewTree(window)
+        }
+        // [DEBUG-bump]（临时调试，定型后删除，每进程一次）：一次性抬升内容高度模拟
+        // 「展开参数」触发的窗口 resize，供验证 resize 后玻璃不复活（外缘仍全透）。
+        let bump = UserDefaults.standard.integer(forKey: "MoniswitchDebugBumpHeight")
+        if bump > 0, !didDebugBump {
+            didDebugBump = true
+            let h = panelContainerController.preferredContentSize.height
+            updateContentHeight(h + CGFloat(bump))
+        }
     }
 
-    // MARK: - 背景板玻璃（macOS 26：clear+常驻key；macOS 27+：不干预）
+    /// [DEBUG-dump] 的视图树 dump（含兄弟节点，从 contentView.superview 起走）；
+    /// 同时 dump layer 树（玻璃可能是 CALayer 而非子视图）与关键类的运行时属性名。
+    private static func dumpViewTree(_ window: NSWindow) {
+        var lines: [String] = []
+        lines.append("window=\(type(of: window)) hasShadow=\(window.hasShadow) isOpaque=\(window.isOpaque) frame=\(window.frame)")
+        func walk(_ v: NSView, depth: Int) {
+            lines.append(String(repeating: "  ", count: depth)
+                + "\(type(of: v)) frame=\(NSStringFromRect(v.frame)) hidden=\(v.isHidden) alpha=\(v.alphaValue)")
+            for s in v.subviews { walk(s, depth: depth + 1) }
+        }
+        if let content = window.contentView {
+            walk(content.superview ?? content, depth: 0)
+        }
+        // layer 树：根取 NSPopoverFrame（contentView 的 superview，窗口真正的 chrome 视图）
+        lines.append("--- layers ---")
+        func walkLayer(_ l: CALayer, depth: Int) {
+            lines.append(String(repeating: "  ", count: depth)
+                + "\(type(of: l)) frame=\(l.frame) hidden=\(l.isHidden) name=\(l.name ?? "-")")
+            for s in l.sublayers ?? [] { walkLayer(s, depth: depth + 1) }
+        }
+        if let popoverFrame = window.contentView?.superview {
+            lines.append("popoverFrameClass=\(type(of: popoverFrame)) wantsLayer=\(popoverFrame.wantsLayer)")
+            if let layer = popoverFrame.layer { walkLayer(layer, depth: 0) }
+        }
+        // 私有属性现值（找玻璃相关旋钮）
+        lines.append("--- private prop values ---")
+        for p in ["_glassWindowBackingGlassView", "cn_isSkyglowEnabled",
+                  "_hostWindowIsOpaque", "_hostWindowBackgroundColor", "allowsInteriorShadow"] {
+            let v = window.value(forKey: p)
+            if let view = v as? NSView {
+                lines.append("\(p) = \(type(of: view)) frame=\(NSStringFromRect(view.frame)) hidden=\(view.isHidden) alpha=\(view.alphaValue) desc=\(view)")
+            } else {
+                lines.append("\(p) = \(String(describing: v))")
+            }
+        }
+        // 全应用窗口清单（排查与面板无关的幽灵窗口，如 900x450 的 Settings 占位窗）
+        lines.append("--- app windows ---")
+        for w in NSApp.windows {
+            lines.append("\(type(of: w)) frame=\(NSStringFromRect(w.frame)) title='\(w.title)' visible=\(w.isVisible) identifier=\(w.identifier?.rawValue ?? "-")")
+        }
+        // 运行时属性名（_NSPopoverWindow 与 NSPopoverFrame，找玻璃相关私有旋钮）
+        lines.append("--- runtime properties ---")
+        func dumpProps(_ cls: AnyClass, label: String) {
+            lines.append("[\(label)] \(cls)")
+            var c: AnyClass? = cls
+            while let cur = c {
+                var count: UInt32 = 0
+                if let props = class_copyPropertyList(cur, &count) {
+                    let names = (0..<count).map { String(cString: property_getName(props[Int($0)])) }
+                    if !names.isEmpty { lines.append("  \(cur): \(names.joined(separator: ", "))") }
+                }
+                c = class_getSuperclass(cur)
+            }
+        }
+        dumpProps(type(of: window), label: "window")
+        if let frame = window.contentView?.subviews.first { dumpProps(type(of: frame), label: "popoverFrame") }
+        let text = lines.joined(separator: "\n")
+        try? text.write(toFile: "/tmp/moniswitch-viewtree.txt", atomically: true, encoding: .utf8)
+    }
 
-    /// 背板玻璃按系统分支（2026-09-14 macOS 26 矩阵 + 2026-09-20 macOS 27 矩阵实测定型）：
+    /// [DEBUG-bump] 的每进程一次性标记。
+    private var didDebugBump = false
+
+    // MARK: - 背板处理（无背板悬浮，2026-09-21 重启「悬浮卡片」路线）
+
+    /// 无背板悬浮（用户拍板：本轮根治 2026-09-14 回退时的两条死因后正式启用）：
     ///
-    /// - **macOS 27+：完全不干预。** 27 实测（2×2 矩阵：makeKey × style 覆盖，全部
-    ///   冷启动新建面板 + 边距带像素采样）：① 26 时代的两个旋钮全部失效——`.clear`
-    ///   强制对读数零影响（四档中两对逐位相同）；key 态差异仅 ≤1.4/255（26 时代为
-    ///   +50~102），肉眼不可辨；② 27 新增的外观「Liquid Glass 透明度」连续滑块
-    ///   作用于菜单栏/Dock 等系统玻璃，但 **NSPopover 背板玻璃不消费它**（滑块
-    ///   两端面板读数逐位相同，用户肉眼同证）。27 上 popover 玻璃观感是系统固有
-    ///   渲染，无任何公开旋钮可调。
-    /// - **macOS 26：clear + 常驻 key（2026-09-14 矩阵定型，机制在 26 真实有效）。**
-    ///   背板是私有类 NSGlassView（继承公开类 NSGlassEffectView；是 contentView
-    ///   的兄弟节点，须从 `window.contentView.superview` 起遍历才能找到），其内层
-    ///   随窗口 key 态自适应：点击 → 变 key → 加白 +50~102（原 bug 观感）；
-    ///   `style = .clear` + 出生即 makeKey = 全部状态里最薄的玻璃且点击时已无状态
-    ///   可切换，「点击变白」构造性不存在（合成点击实测零漂移）；`tintColor`
-    ///   是彻底 no-op。删除 26 分支会让 26 用户复发「点击变白」，勿动。
-    /// - **macOS 13~15：无 NSGlassView**，样式循环找不到视图即跳过；makeKey
-    ///   无害保留（不抢键盘焦点、不激活 App，与 v0.1.6 行为一致）。
+    /// - **macOS 26+：** 2026-09-21 视图树 dump 实测（27）：popover 层级为
+    ///   `_NSPopoverWindow → NSPopoverFrame → NSView(13,13) → NSHostingView`，
+    ///   **27 上已不存在 NSGlassView/NSGlassEffectView 视图**（26 时代的隐藏技法
+    ///   与 .clear 旋钮在 27 空转的共同根因）；玻璃背板由窗口/NSPopoverFrame
+    ///   自身渲染。当前杠杆：`window.hasShadow = false`（已验证可写入）+
+    ///   窗口透明化（isOpaque=false + backgroundColor=.clear）+ 26 及以下仍走
+    ///   玻璃视图隐藏（26 上该视图存在且技法已验证）。开发期由
+    ///   MoniswitchDebugBackdropMode 跑策略矩阵定位 27 的最终杀招，定型后固化。
+    /// - **macOS 13~15：保留系统玻璃背板（makeKey 无害保留，与 v0.1.6 行为一致）。**
     ///
-    /// 完整实验矩阵与诊断方法论见 AGENTS.md「悬浮卡片背景板」条目、
-    /// HANDOFF-floating-panel.md 与 HANDOFF-glass-follow-slider.md。
+    /// 卡片阴影直接落在壁纸上的观感由 BubbleMetrics 的悬浮阴影参数承担
+    /// （bubbleFloatingShadow，壁纸承接语境重调）；完整实验矩阵与历史结论见
+    /// AGENTS.md「悬浮卡片背景板」条目与 HANDOFF 系列文档。
     @MainActor
-    private func applyLiquidGlassBackdrop() {
-        if #available(macOS 27.0, *) { return }
+    private func applyFloatingBackdrop() {
         guard let window = popover.contentViewController?.view.window else { return }
-        window.makeKey()
-        if #available(macOS 26.0, *) {
-            guard let root = window.contentView?.superview ?? window.contentView else { return }
-            for glass in Self.glassEffectViews(under: root) {
-                glass.style = .clear
+        guard #available(macOS 26.0, *) else {
+            window.makeKey()   // 13~15：保留系统背板行为
+            return
+        }
+        // [DEBUG-backdrop-mode]（临时策略矩阵，定型后删除；消融阶梯 1<2<3<0）：
+        // 0/未写=全量策略（关投影+窗口透明化+隐藏玻璃视图[26-]+隐藏材质 layer[27]）；
+        // 1=完全不干预（对照组）；2=仅关投影+窗口透明化；3=0 减 layer 级（视图级 only）。
+        let mode = UserDefaults.standard.integer(forKey: "MoniswitchDebugBackdropMode")
+        if mode == 1 { return }
+        window.hasShadow = false
+        if mode == 0 || mode == 2 {
+            window.isOpaque = false
+            window.backgroundColor = .clear
+        }
+        if mode == 0 || mode == 3 {
+            // 视图级（macOS 26 及以下：玻璃以 NSGlassEffectView 子类视图存在）
+            if let root = window.contentView?.superview ?? window.contentView {
+                for glass in Self.glassEffectViews(under: root) {
+                    glass.isHidden = true
+                }
+            }
+            // layer 级（macOS 27：玻璃以纯 CALayer 存在——NSPopoverFrame.layer 下名为
+            // kCUIVariantPopoverMaterial 的材质组，含 backdrop 磨砂/fill/tone/Chameleon
+            // 自适应四层；视图级手段在 27 全部够不着，2026-09-21 dump 定位）
+            if let frameLayer = window.contentView?.superview?.layer {
+                Self.hideNamedLayers(under: frameLayer, name: "kCUIVariantPopoverMaterial")
+            }
+        }
+        // [DEBUG-makekey]（临时调试，定型后删除）：验证 key 态（点击面板内部后的状态）
+        // 材质层不复活——26 时代 key 态是加白触发器，27 需单独确认。
+        if UserDefaults.standard.bool(forKey: "MoniswitchDebugMakeKey") {
+            window.makeKey()
+        }
+    }
+
+    /// 递归隐藏指定名称的 CALayer（不进入已命中层的内部——其子层属于同一材质组）。
+    private static func hideNamedLayers(under layer: CALayer, name: String) {
+        for sub in layer.sublayers ?? [] {
+            if sub.name == name {
+                sub.isHidden = true
+            } else {
+                hideNamedLayers(under: sub, name: name)
             }
         }
     }

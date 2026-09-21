@@ -103,6 +103,38 @@ enum BubbleMetrics {
 
     /// SelectionRow 选项列表限高：超过则列表内部滚动，面板高度可控（面板级 ScrollView 已废弃，勿混淆）。
     static let selectionListMaxHeight: CGFloat = 216
+
+    // MARK: 无背板悬浮阴影（壁纸承接语境，2026-09-21）
+
+    /// 悬浮阴影参数（最多两层：layer1 大范围 + layer2 贴边；单层预设把 layer2 置 0）。
+    struct FloatingShadowSpec {
+        var opacity1: Double
+        var radius1: CGFloat
+        var y1: CGFloat
+        var opacity2: Double
+        var radius2: CGFloat
+        var y2: CGFloat
+    }
+
+    /// 开发期调试开关（定型后删除）：`defaults write com.moniswitch.app
+    /// MoniswitchDebugShadowPreset N` 免重编切换候选参数组，配合真实壁纸人工验收；
+    /// 未写/越界 = 0（对照组）。
+    static var floatingShadowDebugPreset: Int {
+        UserDefaults.standard.integer(forKey: "MoniswitchDebugShadowPreset")
+    }
+
+    /// 候选参数组。0=现行双层（对照组，为「投在磨砂玻璃背板上」语境调的）；
+    /// 1/2=单层柔和（对齐 Tutti 截图观感：柔和小扩散、无硬边）；3=双层全软
+    /// （去掉贴边 key 层——死因②「1px 细线」的主要嫌疑即贴边小半径阴影在壁纸上
+    /// 收出硬线）。定型后选中的参数写死进 bubbleFloatingShadow 并删除调试机制。
+    static func floatingShadowSpec(preset: Int) -> FloatingShadowSpec {
+        switch preset {
+        case 1:  return .init(opacity1: 0.10, radius1: 8,  y1: 3, opacity2: 0,    radius2: 0,   y2: 0)
+        case 2:  return .init(opacity1: 0.08, radius1: 14, y1: 5, opacity2: 0,    radius2: 0,   y2: 0)
+        case 3:  return .init(opacity1: 0.09, radius1: 16, y1: 6, opacity2: 0.05, radius2: 6,   y2: 2)
+        default: return .init(opacity1: 0.06, radius1: 11, y1: 5, opacity2: 0.09, radius2: 3.5, y2: 1.5)
+        }
+    }
 }
 
 extension View {
@@ -113,6 +145,16 @@ extension View {
     func bubbleShadow(opacity: Double = 1) -> some View {
         shadow(color: .black.opacity(0.06 * opacity), radius: 11, x: 0, y: 5)
             .shadow(color: .black.opacity(0.09 * opacity), radius: 3.5, x: 0, y: 1.5)
+    }
+
+    /// 无背板语境的面板气泡悬浮阴影：阴影**直接落在壁纸上**（区别于投在系统玻璃
+    /// 背板/窗口底色上的 bubbleShadow——后者仍归设置窗口卡片使用，两者语境不同
+    /// 不要混用）。参数经 BubbleMetrics.floatingShadowSpec；开发期由 defaults
+    /// 调试开关选组（免重编 A/B），定型后写死并删除调试机制。
+    func bubbleFloatingShadow() -> some View {
+        let s = BubbleMetrics.floatingShadowSpec(preset: BubbleMetrics.floatingShadowDebugPreset)
+        return shadow(color: .black.opacity(s.opacity1), radius: s.radius1, x: 0, y: s.y1)
+            .shadow(color: .black.opacity(s.opacity2), radius: s.radius2, x: 0, y: s.y2)
     }
 }
 

@@ -54,6 +54,7 @@ enum TextKey: String {
     case refreshInterval        = "refreshInterval"        // 刷新间隔
     case intervalSeconds        = "intervalSeconds"        // N 秒
     case detailedMenuInfo       = "detailedMenuInfo"       // 菜单显示刷新率与 HiDPI
+    case showLayoutPreview      = "showLayoutPreview"      // 显示布局预览（设置开关）
 
     // 设置 - 通知
     case groupNotifications     = "groupNotifications"     // 通知
@@ -174,6 +175,7 @@ final class L10n: ObservableObject {
         .refreshInterval:  [.zh: "刷新间隔",                      .en: "Refresh interval"],
         .intervalSeconds:  [.zh: "%d 秒",                         .en: "Every %ds"],
         .detailedMenuInfo: [.zh: "菜单显示刷新率与 HiDPI",        .en: "Show refresh rate & HiDPI in menu"],
+        .showLayoutPreview:[.zh: "显示布局预览",                  .en: "Show layout preview"],
 
         .groupNotifications:[.zh: "通知",                         .en: "Notifications"],
         .notifyOnSwitch:   [.zh: "切换完成后发送通知",            .en: "Notify after switching"],

@@ -70,6 +70,12 @@ struct GeneralTab: View {
                                 .labelsHidden()
                                 .toggleStyle(.switch)
                         }
+                        Divider().padding(.vertical, 6)
+                        settingRow(l10n.t(.showLayoutPreview)) {
+                            Toggle("", isOn: $settings.showLayoutPreview)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
                     }
                 }
 

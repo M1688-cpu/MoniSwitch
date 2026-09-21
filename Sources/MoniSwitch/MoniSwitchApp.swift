@@ -35,5 +35,30 @@ struct MoniSwitchApp: App {
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         PanelController.shared.setup()
+        hidePlaceholderSettingsWindow()
+        // 占位 Settings scene 的窗口可能在启动后异步实体化（macOS 27 实测会以
+        // 900x450 空白窗「MoniSwitch Settings」显示在桌面），用窗口遮挡状态变化
+        // 通知（上屏必发）兜底再收，幂等。selector 式观察者（项目约定：block 式
+        // 在 SDK 26 下有 @Sendable 捕获告警，基线零警告）。
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(windowOcclusionStateChanged(_:)),
+            name: NSWindow.didChangeOcclusionStateNotification, object: nil)
+    }
+
+    /// 收起 SwiftUI `Settings { EmptyView() }` 占位 scene 实体化的窗口
+    /// （identifier=com_apple_SwiftUI_Settings_window）。该窗口从不承载真实 UI
+    /// （⌘, 已由 CommandGroup 接管到 DockPolicyManager.openSettings），但 macOS 27
+    /// 上会实体化并常驻桌面（2026-09-21 CGWindowList + 截图实测），必须收起。
+    private func hidePlaceholderSettingsWindow() {
+        for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
+            window.orderOut(nil)
+        }
+    }
+
+    @objc private func windowOcclusionStateChanged(_ note: Notification) {
+        guard let window = note.object as? NSWindow,
+              window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window",
+              window.isVisible else { return }
+        window.orderOut(nil)
     }
 }

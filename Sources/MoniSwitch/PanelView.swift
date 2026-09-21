@@ -20,7 +20,8 @@ private struct PanelContentHeightKey: PreferenceKey {
 ///   - 每个功能分栏是一张圆角气泡卡片（`BubbleCard`，Components.swift）；
 ///   - 强调色跟随系统（`BrandColor.accent`，Components.swift）；
 ///   - 所有切换操作复用 `AppState` / `PresetManager` 的现有逻辑，只改触发控件形态；
-///   - 箭头/居中对齐/展开动画由 NSPopover 系统 chrome 提供（圆角贴顶同理）。
+///   - 面板无背板（2026-09-21 起）：气泡卡片直接悬浮于壁纸，居中对齐/展开动画
+///     由 NSPopover 系统行为提供；指向菜单栏的箭头随玻璃背板隐藏而消失（同 Tutti）。
 ///
 /// 卡片顺序：主显示器 → 排列与镜像 → 布局预设 → 布局预览 → 底部操作栏。
 /// 交互：操作进行中（isOperating）禁用卡片区并显示顶部流动进度条；
@@ -76,7 +77,11 @@ struct PanelView: View {
                     if !presetManager.presets.isEmpty {
                         presetsCard
                     }
-                    layoutPreviewCard
+                    // 布局预览卡受设置开关控制（默认开）；关闭后整卡移除，
+                    // 高度桥自动跟随。布局图联动（hover/选中/展开）随卡整体消失。
+                    if settings.showLayoutPreview {
+                        layoutPreviewCard
+                    }
                 }
                 .disabled(busy)
             }
@@ -360,9 +365,9 @@ struct PanelView: View {
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 8)
-            // 与气泡统一材质（BubbleBackground 不透明纯白）+ 阴影；拉满剩余宽度。
+            // 与气泡统一材质（BubbleBackground 不透明纯白）+ 壁纸承接悬浮阴影；拉满剩余宽度。
             .modifier(BubbleBackground())
-            .bubbleShadow()
+            .bubbleFloatingShadow()
             .frame(maxWidth: .infinity)
 
             // 退出：内容自适应小气泡，刚好适配按钮触区。
@@ -372,7 +377,7 @@ struct PanelView: View {
             .padding(.vertical, 6)
             .padding(.horizontal, 12)
             .modifier(BubbleBackground())
-            .bubbleShadow()
+            .bubbleFloatingShadow()
         }
     }
 }
