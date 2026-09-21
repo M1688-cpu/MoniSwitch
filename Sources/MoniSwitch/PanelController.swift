@@ -11,6 +11,8 @@ import SwiftUI
 ///     箭头继续追踪图标）；
 ///   - `animates = true` 的系统原生展开动画：从顶部锚点由小放大向下生长；
 ///   - 圆角/贴顶等 chrome 回归系统标准 popover 行为，根治上述渲染 bug。
+///   - 2026-09-21 起背板整体移除（无背板悬浮，见 applyFloatingBackdrop）：气泡
+///     卡片直接悬浮于壁纸，指向菜单栏的箭头随玻璃 chrome 一起消失（同参考 Tutti）。
 final class PanelController: NSObject, NSPopoverDelegate {
 
     static let shared = PanelController()
