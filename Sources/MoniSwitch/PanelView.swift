@@ -91,8 +91,15 @@ struct PanelView: View {
         // 卡片与菜单栏的空隙偏大，用户扫值定档后写死；其余三边保持 16
         // （底部给悬浮阴影留衰减空间，勿跟顶部一起缩）。
         .padding(EdgeInsets(top: BubbleMetrics.panelTopPadding, leading: 16, bottom: 16, trailing: 16))
-        // 只锁宽度，高度按内容自适应。
-        .frame(minWidth: 380, idealWidth: 380, maxWidth: 380)
+        // 只锁卡片列宽度，高度按内容自适应。
+        .frame(minWidth: BubbleMetrics.panelColumnWidth,
+               idealWidth: BubbleMetrics.panelColumnWidth,
+               maxWidth: BubbleMetrics.panelColumnWidth)
+        // 无背板呼吸边距（透明）：窗口比卡片列大一圈，悬浮阴影（基座 r8 + hover r10）
+        // 在窗口内淡尽，不被窗口边界裁出「背景板框」直线（2026-09-21 用户报告的
+        // hover 框线）。顶部**不加**——保持用户定档的卡顶-菜单栏间距不变。
+        .padding(.horizontal, BubbleMetrics.shadowBreathingSide)
+        .padding(.bottom, BubbleMetrics.shadowBreathingBottom)
         // 内容理想高度上报（手动尺寸桥的 SwiftUI 侧）：sizingOptions=[] 后
         // popover 不再自动跟随内容尺寸，由这里实测高度 → PanelController 回写
         // preferredContentSize。挂 background 不占布局；宽度恒 380，只需上报高度。
@@ -108,7 +115,8 @@ struct PanelView: View {
         .overlay(alignment: .top) {
             if busy {
                 IndeterminateBar(accent: accent)
-                    .padding(.horizontal, 16)
+                    // 呼吸边距计入：进度条保持压在卡片列上（与卡同宽），不越到透明带。
+                    .padding(.horizontal, BubbleMetrics.shadowBreathingSide + 16)
                     .padding(.top, 6)
                     .transition(.opacity)
             }

@@ -122,7 +122,7 @@ final class PanelController: NSObject, NSPopoverDelegate {
     @MainActor
     func updateContentHeight(_ height: CGFloat) {
         guard abs(panelContainerController.preferredContentSize.height - height) > 0.5 else { return }
-        panelContainerController.preferredContentSize = NSSize(width: 380, height: height)
+        panelContainerController.preferredContentSize = NSSize(width: BubbleMetrics.hostContentWidth, height: height)
         // 窗口 resize 会触发系统重设玻璃配置（历史实测 26：.clear 被打回 .regular；隐藏层
         // 也可能被系统复活），高度变化是面板全部 resize 路径的必经点，在此幂等补挂；
         // 系统重配可能落在本轮布局之后，再补一跳 async。

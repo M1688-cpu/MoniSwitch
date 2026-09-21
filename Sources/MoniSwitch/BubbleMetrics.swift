@@ -92,24 +92,40 @@ enum BubbleMetrics {
     /// 注意：不要改用 rotation3DEffect 做 3D 效果——3D 透视变换会栅格化重采样，
     /// HiDPI 下有效分辨率减半（hover 模糊事故的根因，2026-09 实测）。
     static let liftScale: CGFloat = 1.02
-    /// hover 增强阴影（叠在 bubbleShadow 双层之上，营造「浮起」层次）。
-    static let liftShadowOpacity: Double = 0.10
-    static let liftShadowRadius: CGFloat = 16
+    /// hover 增强阴影（叠在 bubbleFloatingShadow 之上，营造「浮起」层次）。
+    /// 2026-09-21 r16→r10 + 不透明度补强：r16 的淡出范围（~1.8×r≈29pt+）溢出
+    /// 窗口余量，hover 时被窗口边界裁出「背景板框」直线（用户报告）；r10 淡出
+    /// ~18pt，配合窗口呼吸边距后四边余量充足。浮起感由「更黑」而非「更大」表达。
+    static let liftShadowOpacity: Double = 0.12
+    static let liftShadowRadius: CGFloat = 10
     static let liftShadowY: CGFloat = 8
     /// 浮起/落回弹簧。
     static let liftSpring = Animation.spring(response: 0.3, dampingFraction: 0.7)
 
     // MARK: 面板顶部间距（无背板语境，开发期可调）
 
-    /// 面板根视图顶部 padding。历史值 16（有背板时代为玻璃边框留白）；无背板后
-    /// 卡顶到菜单栏的空隙 = 3pt 锚定 + 13pt popover chrome 内缩 + 此值，用户反馈
-    /// 偏大，2026-09-21 起开发期由 defaults 键 `MoniswitchDebugTopPadding` 可调
-    /// （整数点数，钳制 2–16），扫值定档后写死并删调试读取。
+    /// 面板根视图顶部 padding。2026-09-21 用户扫值定档 **5**（有背板时代的历史值 16
+    /// 在无背板下空隙偏大）。开发期仍由 defaults 键 `MoniswitchDebugTopPadding`
+    /// 可调（整数点数，钳制 2–16）覆盖，验收后删调试读取。
     static var panelTopPadding: CGFloat {
         let v = UserDefaults.standard.integer(forKey: "MoniswitchDebugTopPadding")
-        guard v > 0 else { return 16 }
+        guard v > 0 else { return 5 }
         return min(max(CGFloat(v), 2), 16)
     }
+
+    // MARK: 面板窗口呼吸边距（无背板悬浮阴影的淡出空间）
+
+    /// 卡片列宽度（含内边距；宽度锁与 PanelController 的 preferredContentSize 共用，
+    /// 勿再各写魔法数）。
+    static let panelColumnWidth: CGFloat = 380
+    /// 左右/底部透明呼吸边距：窗口比卡片列大一圈，悬浮阴影（基座 r8 + hover r10）
+    /// 在窗口内淡尽，不被窗口边界裁出「背景板框」直线（2026-09-21 用户报告的
+    /// hover 框线根因：r16 时代 hover 阴影淡出 ~29pt+，溢出窗口余量）。
+    /// 顶部**不加**——保持用户定档的卡顶-菜单栏间距不变。
+    static let shadowBreathingSide: CGFloat = 12
+    static let shadowBreathingBottom: CGFloat = 12
+    /// 宿主内容宽度（= 卡片列 + 两侧呼吸），PanelController 的 preferredContentSize 用。
+    static var hostContentWidth: CGFloat { panelColumnWidth + shadowBreathingSide * 2 }
 
     // MARK: 面板内嵌套滚动
 
@@ -135,16 +151,17 @@ enum BubbleMetrics {
         UserDefaults.standard.integer(forKey: "MoniswitchDebugShadowPreset")
     }
 
-    /// 候选参数组。0=现行双层（对照组，为「投在磨砂玻璃背板上」语境调的）；
-    /// 1/2=单层柔和（对齐 Tutti 截图观感：柔和小扩散、无硬边）；3=双层全软
-    /// （去掉贴边 key 层——死因②「1px 细线」的主要嫌疑即贴边小半径阴影在壁纸上
-    /// 收出硬线）。定型后选中的参数写死进 bubbleFloatingShadow 并删除调试机制。
+    /// 候选参数组。2026-09-21 用户定档 **preset 1**（单层柔和，默认档）。0=旧双层
+    /// （历史对照）；2=单层宽散；3=双层全软；4=hover 阴影同参数（r10/0.12/y8，
+    /// **临时诊断档**：静态复现 hover 阴影几何、验证其淡出范围在窗口余量内，
+    /// 验收后删）。开发期 defaults 键 MoniswitchDebugShadowPreset 免重编 A/B。
     static func floatingShadowSpec(preset: Int) -> FloatingShadowSpec {
         switch preset {
-        case 1:  return .init(opacity1: 0.10, radius1: 8,  y1: 3, opacity2: 0,    radius2: 0,   y2: 0)
+        case 0:  return .init(opacity1: 0.06, radius1: 11, y1: 5, opacity2: 0.09, radius2: 3.5, y2: 1.5)
         case 2:  return .init(opacity1: 0.08, radius1: 14, y1: 5, opacity2: 0,    radius2: 0,   y2: 0)
         case 3:  return .init(opacity1: 0.09, radius1: 16, y1: 6, opacity2: 0.05, radius2: 6,   y2: 2)
-        default: return .init(opacity1: 0.06, radius1: 11, y1: 5, opacity2: 0.09, radius2: 3.5, y2: 1.5)
+        case 4:  return .init(opacity1: 0.12, radius1: 10, y1: 8, opacity2: 0,    radius2: 0,   y2: 0)
+        default: return .init(opacity1: 0.10, radius1: 8,  y1: 3, opacity2: 0,    radius2: 0,   y2: 0)
         }
     }
 }
