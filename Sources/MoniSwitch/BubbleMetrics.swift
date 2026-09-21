@@ -99,6 +99,18 @@ enum BubbleMetrics {
     /// 浮起/落回弹簧。
     static let liftSpring = Animation.spring(response: 0.3, dampingFraction: 0.7)
 
+    // MARK: 面板顶部间距（无背板语境，开发期可调）
+
+    /// 面板根视图顶部 padding。历史值 16（有背板时代为玻璃边框留白）；无背板后
+    /// 卡顶到菜单栏的空隙 = 3pt 锚定 + 13pt popover chrome 内缩 + 此值，用户反馈
+    /// 偏大，2026-09-21 起开发期由 defaults 键 `MoniswitchDebugTopPadding` 可调
+    /// （整数点数，钳制 2–16），扫值定档后写死并删调试读取。
+    static var panelTopPadding: CGFloat {
+        let v = UserDefaults.standard.integer(forKey: "MoniswitchDebugTopPadding")
+        guard v > 0 else { return 16 }
+        return min(max(CGFloat(v), 2), 16)
+    }
+
     // MARK: 面板内嵌套滚动
 
     /// SelectionRow 选项列表限高：超过则列表内部滚动，面板高度可控（面板级 ScrollView 已废弃，勿混淆）。

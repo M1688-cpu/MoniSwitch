@@ -87,7 +87,10 @@ struct PanelView: View {
             }
             bottomToolbar
         }
-        .padding(16)
+        // 顶部 padding 开发期可调（MoniswitchDebugTopPadding，默认 16）：无背板后
+        // 卡片与菜单栏的空隙偏大，用户扫值定档后写死；其余三边保持 16
+        // （底部给悬浮阴影留衰减空间，勿跟顶部一起缩）。
+        .padding(EdgeInsets(top: BubbleMetrics.panelTopPadding, leading: 16, bottom: 16, trailing: 16))
         // 只锁宽度，高度按内容自适应。
         .frame(minWidth: 380, idealWidth: 380, maxWidth: 380)
         // 内容理想高度上报（手动尺寸桥的 SwiftUI 侧）：sizingOptions=[] 后
