@@ -42,6 +42,8 @@ final class BrightnessManager {
 
     /// 单例与 App 同生命周期（不 deinit、不移除观察者）。
     private var screenObserver: NSObjectProtocol?
+    private var sleepObserver: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
 
     private init() {
         persisted = UserDefaults.standard.dictionary(forKey: persistenceKey) as? [String: Double] ?? [:]
@@ -51,6 +53,29 @@ final class BrightnessManager {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
+        }
+        // 睡眠守卫：睡眠期间挂起 DDC 写（I2C 总线常无响应），唤醒后恢复并刷新
+        // （外接屏可能重配 / persistent id 可能漂移，顺带同步新 service 绑定）
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+        sleepObserver = workspaceCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { await DDCWriter.shared.setSuspended(true) }
+        }
+        wakeObserver = workspaceCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            // 不捕获 self（Sendable 闭包约束下直接引用单例，保持零警告基线）
+            Task {
+                await DDCWriter.shared.setSuspended(false)
+                await MainActor.run {
+                    BrightnessManager.shared.refresh()
+                }
+            }
         }
         refresh()
     }
@@ -86,8 +111,11 @@ final class BrightnessManager {
                 ))
             }
 
-            // 释放被替换掉的旧 IOAVService（仍在使用的移交所有权）
+            // service 生命周期守卫（2026-10 code-review 修复）：先声明存活集 +
+            // 排空 DDCWriter 在途写（防 use-after-release），随后才释放被替换的旧 service
             let newServices = Set(newEntries.map { UnsafeRawPointer($0.service) })
+            await DDCWriter.shared.updateLiveServices(newServices)
+            await DDCWriter.shared.waitForIdle()
             for old in entries where !newServices.contains(UnsafeRawPointer(old.service)) {
                 PrivateAPI.release(old.service)
             }

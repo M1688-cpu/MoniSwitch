@@ -671,7 +671,7 @@ private struct ArrangementRow: View {
                                     revealHeight = 0
                                     withAnimation(panelReveal) { revealHeight = blockHeight }
                                 }
-                                .onChange(of: geo.size.height) { newHeight in
+                                .onChange(of: geo.size.height) { _, newHeight in
                                     // 首帧量到 0（masked 祖先下新插入子树的零
                                     // proposal）时，这里补走带动画的初始揭示。
                                     let isInitialReveal = (blockHeight == 0 && newHeight > 0)
@@ -898,7 +898,7 @@ private struct SelectionRow: View {
                     GeometryReader { geo in
                         Color.clear
                             .onAppear { listHeight = geo.size.height }
-                            .onChange(of: geo.size.height) { listHeight = $0 }
+                            .onChange(of: geo.size.height) { _, newHeight in listHeight = newHeight }
                     }
                 )
             }
@@ -928,7 +928,7 @@ private struct SelectionRow: View {
                 // 兜底：挂载时已处于展开态（理论上不会发生），直接全揭示。
                 if expanded { revealHeight = listVisibleHeight }
             }
-            .onChange(of: expanded) { isOn in
+            .onChange(of: expanded) { _, isOn in
                 if isOn {
                     // 揭示动画：从 0 弹簧拉到实高（纯视觉，不参与布局）。
                     revealHeight = 0
@@ -936,7 +936,7 @@ private struct SelectionRow: View {
                 }
                 // 收起时不动 revealHeight：frame 弹簧回抽 + clipped 即收起动画。
             }
-            .onChange(of: listHeight) { _ in
+            .onChange(of: listHeight) { _, _ in
                 // 选项数变化（如刷新后）同步校正揭示高度与布局目标。
                 if expanded {
                     withAnimation(panelReveal) { revealHeight = listVisibleHeight }

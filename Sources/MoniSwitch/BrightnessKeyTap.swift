@@ -32,6 +32,10 @@ final class BrightnessKeyTap {
     fileprivate var tapPort: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var runLoopQueue: DispatchQueue?
+    /// tap 专属 runloop（stop 时 CFRunLoopStop 用；CFRunLoopRun 不接受外部停止
+    /// 信号会永远阻塞队列线程——2026-10 code-review 抓的泄漏）。跨线程写一次后
+    /// 只在主线程读，属良性竞态（MediaKeyTap 同款模式）。
+    private var runLoop: CFRunLoop?
 
     var isRunning: Bool { tapPort != nil }
 
@@ -79,22 +83,31 @@ final class BrightnessKeyTap {
             return
         }
         runLoopQueue = DispatchQueue(label: "moniswitch.brightnesskeytap")
-        runLoopQueue?.async {
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
+        runLoopQueue?.async { [weak self] in
+            let runLoop = CFRunLoopGetCurrent()
+            CFRunLoopAddSource(runLoop, source, .commonModes)
+            if let self {
+                self.runLoop = runLoop
+            }
             CFRunLoopRun()
         }
     }
 
-    /// 停止监听并拆除 tap（主线程调用）。
+    /// 停止监听并拆除 tap（主线程调用）：先摘 runloop source 并停掉 runloop
+    /// （否则 CFRunLoopRun 永不返回，队列线程常驻泄漏）。
     func stop() {
         assert(Thread.isMainThread)
         if let runLoopSource {
             CFRunLoopSourceInvalidate(runLoopSource)
         }
+        if let runLoop {
+            CFRunLoopStop(runLoop)
+        }
         if let tapPort {
             CFMachPortInvalidate(tapPort)
         }
         runLoopSource = nil
+        runLoop = nil
         tapPort = nil
         runLoopQueue = nil
     }

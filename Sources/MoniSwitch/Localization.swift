@@ -225,7 +225,7 @@ final class L10n: ObservableObject {
         .tabBrightness:    [.zh: "亮度与按键",                    .en: "Brightness & Keys"],
         .groupBrightnessKeys: [.zh: "F1/F2 亮度键",               .en: "F1/F2 Brightness Keys"],
         .brightnessKeysRow:   [.zh: "F1/F2 同步外接屏亮度",        .en: "Sync external displays on F1/F2"],
-        .brightnessKeysHint:  [.zh: "裸按 F1/F2：内置屏照常由系统调节，外接屏同步跟随同样的步进。按住 ⌥ 再按：仅调节外接屏，并显示指示气泡。", .en: "Plain F1/F2: built-in display adjusts natively and external displays follow. Hold ⌥: external displays only, with an indicator bubble."],
+        .brightnessKeysHint:  [.zh: "裸按 F1/F2：内置屏照常由系统调节，外接屏同步跟随同样的步进。按住 ⌥ 再按：外接屏调节并显示指示气泡（笔记本内置屏不受 ⌥ 影响，仍由系统调节）。", .en: "Plain F1/F2: the built-in display adjusts natively and external displays follow. Hold ⌥: external displays adjust with an indicator bubble (on laptops the built-in display still adjusts natively — listen-only cannot suppress it)."],
         .groupPermission:  [.zh: "输入监控权限",                  .en: "Input Monitoring Permission"],
         .permissionGranted: [.zh: "已授权",                        .en: "Granted"],
         .permissionMissing: [.zh: "未授权，F1/F2 监听未生效",       .en: "Not granted — F1/F2 listening inactive"],

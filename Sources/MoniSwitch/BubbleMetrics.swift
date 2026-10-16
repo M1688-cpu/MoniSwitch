@@ -102,16 +102,12 @@ enum BubbleMetrics {
     /// 浮起/落回弹簧。
     static let liftSpring = Animation.spring(response: 0.3, dampingFraction: 0.7)
 
-    // MARK: 面板顶部间距（无背板语境，开发期可调）
+    // MARK: 面板顶部间距（无背板语境）
 
     /// 面板根视图顶部 padding。2026-09-21 用户扫值定档 **5**（有背板时代的历史值 16
-    /// 在无背板下空隙偏大）。开发期仍由 defaults 键 `MoniswitchDebugTopPadding`
-    /// 可调（整数点数，钳制 2–16）覆盖，验收后删调试读取。
-    static var panelTopPadding: CGFloat {
-        let v = UserDefaults.standard.integer(forKey: "MoniswitchDebugTopPadding")
-        guard v > 0 else { return 5 }
-        return min(max(CGFloat(v), 2), 16)
-    }
+    /// 在无背板下空隙偏大）；2026-10 v2 烘焙写死（原 MoniswitchDebugTopPadding
+    /// 调试键随定档删除）。
+    static let panelTopPadding: CGFloat = 5
 
     // MARK: 面板窗口呼吸边距（无背板悬浮阴影的淡出空间）
 
@@ -140,7 +136,7 @@ enum BubbleMetrics {
 
     // MARK: 无背板悬浮阴影（壁纸承接语境，2026-09-21）
 
-    /// 悬浮阴影参数（最多两层：layer1 大范围 + layer2 贴边；单层预设把 layer2 置 0）。
+    /// 悬浮阴影参数（最多两层：layer1 大范围 + layer2 贴边；单层把 layer2 置 0）。
     struct FloatingShadowSpec {
         var opacity1: Double
         var radius1: CGFloat
@@ -150,26 +146,13 @@ enum BubbleMetrics {
         var y2: CGFloat
     }
 
-    /// 开发期调试开关（定型后删除）：`defaults write com.moniswitch.app
-    /// MoniswitchDebugShadowPreset N` 免重编切换候选参数组，配合真实壁纸人工验收；
-    /// 未写/越界 = 0（对照组）。
-    static var floatingShadowDebugPreset: Int {
-        UserDefaults.standard.integer(forKey: "MoniswitchDebugShadowPreset")
-    }
-
-    /// 候选参数组。2026-09-21 用户定档 **preset 1**（单层柔和，默认档）。0=旧双层
-    /// （历史对照）；2=单层宽散；3=双层全软；4=hover 阴影同参数（r10/0.12/y8，
-    /// **临时诊断档**：静态复现 hover 阴影几何、验证其淡出范围在窗口余量内，
-    /// 验收后删）。开发期 defaults 键 MoniswitchDebugShadowPreset 免重编 A/B。
-    static func floatingShadowSpec(preset: Int) -> FloatingShadowSpec {
-        switch preset {
-        case 0:  return .init(opacity1: 0.06, radius1: 11, y1: 5, opacity2: 0.09, radius2: 3.5, y2: 1.5)
-        case 2:  return .init(opacity1: 0.08, radius1: 14, y1: 5, opacity2: 0,    radius2: 0,   y2: 0)
-        case 3:  return .init(opacity1: 0.09, radius1: 16, y1: 6, opacity2: 0.05, radius2: 6,   y2: 2)
-        case 4:  return .init(opacity1: 0.12, radius1: 10, y1: 8, opacity2: 0,    radius2: 0,   y2: 0)
-        default: return .init(opacity1: 0.10, radius1: 8,  y1: 3, opacity2: 0,    radius2: 0,   y2: 0)
-        }
-    }
+    /// 悬浮阴影定档参数（2026-09-21 用户真实壁纸验收拍板 **preset 1**：单层柔和
+    /// r8/0.10/y3；2026-10 v2 烘焙写死，原 MoniswitchDebugShadowPreset 调试
+    /// 选组机制随定档删除，候选参数组不再保留）。
+    static let floatingShadowSpec = FloatingShadowSpec(
+        opacity1: 0.10, radius1: 8, y1: 3,
+        opacity2: 0, radius2: 0, y2: 0
+    )
 }
 
 extension View {
@@ -184,10 +167,9 @@ extension View {
 
     /// 无背板语境的面板气泡悬浮阴影：阴影**直接落在壁纸上**（区别于投在系统玻璃
     /// 背板/窗口底色上的 bubbleShadow——后者仍归设置窗口卡片使用，两者语境不同
-    /// 不要混用）。参数经 BubbleMetrics.floatingShadowSpec；开发期由 defaults
-    /// 调试开关选组（免重编 A/B），定型后写死并删除调试机制。
+    /// 不要混用）。参数 = BubbleMetrics.floatingShadowSpec（用户定档烘焙值）。
     func bubbleFloatingShadow() -> some View {
-        let s = BubbleMetrics.floatingShadowSpec(preset: BubbleMetrics.floatingShadowDebugPreset)
+        let s = BubbleMetrics.floatingShadowSpec
         return shadow(color: .black.opacity(s.opacity1), radius: s.radius1, x: 0, y: s.y1)
             .shadow(color: .black.opacity(s.opacity2), radius: s.radius2, x: 0, y: s.y2)
     }

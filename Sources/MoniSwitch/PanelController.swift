@@ -178,7 +178,12 @@ final class PanelController: NSObject {
             context.allowsImplicitAnimation = true
             hosting.layer?.setAffineTransform(CGAffineTransform(scaleX: 0.92, y: 0.92))
         }, completionHandler: {
-            panel.orderOut(nil)
+            // 收起动画期间被重新 showPanel 时（0.2s 内点开）不收窗口——
+            // 此时 alpha 已被出场动画拉回 1，无条件 orderOut 会把新开的面板杀掉
+            // （2026-10 code-review 抓的竞态）。
+            if panel.alphaValue < 0.05 {
+                panel.orderOut(nil)
+            }
         })
     }
 

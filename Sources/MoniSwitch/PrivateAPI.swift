@@ -15,14 +15,12 @@ enum PrivateAPI {
     /// IOAVService（opaque CF 对象）的指针形式。
     typealias IOAVServiceRef = UnsafeMutableRawPointer
 
-    typealias IOAVServiceCreateFn = @convention(c) (UnsafeMutableRawPointer?, UInt32) -> IOAVServiceRef?
     typealias IOAVServiceCreateWithServiceFn = @convention(c) (UnsafeMutableRawPointer?, UInt32) -> IOAVServiceRef?
     typealias IOAVServiceReadI2CFn = @convention(c) (IOAVServiceRef, UInt32, UInt32, UnsafeMutableRawPointer, UInt32) -> Int32
     typealias IOAVServiceWriteI2CFn = @convention(c) (IOAVServiceRef, UInt32, UInt32, UnsafeMutableRawPointer, UInt32) -> Int32
     typealias DisplayCreateInfoDictionaryFn = @convention(c) (CGDirectDisplayID) -> UnsafeMutableRawPointer?
     typealias CFReleaseFn = @convention(c) (UnsafeMutableRawPointer) -> Void
 
-    static let ioAVServiceCreate: IOAVServiceCreateFn? = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceCreate")
     static let ioAVServiceCreateWithService: IOAVServiceCreateWithServiceFn? = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceCreateWithService")
     static let ioAVServiceReadI2C: IOAVServiceReadI2CFn? = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceReadI2C")
     static let ioAVServiceWriteI2C: IOAVServiceWriteI2CFn? = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceWriteI2C")

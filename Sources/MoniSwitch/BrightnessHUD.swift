@@ -71,25 +71,25 @@ final class BrightnessHUD {
         return panel
     }
 
-    /// 锚定在菜单栏图标正下方（图标 frame 由面板壳提供；取不到时退到主屏右上角）。
+    /// 锚定在菜单栏图标正下方；屏幕取图标所在屏（多屏下 NSScreen.main 会锚错屏，
+    /// 2026-10 code-review 指出），图标 frame 取不到时退主屏右上角。
     private func positionNearStatusBar(panel: NSPanel) {
-        guard let screen = NSScreen.main else { return }
         let anchor = PanelController.shared.statusItemFrame
+        let screen = anchor.flatMap { frame in
+            NSScreen.screens.first { $0.frame.intersects(frame) }
+        } ?? NSScreen.main
+        guard let screen else { return }
         var x: CGFloat
-        if let anchor, anchor.minX > 0 {
+        var topY: CGFloat
+        if let anchor {
             x = anchor.midX - size.width / 2
+            topY = anchor.minY - 8
         } else {
             x = screen.frame.maxX - size.width - 16
-        }
-        // 菜单栏高度约 24~25pt；HUD 悬在图标下方留 8pt 间距
-        let y: CGFloat
-        if let anchor {
-            y = anchor.minY - size.height - 8
-        } else {
-            y = screen.frame.maxY - 44 - size.height - 8
+            topY = screen.frame.maxY - 44 - 8
         }
         x = max(screen.frame.minX + 8, min(x, screen.frame.maxX - size.width - 8))
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        panel.setFrameOrigin(NSPoint(x: x, y: topY - size.height))
     }
 }
 
@@ -124,10 +124,8 @@ private struct BrightnessHUDView: View {
         }
         .padding(.horizontal, 14)
         .frame(width: 168, height: 44)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 4)
+        // 与面板气泡同设计语言：不透明填充（浅纯白/深卡片色）+ 悬浮阴影（壁纸承接）
+        .modifier(BubbleBackground())
+        .bubbleFloatingShadow()
     }
 }
