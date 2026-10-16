@@ -54,6 +54,10 @@ struct PanelView: View {
     /// 是否有操作在后台执行（含预设回放）：禁用卡片区 + 显示进度条。
     private var busy: Bool { state.isOperating || presetManager.isApplying }
 
+    /// 外接屏亮度中枢（v2）：@Observable 单例经 @State 桥接，body 内读 entries
+    /// 自动追踪；写经 setPercent（本地乐观更新 + DDC 异步合并写）。
+    @State private var brightness = BrightnessManager.shared
+
     var body: some View {
         VStack(spacing: BubbleMetrics.cardSpacing) {
             if state.displays.isEmpty {
@@ -71,6 +75,12 @@ struct PanelView: View {
                 // 也顺带消除两处历史问题（详见 AGENTS.md）：它对子视图 bounds 的
                 // 裁切会把卡片阴影切出直线边界；屏幕重配时理想高度会塌 0。
                 VStack(spacing: BubbleMetrics.cardSpacing) {
+                    // 亮度卡（v2 控制中心式，2026-10）：外接屏各一行滑条，常驻顶部
+                    // ——亮度是合并 MonitorControl 后的最高频操作，零点击可达。
+                    // 无外接 DDC 屏（单内置屏等）整卡不出现。
+                    if !brightness.entries.isEmpty {
+                        brightnessCard
+                    }
                     // 枢纽卡（2026-10 改版）：主屏卡/排列卡并入布局预览——
                     // 多屏=布局图+点块展开参数；单屏=常展开参数（原显示器调节卡）。
                     displayHubCard
@@ -204,6 +214,28 @@ struct PanelView: View {
         }
     }
 
+    // MARK: - 亮度卡（v2 控制中心式，2026-10）
+
+    /// 外接屏亮度卡：每屏一行「图标圆框 + 名称 / ☀ 滑条 + 百分比」，常驻面板顶部
+    /// （亮度是合并 MonitorControl 后的最高频操作，零点击可达）。
+    /// 名称取注册表 ProductName（如 "DELL U2723QE"，比 displayplacer 的
+    /// "27 inch external screen" 更可辨），缺失退本地化「外接显示器」。
+    private var brightnessCard: some View {
+        BubbleCard(title: nil) {
+            VStack(spacing: BubbleMetrics.rowSpacing) {
+                ForEach(brightness.entries) { entry in
+                    BrightnessRow(
+                        name: entry.name.isEmpty ? l10n.t(.externalDisplay) : entry.name,
+                        percent: entry.percent,
+                        accent: accent
+                    ) { newValue in
+                        brightness.setPercent(newValue, for: entry.id)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - 布局预设卡片
 
     /// 已保存预设：每条一行（名称 + 快捷键角标 + 应用按钮）。
@@ -300,6 +332,45 @@ struct PanelView: View {
 }
 
 // MARK: - 面板私有小组件
+
+/// 亮度卡单行：图标圆框 + 名称一行，☀ 滑条 + 百分比一行。
+/// 滑条值直连 BrightnessManager（乐观本地更新 + DDC 异步合并写），拖动即时回显。
+private struct BrightnessRow: View {
+    let name: String
+    let percent: Double
+    let accent: Color
+    let onChange: (Double) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                DeviceIconBadge(isBuiltIn: false, active: true, accent: accent)
+                Text(name)
+                    .font(.system(size: BubbleMetrics.fontBody, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer()
+            }
+            HStack(spacing: 10) {
+                Image(systemName: "sun.min")
+                    .font(.system(size: BubbleMetrics.fontControl))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                Slider(value: Binding(
+                    get: { percent },
+                    set: { onChange($0) }
+                ), in: 0...1)
+                .tint(accent)
+                Text("\(Int((percent * 100).rounded()))%")
+                    .font(.system(size: BubbleMetrics.fontCaption, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 34, alignment: .trailing)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
 
 /// 显示器类型图标圆框：圆形填充底 + 类型图标（内置屏 laptopcomputer / 外接屏 display）。
 ///

@@ -130,6 +130,8 @@ final class PanelController: NSObject {
 
     private func showPanel() {
         guard let panel, let hosting = hostingView else { return }
+        // 面板打开 = 刷新显示器列表（AppState 定时器之外的开面板触发）+ 亮度值
+        BrightnessManager.shared.refresh()
         positionPanel()
         // 出场起点：瞬时压到 0.92 缩放 + 零透明（中途打断重开也不跳变）
         hosting.layer?.setAffineTransform(CGAffineTransform(scaleX: 0.92, y: 0.92))

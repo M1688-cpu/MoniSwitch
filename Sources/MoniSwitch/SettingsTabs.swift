@@ -103,6 +103,96 @@ struct GeneralTab: View {
     }
 }
 
+// MARK: - 亮度与按键标签（v2：F1/F2 外接屏亮度同步）
+
+struct BrightnessTab: View {
+
+    @EnvironmentObject private var l10n: L10n
+    @EnvironmentObject private var settings: AppSettings
+    /// 内容滚动偏移，上报给 SettingsView 驱动顶部毛玻璃渐入。
+    @Binding var scrollOffset: CGFloat
+
+    /// 权限状态实时读（IOHIDCheckAccess 很轻，body 求值即查；开关切换会触发重算，
+    /// 授权后回到 App 拨一下开关即可看到状态更新并启动监听）。
+    private var permissionGranted: Bool { BrightnessKeyTap.permissionGranted }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // —— F1/F2 开关 ——
+                SettingsCard(title: l10n.t(.groupBrightnessKeys), systemImage: "sun.max") {
+                    VStack(spacing: 0) {
+                        settingRow(l10n.t(.brightnessKeysRow)) {
+                            Toggle("", isOn: $settings.brightnessKeysEnabled)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+                        Divider().padding(.vertical, 6)
+                        Text(l10n.t(.brightnessKeysHint))
+                            .font(.system(size: BubbleMetrics.fontCaption))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 2)
+                    }
+                }
+
+                // —— 输入监控权限 ——
+                SettingsCard(title: l10n.t(.groupPermission), systemImage: "lock.shield") {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 8) {
+                            Image(systemName: permissionGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(permissionGranted ? Color.green : Color.orange)
+                            Text(permissionGranted ? l10n.t(.permissionGranted) : l10n.t(.permissionMissing))
+                                .font(.system(size: BubbleMetrics.fontBody))
+                            Spacer()
+                            if !permissionGranted {
+                                Button(l10n.t(.grantPermission)) {
+                                    BrightnessKeyTap.requestPermission()
+                                    // 授权弹窗关闭后立即尝试启动（已授权则直接生效）
+                                    if settings.brightnessKeysEnabled {
+                                        BrightnessKeyTap.shared.start()
+                                    }
+                                }
+                                Button(l10n.t(.openPrivacyPane)) {
+                                    BrightnessKeyTap.openPermissionSettings()
+                                }
+                                .buttonStyle(.link)
+                                .font(.system(size: BubbleMetrics.fontCaption))
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
+                // —— 兼容性说明 ——
+                SettingsCard(title: l10n.t(.groupDisplays), systemImage: "info.circle") {
+                    Text(l10n.t(.ddcUnsupportedHint))
+                        .font(.system(size: BubbleMetrics.fontCaption))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .background(ScrollOffsetReader(offset: $scrollOffset))
+        }
+    }
+
+    /// 与 GeneralTab 同款的设置行。
+    @ViewBuilder
+    private func settingRow<Control: View>(_ title: String, @ViewBuilder control: () -> Control) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: BubbleMetrics.fontBody))
+            Spacer()
+            control()
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 // MARK: - 关于标签
 
 struct AboutTab: View {

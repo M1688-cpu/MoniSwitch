@@ -27,23 +27,25 @@ import AppKit
 struct SettingsView: View {
 
     enum Tab: String, CaseIterable, Identifiable, Hashable {
-        case general, presets, about
+        case general, brightness, presets, about
         var id: String { rawValue }
 
         var systemImage: String {
             switch self {
-            case .general: return "gearshape"
-            case .presets: return "square.stack"
-            case .about:   return "info.circle"
+            case .general:    return "gearshape"
+            case .brightness: return "sun.max"
+            case .presets:    return "square.stack"
+            case .about:      return "info.circle"
             }
         }
 
         /// 右侧内容区顶部标题用的本地化文案 key（跟随选中标签动态切换）。
         var titleKey: TextKey {
             switch self {
-            case .general: return .tabGeneral
-            case .presets: return .tabPresets
-            case .about:   return .tabAbout
+            case .general:    return .tabGeneral
+            case .brightness: return .tabBrightness
+            case .presets:    return .tabPresets
+            case .about:      return .tabAbout
             }
         }
     }
@@ -96,10 +98,11 @@ struct SettingsView: View {
             // 滚动时卡片滑入标题底下，HeaderFadeBackdrop 按滚动距离渐入渐变毛玻璃。
             Group {
                 switch selectedTab {
-                case .general: GeneralTab(scrollOffset: $contentScrollOffset)
-                case .presets: PresetsTab(scrollOffset: $contentScrollOffset)
-                case .about:   AboutTab(scrollOffset: $contentScrollOffset)
-                case .none:    GeneralTab(scrollOffset: $contentScrollOffset)
+                case .general:    GeneralTab(scrollOffset: $contentScrollOffset)
+                case .brightness: BrightnessTab(scrollOffset: $contentScrollOffset)
+                case .presets:    PresetsTab(scrollOffset: $contentScrollOffset)
+                case .about:      AboutTab(scrollOffset: $contentScrollOffset)
+                case .none:       GeneralTab(scrollOffset: $contentScrollOffset)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

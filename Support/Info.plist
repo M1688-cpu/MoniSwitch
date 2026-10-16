@@ -19,7 +19,7 @@
     <string>1</string>
 
     <key>CFBundleShortVersionString</key>
-    <string>0.1.6</string>
+    <string>2.0.0</string>
 
     <key>CFBundleExecutable</key>
     <string>MoniSwitch</string>

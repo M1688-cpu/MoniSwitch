@@ -115,9 +115,10 @@ enum BubbleMetrics {
 
     // MARK: 面板窗口呼吸边距（无背板悬浮阴影的淡出空间）
 
-    /// 卡片列宽度（含内边距；宽度锁与 PanelController 的 preferredContentSize 共用，
-    /// 勿再各写魔法数）。2026-10 380→420：布局图放大改版（用户反馈卡片局促）。
-    static let panelColumnWidth: CGFloat = 420
+    /// 卡片列宽度（含内边距；宽度锁与 PanelController 的窗口宽度共用，
+    /// 勿再各写魔法数）。2026-10 v2 控制中心式改版 420→380：亮度滑条优先布局
+    /// 收窄列宽（380 为 2026-10 前的稳定宽度，参数行/布局图均按此验证过）。
+    static let panelColumnWidth: CGFloat = 380
     /// 左右/底部透明呼吸边距：窗口比卡片列大一圈，悬浮阴影（基座 r8 + hover r10）
     /// 在窗口内淡尽，不被窗口边界裁出「背景板框」直线（2026-09-21 用户报告的
     /// hover 框线根因：r16 时代 hover 阴影淡出 ~29pt+，溢出窗口余量）。

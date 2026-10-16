@@ -103,6 +103,18 @@ enum TextKey: String {
     case currentLayoutBadge     = "currentLayoutBadge"     // 当前（预设与当前布局一致的角标）
     case mirrorTarget           = "mirrorTarget"           // 镜像目标：@
     case autoArrange            = "autoArrange"            // 自动排列按钮
+
+    // 亮度与按键（v2：F1/F2 外接屏亮度同步，设置页新 tab）
+    case tabBrightness          = "tabBrightness"          // 设置边栏：亮度与按键
+    case groupBrightnessKeys    = "groupBrightnessKeys"    // 卡片标题：F1/F2 亮度键
+    case brightnessKeysRow      = "brightnessKeysRow"      // 开关行：F1/F2 同步外接屏亮度
+    case brightnessKeysHint     = "brightnessKeysHint"     // 用法说明（裸按/⌥ 修饰键）
+    case groupPermission        = "groupPermission"        // 卡片标题：输入监控权限
+    case permissionGranted      = "permissionGranted"      // 状态：已授权
+    case permissionMissing      = "permissionMissing"      // 状态：未授权未生效
+    case grantPermission        = "grantPermission"        // 按钮：授权…
+    case openPrivacyPane        = "openPrivacyPane"        // 按钮：打开系统设置
+    case ddcUnsupportedHint     = "ddcUnsupportedHint"     // 说明：坞/电视等无 DDC 的屏不出现在亮度列表
 }
 
 
@@ -210,6 +222,16 @@ final class L10n: ObservableObject {
         .lowResolutionTag: [.zh: "低分辨率",                     .en: "Low resolution"],
 
         .setAsPrimary:     [.zh: "设为主屏",                      .en: "Set as Main"],
+        .tabBrightness:    [.zh: "亮度与按键",                    .en: "Brightness & Keys"],
+        .groupBrightnessKeys: [.zh: "F1/F2 亮度键",               .en: "F1/F2 Brightness Keys"],
+        .brightnessKeysRow:   [.zh: "F1/F2 同步外接屏亮度",        .en: "Sync external displays on F1/F2"],
+        .brightnessKeysHint:  [.zh: "裸按 F1/F2：内置屏照常由系统调节，外接屏同步跟随同样的步进。按住 ⌥ 再按：仅调节外接屏，并显示指示气泡。", .en: "Plain F1/F2: built-in display adjusts natively and external displays follow. Hold ⌥: external displays only, with an indicator bubble."],
+        .groupPermission:  [.zh: "输入监控权限",                  .en: "Input Monitoring Permission"],
+        .permissionGranted: [.zh: "已授权",                        .en: "Granted"],
+        .permissionMissing: [.zh: "未授权，F1/F2 监听未生效",       .en: "Not granted — F1/F2 listening inactive"],
+        .grantPermission:  [.zh: "授权…",                         .en: "Grant…"],
+        .openPrivacyPane:  [.zh: "打开系统设置",                   .en: "Open System Settings"],
+        .ddcUnsupportedHint: [.zh: "经坞站/转换器连接或部分电视不支持 DDC 亮度控制，此类屏幕不会出现在亮度列表中。", .en: "Displays connected through docks/adapters and some TVs don't support DDC brightness control; they won't appear in the brightness list."],
         .currentLayoutBadge:[.zh: "当前",                        .en: "Current"],
         .mirrorTarget:     [.zh: "镜像目标：%@",                  .en: "Mirror target: %@"],
         .autoArrange:      [.zh: "自动排列（横向排开，消除重叠）",  .en: "Auto-arrange (line up, fix overlap)"],
