@@ -193,13 +193,18 @@ final class DisplayManager {
 
     /// 解析屏块里出现的所有分辨率（按 "WxH" 去重，保持 displayplacer 输出顺序）。
     ///
-    /// 解析 "mode N: res:WxH hz:X [scaling:on]" 行。注意 `res:` 是**逻辑分辨率**
+    /// 解析 "mode N: res:WxH hz:X ... [scaling:on]" 行。注意 `res:` 是**逻辑分辨率**
     /// （HiDPI 模式物理像素为 2 倍），同一逻辑分辨率常同时存在 HiDPI 与非 HiDPI
     /// 两个模式（如 4K 屏的 res:1920x1080 与 res:3840x2160 各有双变体）。合并成
     /// 一条菜单项时优先生效 HiDPI 变体（与系统设置默认一致），`hidpi` 标志随后
     /// 由 setResolution 用于决定 scaling:on/off。
+    ///
+    /// scaling:on 后缀的匹配用 `[^\n]*scaling:on`：当前捆绑的 displayplacer 输出里
+    /// 后缀排在 color_depth 之后（`res:WxH hz:X color_depth:8 scaling:on`，2026-10
+    /// 本机实测），旧正则 `(\s+scaling:on)?` 只认紧跟 hz 的旧格式，会漏检全部
+    /// HiDPI 变体（回归测试 DisplayListParserTests.hidpiVariantMerge 锁定）。
     private func parseResolutions(in block: String) -> [ResolutionOption] {
-        let pattern = #"res:(\d+)x(\d+)\s+hz:(\d+)(\s+scaling:on)?"#
+        let pattern = #"res:(\d+)x(\d+)\s+hz:(\d+)([^\n]*scaling:on)?"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
         let range = NSRange(block.startIndex..., in: block)
         var order: [String] = []              // 分辨率首次出现顺序
