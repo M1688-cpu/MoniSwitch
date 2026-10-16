@@ -5,6 +5,7 @@ import SwiftUI
 /// F1/F2 调外接屏亮度时的迷你 HUD 气泡：浮在菜单栏图标下方，与面板同设计语言
 /// （不透明填充圆角气泡 + 悬浮阴影），显示太阳图标 + 进度条 + 百分比，1.2s 无新
 /// 事件后淡出；重复按键自动续期。纯展示：`ignoresMouseEvents` 挡全部命中。
+@MainActor
 final class BrightnessHUD {
     static let shared = BrightnessHUD()
 
