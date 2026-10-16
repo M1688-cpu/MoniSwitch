@@ -59,12 +59,30 @@ final class PanelController: NSObject, NSPopoverDelegate {
 
         // [DEBUG-autoshow]（临时调试，定型后删除）：启动后自动弹出面板，供像素采样验证
         // 背板/阴影。macOS 27 上合成点击对面板不可靠、AX 开面板有命中区偏移，自动弹出
-        // 是唯一无副作用的机器验证入口。
-        if UserDefaults.standard.bool(forKey: "MoniswitchDebugAutoShow"),
-           let button = item.button {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-                self?.show(from: button)
+        // 是唯一无副作用的机器验证入口。延迟可调（MoniswitchDebugAutoShowDelay，秒；
+        // 验证「预热后首开零闪」时设 >1.6s 跳过预热窗口期）。
+        if UserDefaults.standard.bool(forKey: "MoniswitchDebugAutoShow") {
+            let delay = UserDefaults.standard.double(forKey: "MoniswitchDebugAutoShowDelay")
+            let when = DispatchTime.now() + (delay > 0 ? delay : 0.6)
+            DispatchQueue.main.asyncAfter(deadline: when) { [weak self] in
+                guard let self else { return }
+                if self.isResidentMode {
+                    self.presentResidentPanel()
+                } else if let button = self.statusItem?.button {
+                    self.show(from: button)
+                }
             }
+        }
+
+        // 常驻隐形模式（macOS 26+，零闪定型）：唯一一次 show 在启动时完成
+        // （didFinishLaunching 阶段可能静默失败，由 startResidentPanel 的重试兜住）；
+        // 13~15 保留经典 show/close（系统背板 + 系统动画）。
+        if #available(macOS 26.0, *) {
+            isResidentMode = true
+            // 常驻模式禁止系统自动收起（transient 的失活收起会拆掉常驻窗口）；
+            // 外部点击收起由 installDismissMonitors 手装监控承担（本来就在管）。
+            popover.behavior = .applicationDefined
+            startResidentPanel()
         }
 
     }
@@ -88,6 +106,8 @@ final class PanelController: NSObject, NSPopoverDelegate {
     private lazy var panelContainerController: NSViewController = {
         let container = NSViewController()
         container.view = NSView()
+        // 入场/出场缩放动画驱动本视图 layer.transform（见 presentResidentPanel）。
+        container.view.wantsLayer = true
         let host = hostingController.view
         host.translatesAutoresizingMaskIntoConstraints = false
         container.view.addSubview(host)
@@ -130,10 +150,204 @@ final class PanelController: NSObject, NSPopoverDelegate {
         DispatchQueue.main.async { [weak self] in self?.applyFloatingBackdrop() }
     }
 
+    // MARK: - 常驻隐形模式（macOS 26+，2026-09-21 零闪定型）
+
+    /// 常驻隐形模式标记：popover 启动时 show 一次后**永不 close**，显隐用窗口
+    /// alpha 淡入淡出 + 容器缩放（入场动画，见 presentResidentPanel）+
+    /// ignoresMouseEvents 切换表达。
+    ///
+    /// 动机（实测链）：popover 每次 `show()` 都会重建/重置材质层
+    /// （kCUIVariantPopoverMaterial）——预热线藏好的层活不过 close→show，
+    /// 首开仍会闪 ≤0.1s 玻璃（帧采样证实）；常驻后不再有重新 show，材质层藏好
+    /// 后的重建只来自窗口 resize（updateContentHeight 补挂覆盖）与系统偶发重配
+    /// （0.5s keepalive 兜底）→ **零闪**。代价：放弃系统 animates 展开动画，改
+    /// 自绘入场动画（缩放+淡入，见 presentResidentPanel，2026-10）；窗口常驻
+    /// alpha=0（隐形 + 鼠标穿透，CGWindowList 采样脚本
+    /// 注意它会永远被列出）。
+    private var isResidentMode = false
+    /// 常驻模式下面板当前是否可见（淡出立即置 false，与 alpha 动画解耦）。
+    private var isPanelVisible = false
+    /// 补挂脉冲剩余 tick（见 startBackdropReapplyPulse）。
+    private var backdropReapplyTicks = 0
+    /// 低频补挂 keepalive（0.5s；材质层已藏时是轻量 no-op，覆盖隐藏期的系统重配）。
+    private var keepaliveTimer: Timer?
+
+    /// 启动常驻：唯一一次 show，窗口压透明 + 鼠标穿透，藏好材质层后待命。
+    /// didFinishLaunching 阶段 popover.show 会**静默失败**（didShow 不触发、窗口
+    /// 不创建——2026-09-21 全量窗口探测实证），带 0.3s 重试；若用户在重试窗口期
+    /// 抢先点击（presentResidentPanel 应急路径已拉起），只补齐补挂不重复 show、
+    /// 不覆盖可见态。
+    @MainActor
+    private func startResidentPanel(attempt: Int = 0) {
+        guard let button = statusItem?.button else { return }
+        if !popover.isShown {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
+        }
+        guard popover.isShown, let window = popover.contentViewController?.view.window else {
+            if attempt < 10 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    self?.startResidentPanel(attempt: attempt + 1)
+                }
+            }
+            return
+        }
+        if !isPanelVisible {
+            window.alphaValue = 0
+            window.ignoresMouseEvents = true
+        }
+        applyFloatingBackdrop()
+        startBackdropReapplyPulse()
+        guard keepaliveTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.5, target: self, selector: #selector(keepaliveTick),
+                          userInfo: nil, repeats: true)
+        RunLoop.main.add(timer, forMode: .common)
+        keepaliveTimer = timer
+    }
+
+    /// keepalive：幂等补挂。Timer target 持有 self（单例常驻，与进程同生命周期）。
+    /// [DEBUG-dump]（临时调试，定型后删除）：DumpTree 开着时每轮覆盖写视图/layer
+    /// 树——常驻窗口的**当前实时**结构（popoverDidShow 只在唯一一次 show 触发，
+    /// 外观切换等系统重建发生在其后，静态 dump 看不到）。
+    @objc @MainActor private func keepaliveTick() {
+        applyFloatingBackdrop()
+        if UserDefaults.standard.bool(forKey: "MoniswitchDebugDumpTree"),
+           let window = popover.contentViewController?.view.window {
+            Self.dumpViewTree(window)
+        }
+    }
+
+    /// 常驻模式显示面板：先同步补挂（隐藏期材质层若被重建，此刻藏掉——淡入的
+    /// 第一帧就无玻璃），再入场动画 + 恢复鼠标命中 + 点亮图标高亮。
+    ///
+    /// 入场动画（2026-10）：窗口淡入 0.2s + 容器从 0.92 顶部居中锚放大到 1.0，
+    /// 呈现「从菜单栏图标下方生长」的方向感（模拟系统 popover 展开——常驻模式
+    /// 放弃了系统 animates，此前纯 alpha 淡入被用户反馈僵硬）。终态恒等变换，
+    /// 静止态文字保持原生锐度（纯缩放无透视分量，2D 仿射不栅格化）。
+    @MainActor
+    private func presentResidentPanel() {
+        // 常驻窗口尚未建立（启动 show 失败且重试未及）或被系统关闭：先补 show
+        // （材质层重建由脉冲在 ≤0.1s 内补藏，应急路径允许极短过渡；正常路径不走到这）。
+        var didEmergencyShow = false
+        if !popover.isShown, let button = statusItem?.button {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
+            didEmergencyShow = popover.isShown
+        }
+        guard let window = popover.contentViewController?.view.window else { return }
+        isPanelVisible = true
+        applyFloatingBackdrop()
+        window.ignoresMouseEvents = false
+        configurePanelScaleAnchor()
+        if didEmergencyShow {
+            // 应急路径：真实 show() 的系统展开动画（animates=true）正在播，
+            // 跳过自绘缩放避免两套动画叠加；窗口 alpha 本就为 1，淡入也是 no-op。
+        } else {
+            // 首帧即小态（无动画压回 0.92：隐藏期本应保持小态，但上一次出场
+            // 动画若被中途打断会停在中间值），再动画放大。
+            setPanelScale(Self.panelEntryScale, animated: false)
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = Self.panelEntryDuration
+                window.animator().alphaValue = 1
+            }
+            setPanelScale(1, animated: true)
+        }
+        if let button = statusItem?.button {
+            DispatchQueue.main.async { button.cell?.isHighlighted = true }
+        }
+        startBackdropReapplyPulse()
+    }
+
+    /// 常驻模式隐藏面板：淡出 + 立即鼠标穿透（淡出途中点击不落面板）；
+    /// 容器对称缩回 0.92（隐藏期保持小态，下次入场第一帧即小）。
+    @MainActor
+    private func dismissResidentPanel() {
+        guard isPanelVisible, let window = popover.contentViewController?.view.window else { return }
+        isPanelVisible = false
+        window.ignoresMouseEvents = true
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = Self.panelEntryDuration
+            window.animator().alphaValue = 0
+        }
+        setPanelScale(Self.panelEntryScale, animated: true)
+        statusItem?.button?.cell?.isHighlighted = false
+    }
+
+    // MARK: 入场缩放动画（2026-10）
+
+    /// 入场缩放起点与时长：0.92 → 1.0，0.2s easeOut（出场对称回 0.92）。
+    /// 0.96 起点用户反馈「不明显」，2026-10 调到 0.92。
+    private static let panelEntryScale: CGFloat = 0.92
+    private static let panelEntryDuration: TimeInterval = 0.2
+
+    /// 给容器 view 的 layer 设顶部居中锚点（缩放围绕菜单栏图标下缘向下生长）。
+    /// 只在隐藏态调用：改锚点会重排 layer 几何，标准配方「改 anchorPoint 后回写
+    /// 原 frame」抵消偏移，隐形时做无视觉副作用；幂等。
+    @MainActor
+    private func configurePanelScaleAnchor() {
+        guard let layer = panelContainerController.view.layer else { return }
+        let target = CGPoint(x: 0.5, y: 1.0)
+        guard layer.anchorPoint != target else { return }
+        let frame = layer.frame
+        layer.anchorPoint = target
+        layer.frame = frame
+    }
+
+    /// 设容器缩放（驱动 layer.transform）。animated=true 必须走 NSAnimationContext
+    /// 的 allowsImplicitAnimation——**layer-backed NSView 的 CA 隐式动画默认被
+    /// AppKit 关闭**，裸 CATransaction.setAnimationDuration 对它无效（实测踩坑：
+    /// 改版首轮缩放从未生效，用户反馈"只有首次打开有动画"实为应急路径 show()
+    /// 的系统动画在播）；false 用 CATransaction 关 Actions 直设（防隐式动画）。
+    /// 窗口 alpha 淡入淡出与缩放双轨并行。
+    @MainActor
+    private func setPanelScale(_ scale: CGFloat, animated: Bool) {
+        guard let layer = panelContainerController.view.layer else { return }
+        let target = CATransform3DMakeScale(scale, scale, 1)
+        if animated {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = Self.panelEntryDuration
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                ctx.allowsImplicitAnimation = true
+                layer.transform = target
+            }
+        } else {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.transform = target
+            CATransaction.commit()
+        }
+    }
+
+    /// 补挂脉冲：show/淡入启动后 1.6s 内每 0.1s 幂等补挂一轮，覆盖「材质层构建
+    /// 晚于打点」与「窗口 resize 重建材质层」（26 时代 resize 重置玻璃的同源行为）
+    /// 两个窗口期；对已隐藏层是 no-op，成本可忽略。
+    @MainActor
+    private func startBackdropReapplyPulse() {
+        backdropReapplyTicks = 16
+        backdropPulseTick()
+    }
+
+    @MainActor
+    private func backdropPulseTick() {
+        guard backdropReapplyTicks > 0 else { return }
+        backdropReapplyTicks -= 1
+        applyFloatingBackdrop()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.backdropPulseTick()
+        }
+    }
+
     // MARK: - 开关面板
 
     /// 点菜单栏图标：toggle 面板（竞态守卫见 lastCloseTime 注释）。
     @objc @MainActor private func togglePanel(_ sender: NSStatusBarButton) {
+        // 常驻模式：popover 永不 close，无 transient 自关 → lastCloseTime 竞态不存在。
+        if isResidentMode {
+            if isPanelVisible {
+                dismissResidentPanel()
+            } else {
+                presentResidentPanel()
+            }
+            return
+        }
         if let last = lastCloseTime, Date().timeIntervalSince(last) < 0.25 { return }
         if popover.isShown {
             popover.performClose(sender)
@@ -148,9 +362,11 @@ final class PanelController: NSObject, NSPopoverDelegate {
         hostingController.view.layoutSubtreeIfNeeded()
         // preferredEdge 取按钮的 maxY = 菜单栏图标下方（NSStatusBarButton 坐标系不翻转）。
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
-        // 无背板悬浮处理（26+：隐藏玻璃层 + 关窗口投影；13~15：makeKey 保持系统背板），
-        // 详见 applyFloatingBackdrop；窗口 resize 后的补挂在 updateContentHeight。
+        // 预热被外部收起等路径可能残留 alpha=0（隐形窗复用），一律复位；随后无背板
+        // 处理 + 补挂脉冲（材质层构建/resize 重建的窗口期覆盖）。
+        popover.contentViewController?.view.window?.alphaValue = 1
         applyFloatingBackdrop()
+        startBackdropReapplyPulse()
         // 图标高亮反馈：模板 image 在高亮态自动反色（等价原 MenuBarExtra 行为）。
         // 系统在 show 过程中会重置 cell 状态，异步到下一轮 runloop 再置位才稳。
         DispatchQueue.main.async {
@@ -158,8 +374,13 @@ final class PanelController: NSObject, NSPopoverDelegate {
         }
     }
 
-    /// 主动收起面板（「设置」等切走焦点/激活策略前调用，防面板悬空）。
+    /// 主动收起面板（「设置」等切走焦点/激活策略前调用，防面板悬空；
+    /// 外部点击收起也走这里）。常驻模式 = 淡出；经典模式（13~15）= performClose。
     @MainActor func close() {
+        if isResidentMode {
+            dismissResidentPanel()
+            return
+        }
         guard popover.isShown else { return }
         popover.performClose(nil)
     }
@@ -197,9 +418,19 @@ final class PanelController: NSObject, NSPopoverDelegate {
     /// （由 togglePanel 处理，防双重关闭）时放行。
     @MainActor
     private func dismissPopoverIfClickedOutside() {
+        let location = NSEvent.mouseLocation
+        // 常驻模式：可见时点在面板窗口外（状态按钮除外）→ 淡出。
+        if isResidentMode {
+            guard isPanelVisible,
+                  let window = popover.contentViewController?.view.window else { return }
+            if window.frame.contains(location) { return }
+            if let button = statusItem?.button, button.window?.frame.contains(location) == true { return }
+            dismissResidentPanel()
+            return
+        }
+        // 经典模式（13~15）。
         guard popover.isShown,
               let popoverWindow = popover.contentViewController?.view.window else { return }
-        let location = NSEvent.mouseLocation
         if popoverWindow.frame.contains(location) { return }
         if let button = statusItem?.button, button.window?.frame.contains(location) == true { return }
         close()
@@ -366,6 +597,13 @@ final class PanelController: NSObject, NSPopoverDelegate {
     }
 
     @MainActor func popoverDidClose(_ notification: Notification) {
+        // 常驻模式下 popover 不应被关闭（系统意外行为）；若发生，复位可见态，
+        // 下次 presentResidentPanel 的保险路径会重新 show。
+        if isResidentMode {
+            isPanelVisible = false
+            statusItem?.button?.cell?.isHighlighted = false
+            return
+        }
         lastCloseTime = Date()
         statusItem?.button?.cell?.isHighlighted = false
     }

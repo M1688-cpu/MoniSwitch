@@ -45,17 +45,20 @@ struct BubbleBackground: ViewModifier {
 /// 无边框：不加 stroke 描边，仅靠不透明填充（BubbleBackground）与圆角呈现气泡形态，
 /// 四周悬浮阴影与背景拉开层次。
 struct BubbleCard<Content: View>: View {
-    let title: String
+    /// 分区标题；nil = 无标题卡（2026-10 布局图枢纽卡：图即内容，标题字样删除）。
+    let title: String?
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: BubbleMetrics.fontCaption, weight: .semibold))
-                .tracking(BubbleMetrics.sectionLabelTracking)
-                .textCase(.uppercase)
-                .foregroundStyle(BubbleMetrics.sectionLabelColor)
-                .lineLimit(1)
+            if let title {
+                Text(title)
+                    .font(.system(size: BubbleMetrics.fontCaption, weight: .semibold))
+                    .tracking(BubbleMetrics.sectionLabelTracking)
+                    .textCase(.uppercase)
+                    .foregroundStyle(BubbleMetrics.sectionLabelColor)
+                    .lineLimit(1)
+            }
             content
         }
         .padding(16)

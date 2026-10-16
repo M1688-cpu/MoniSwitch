@@ -33,7 +33,6 @@ final class AppSettings: ObservableObject {
         static let autoRefreshEnabled = "autoRefreshEnabled"
         static let autoRefreshInterval = "autoRefreshInterval"
         static let detailedMenuInfo   = "detailedMenuInfo"
-        static let showLayoutPreview = "showLayoutPreview"
         static let notificationsEnabled = "notificationsEnabled"
     }
 
@@ -77,15 +76,6 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// 菜单栏面板显示「布局预览」卡片（关闭后整卡移除，面板高度自适应）。
-    /// 默认开：保持既有行为不突变。
-    @Published var showLayoutPreview: Bool {
-        didSet {
-            guard oldValue != showLayoutPreview else { return }
-            UserDefaults.standard.set(showLayoutPreview, forKey: Key.showLayoutPreview)
-        }
-    }
-
     /// 切换显示器后发送系统通知。
     @Published var notificationsEnabled: Bool {
         didSet {
@@ -108,7 +98,6 @@ final class AppSettings: ObservableObject {
         self.autoRefreshEnabled  = defaults.object(forKey: Key.autoRefreshEnabled) as? Bool ?? false
         self.autoRefreshInterval = defaults.object(forKey: Key.autoRefreshInterval) as? Int ?? 10
         self.detailedMenuInfo    = defaults.object(forKey: Key.detailedMenuInfo) as? Bool ?? false
-        self.showLayoutPreview  = defaults.object(forKey: Key.showLayoutPreview) as? Bool ?? true
         self.notificationsEnabled = defaults.object(forKey: Key.notificationsEnabled) as? Bool ?? false
     }
 

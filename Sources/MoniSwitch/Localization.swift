@@ -54,7 +54,6 @@ enum TextKey: String {
     case refreshInterval        = "refreshInterval"        // 刷新间隔
     case intervalSeconds        = "intervalSeconds"        // N 秒
     case detailedMenuInfo       = "detailedMenuInfo"       // 菜单显示刷新率与 HiDPI
-    case showLayoutPreview      = "showLayoutPreview"      // 显示布局预览（设置开关）
 
     // 设置 - 通知
     case groupNotifications     = "groupNotifications"     // 通知
@@ -100,9 +99,7 @@ enum TextKey: String {
     case lowResolutionTag       = "lowResolutionTag"       // 非 HiDPI 变体标注
 
     // 面板气泡卡片（.window 样式专用）
-    case panelArrange           = "panelArrange"           // 排列与镜像
-    case panelDisplayAdjust     = "panelDisplayAdjust"     // 显示器调节（单内置屏时的卡片标题）
-    case panelLayoutPreview     = "panelLayoutPreview"     // 布局预览
+    case setAsPrimary           = "setAsPrimary"           // 设为主屏（非主屏参数块操作行）
     case currentLayoutBadge     = "currentLayoutBadge"     // 当前（预设与当前布局一致的角标）
     case mirrorTarget           = "mirrorTarget"           // 镜像目标：@
     case autoArrange            = "autoArrange"            // 自动排列按钮
@@ -175,7 +172,6 @@ final class L10n: ObservableObject {
         .refreshInterval:  [.zh: "刷新间隔",                      .en: "Refresh interval"],
         .intervalSeconds:  [.zh: "%d 秒",                         .en: "Every %ds"],
         .detailedMenuInfo: [.zh: "菜单显示刷新率与 HiDPI",        .en: "Show refresh rate & HiDPI in menu"],
-        .showLayoutPreview:[.zh: "显示布局预览",                  .en: "Show layout preview"],
 
         .groupNotifications:[.zh: "通知",                         .en: "Notifications"],
         .notifyOnSwitch:   [.zh: "切换完成后发送通知",            .en: "Notify after switching"],
@@ -213,9 +209,7 @@ final class L10n: ObservableObject {
         .hidpiTag:         [.zh: "HiDPI",                        .en: "HiDPI"],
         .lowResolutionTag: [.zh: "低分辨率",                     .en: "Low resolution"],
 
-        .panelArrange:     [.zh: "排列与镜像",                    .en: "Arrange & Mirror"],
-        .panelDisplayAdjust: [.zh: "显示器调节",                  .en: "Display Adjustment"],
-        .panelLayoutPreview:[.zh: "布局预览",                     .en: "Layout"],
+        .setAsPrimary:     [.zh: "设为主屏",                      .en: "Set as Main"],
         .currentLayoutBadge:[.zh: "当前",                        .en: "Current"],
         .mirrorTarget:     [.zh: "镜像目标：%@",                  .en: "Mirror target: %@"],
         .autoArrange:      [.zh: "自动排列（横向排开，消除重叠）",  .en: "Auto-arrange (line up, fix overlap)"],

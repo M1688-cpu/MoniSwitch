@@ -116,8 +116,8 @@ enum BubbleMetrics {
     // MARK: 面板窗口呼吸边距（无背板悬浮阴影的淡出空间）
 
     /// 卡片列宽度（含内边距；宽度锁与 PanelController 的 preferredContentSize 共用，
-    /// 勿再各写魔法数）。
-    static let panelColumnWidth: CGFloat = 380
+    /// 勿再各写魔法数）。2026-10 380→420：布局图放大改版（用户反馈卡片局促）。
+    static let panelColumnWidth: CGFloat = 420
     /// 左右/底部透明呼吸边距：窗口比卡片列大一圈，悬浮阴影（基座 r8 + hover r10）
     /// 在窗口内淡尽，不被窗口边界裁出「背景板框」直线（2026-09-21 用户报告的
     /// hover 框线根因：r16 时代 hover 阴影淡出 ~29pt+，溢出窗口余量）。
@@ -126,6 +126,11 @@ enum BubbleMetrics {
     static let shadowBreathingBottom: CGFloat = 12
     /// 宿主内容宽度（= 卡片列 + 两侧呼吸），PanelController 的 preferredContentSize 用。
     static var hostContentWidth: CGFloat { panelColumnWidth + shadowBreathingSide * 2 }
+
+    // MARK: 布局图（2026-10 放大改版）
+
+    /// 布局图固定高度（2026-10 120→160，用户拍板「加高+加宽」，屏块常驻名居中）。
+    static let diagramHeight: CGFloat = 160
 
     // MARK: 面板内嵌套滚动
 
