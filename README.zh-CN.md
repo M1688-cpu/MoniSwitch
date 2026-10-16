@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  一个 macOS 菜单栏小工具，不用进「系统设置 → 显示器」就能切换主显示器、调整外接屏的左右位置，以及切换外接屏的扩展/镜像。
+  一个 macOS 菜单栏显示器控制中心：切换主显示器、排列与镜像外接屏，v2 新增——用 F1/F2 亮度键或面板滑条直接控制外接显示器亮度（原生 DDC/CI，无需常驻辅助工具）。
 </p>
 
 <p align="center">
@@ -11,15 +11,16 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue" alt="platform">
+  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" alt="platform">
   <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey" alt="arch">
-  <img src="https://img.shields.io/badge/version-0.1.5-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
 
 ## 功能
 
-- 菜单栏常驻：点击图标弹出气泡卡片面板，原生 popover 观感（箭头指向图标、在图标上居中、展开动画），点击面板外任意位置即收起
+- **v2 新增**——外接显示器亮度：面板顶部每块外接屏一条滑条（原生 DDC/CI over IOAVService），F1/F2 亮度键在调内置屏的同时同步全部外接屏（listen-only 只旁听不拦截；按住 ⌥ 只调外接并显示气泡 HUD）
+- 菜单栏常驻：点击图标弹出悬浮气泡卡片面板（自有无边框 NSPanel，图标下方居中、缩放淡入入场），点击面板外任意位置即收起
 - 在面板里点任意显示器，即可把它设为主显示器（白条所在屏）
 - 展开某块屏的参数组，可把外接屏放到主屏的左边或右边
 - 排列卡可折叠：每块屏的 位置/分辨率/刷新率 折叠在屏名行下，默认收起、同时只展开一块屏；点击布局图中的屏块可直接定位展开
@@ -140,10 +141,14 @@ displayplacer 二进制随 App 一起打包，开箱即用。
 ## 技术栈
 
 - 语言：Swift 6
-- UI：SwiftUI + AppKit（`NSStatusItem` + `NSPopover` 菜单栏面板，macOS 13+）
+- UI：SwiftUI + AppKit（`NSStatusItem` + 自有无边框 `NSPanel` 悬浮面板，macOS 14+）
+- 亮度：原生 DDC/CI（dlopen 私有 `IOAVService`，Apple Silicon），F1/F2 走 listen-only CGEventTap
+- 测试：Swift Testing（DDC 协议向量、displayplacer 解析 fixture、预设漂移重映射）
 - 构建：Swift Package Manager（纯文本 `Package.swift`，命令行即可编译）
 - 类型：纯菜单栏 App（`LSUIElement = YES`，无 Dock 图标）
 - 分发：非沙盒，本地 ad-hoc 签名，DMG 直链
+
+> 亮度控制站在 [MonitorControl](https://github.com/MonitorControl/MonitorControl) 与 [m1ddc](https://github.com/waydabber/m1ddc)（均 MIT）的 DDC/CI 实战经验之上——关键常量与屏→服务映射沿用其经过大规模验证的实现。
 
 ## 项目结构
 

@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  A macOS menu-bar utility: switch the main display, move external screens left or right, and toggle extend/mirror without a trip to System Settings → Displays.
+  A macOS menu-bar control center for your displays: switch the main display, arrange and mirror externals, and — new in v2 — control external-monitor brightness with the F1/F2 keys or in-panel sliders (native DDC/CI, no helper app).
 </p>
 
 <p align="center">
@@ -11,15 +11,16 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue" alt="platform">
+  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" alt="platform">
   <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey" alt="arch">
-  <img src="https://img.shields.io/badge/version-0.1.5-blue" alt="version">
+  <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
 
 ## Features
 
-- Lives in the menu bar: click the icon to open a bubble-card panel with a native popover look (arrow pointing at the icon, centered above it, expand animation); clicking anywhere outside dismisses it
+- **New in v2** — external-display brightness: each external screen gets a slider right at the top of the panel (native DDC/CI over IOAVService), and the F1/F2 brightness keys sync every external display along with the built-in one (listen-only tap, nothing is intercepted; hold ⌥ to adjust externals with a bubble HUD)
+- Lives in the menu bar: click the icon to open a floating bubble-card panel (own borderless NSPanel, centered under the icon, scale-and-fade entry animation); clicking anywhere outside dismisses it
 - Click any display in the panel to make it the main display (the one with the menu bar)
 - Unfold a screen's parameter group to place an external screen to the left or right of the main display
 - Collapsible arrangement card: each screen's position/resolution/refresh-rate rows fold under its name row, collapsed by default with only one expanded at a time; click a block in the layout preview to jump straight to that screen
@@ -140,10 +141,14 @@ The displayplacer binary is bundled with the app and works out of the box.
 ## Tech stack
 
 - Language: Swift 6
-- UI: SwiftUI + AppKit (`NSStatusItem` + `NSPopover` menu-bar panel, macOS 13+)
+- UI: SwiftUI + AppKit (`NSStatusItem` + borderless `NSPanel` floating panel, macOS 14+)
+- Brightness: native DDC/CI (private `IOAVService` via dlopen, Apple Silicon), F1/F2 via listen-only CGEventTap
+- Tests: Swift Testing (DDC protocol vectors, displayplacer parser fixtures, preset drift remapping)
 - Build: Swift Package Manager (plain-text `Package.swift`, builds from the command line)
 - Type: pure menu-bar app (`LSUIElement = YES`, no Dock icon)
 - Distribution: non-sandboxed, local ad-hoc signing, direct DMG download
+
+> Brightness control builds on the DDC/CI know-how of [MonitorControl](https://github.com/MonitorControl/MonitorControl) and [m1ddc](https://github.com/waydabber/m1ddc) (both MIT) — key constants and the display→service mapping follow their battle-tested implementations.
 
 ## Project structure
 

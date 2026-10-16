@@ -2,69 +2,77 @@
 
 ## 项目简介
 
-macOS 菜单栏显示器快捷切换工具。纯菜单栏 App（LSUIElement=YES），无 Dock 图标无主窗口。
-底层调用 displayplacer 完成显示器切换。
+macOS 菜单栏显示器控制中心。纯菜单栏 App（LSUIElement=YES），无 Dock 图标无主窗口。
+布局切换走 displayplacer；外接屏亮度走 DDC/CI（原生 IOAVService，Apple Silicon 原生实现，
+MonitorControl 路线）；F1/F2 亮度键经 listen-only 事件监听同步外接屏。
+
+**v2（2026-10，分支 `v2`）**：全面重构——自有 NSPanel 悬浮面板壳替代 NSPopover、
+DDC 亮度引擎 + F1/F2 键监听 + HUD、面板「控制中心式」改版（亮度滑条卡常驻顶部）、
+设置页新增「亮度与按键」、新增单元测试目标。下文「v2 全面重构」条目是现行架构的
+单一事实源；其后的 NSPopover 时代条目（背板隐藏/常驻模式/尺寸闸门等）均为**历史存档**
+（对应代码已删，只留作战史与教训，勿按其施工）。
 
 ## 会话启动约定
 
-每个新对话开始时，先过一遍本机 skill 清单并按当轮任务加载相关项（不全载）：engineering 18 个（tdd、code-review、diagnosing-bugs、implement、prototype、research、triage、domain-modeling、codebase-design、improve-codebase-architecture、resolving-merge-conflicts、to-spec、to-tickets、grill-with-docs、wayfinder、wizard、ask-matt、setup-matt-pocock-skills）+ productivity 7 个（grilling、grill-me、handoff、teach、wait-what、to-questionnaire、writing-for-agents）。常用映射：查 bug / 跑实验矩阵 → diagnosing-bugs；改本文档或写交接文档 → writing-for-agents；实现定型 → implement（自查加 code-review）；会话中断需要交接 → handoff。
+每个新对话开始时，先过一遍本机 skill 清单并按当轮任务加载相关项（不全载）。常用映射：查 bug / 跑实验矩阵 → diagnosing-bugs；改本文档或写交接文档 → writing-for-agents；实现定型 → implement（自查加 code-review）；涉及动鼠标键盘/截图的验证 → knock-first（先探测用户状态、列动作清单征求同意）；会话中断需要交接 → handoff；纯逻辑先行 → tdd。
 
 ## 技术栈
 
-- Swift 6 / SwiftUI / macOS 13+（NSStatusItem + NSPopover 菜单栏面板）
+- Swift 6 工具链（语言模式暂 v5） / SwiftUI / **macOS 14+**（v2 起，@Observable 可用）
 - 纯 Swift Package Manager 构建，命令行 `swift build` 或 `bash Support/build-app.sh` 打包
+- 测试：Swift Testing（`#expect`），CLT 环境无 XCTest；跑测试一律 `bash Support/run-tests.sh`
 - 非 Xcode 项目，无 .xcodeproj
 
 ## 构建与打包
 
 ```bash
 swift build                    # debug 编译
-swift build -c release         # release 编译
+bash Support/run-tests.sh      # 单元测试（绕开宏插件增量 bug，见下）
 bash Support/build-app.sh      # 一键打包（编译 → .app → 签名 → .dmg）
 ```
 
 产物在 `Support/` 下（已被 .gitignore 忽略，不入库）。
 发布产物统一放 `dist/`（也被 .gitignore 忽略）。
 
-- **build-app.sh 自动探测最新 SDK（2026-09）**：脚本在 CLT（`/Library/Developer/CommandLineTools/SDKs`）与 Xcode（`/Applications/Xcode*.app/.../SDKs`）两处找版本号最大的 `MacOSX*.sdk`（`sort -V` 全版本比较）设为本次构建的 `SDKROOT`，不动 xcode-select 系统默认。动机：NSPopover 背景板、NSSwitch 开关等系统 chrome 的 **Liquid Glass 新观感只有用 macOS 26 SDK 编译才被系统采用**（运行时 macOS 26，本机 CLT 曾只有 15.5 SDK）；已约定安装「Command Line Tools for Xcode 26」后由本脚本自动用上 26 SDK。直接 `swift build`（不经脚本）不受影响，仍走默认 SDK。另（2026-09-12）：脚本已加 `set -o pipefail`——此前 `swift build -c release 2>&1 | tail -5` 的管道会拿 tail 的退出码 0 掩盖编译失败，`set -e` 拦不住，脚本会带着**旧二进制**继续打包出「假新版」（实测踩坑：实验矩阵整轮跑空毫无察觉）。**（2026-09-20 增补）本机 CLT 出现 27.0 SDK 后，裸 `swift build` 默认走 27.0 SDK 会直接编译失败**（`SwiftUIMacros.StateMacro` 宏插件缺失，与脚本自动探测选 27 同因）——本机编译一律显式指定：`SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，打包用 `MONISWITCH_SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk bash Support/build-app.sh`；早期交接文档「直接 swift build 不受影响」的说法以本条为准。
+- **本机编译一律显式指定 SDK（最高优先）**：裸 `swift build` 默认走 27.0 SDK 直接编译失败（`SwiftUIMacros.StateMacro` 宏插件缺失）——`SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，打包 `MONISWITCH_SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk bash Support/build-app.sh`。build-app.sh 内部自动探测逻辑（CLT+Xcode 两处找最大 SDK）与 `set -o pipefail`（防 tail 掩盖编译失败打出假新版）仍保留。
+- **Swift Testing 宏插件增量 bug（2026-10 实测）**：CLT 新构建系统在测试目标**增量**重编译时偶发 `TestingMacros not found`（全量构建正常）；`Support/run-tests.sh` 先定向清测试目标中间产物再跑，仍偶发时重跑一次即过。
 
 ## 项目结构
 
 ```
 Sources/MoniSwitch/
-  MoniSwitchApp.swift      # @main 入口（AppDelegate 创建菜单栏图标 + ⌘, 命令）+ menuBarIcon
-  PanelController.swift    # 菜单栏面板控制器（NSStatusItem + NSPopover，容器闸门/手动尺寸桥
-                           #   承载 PanelView；开关/竞态守卫/图标高亮/AppState 宿主/无背板悬浮处理）
+  MoniSwitchApp.swift      # @main 入口（AppDelegate 创建菜单栏图标 + ⌘, 命令 + 亮度键监听启动）
+  PanelController.swift    # v2 菜单栏悬浮面板壳（NSStatusItem + 自有无边框 NSPanel，顶边锚死
+                           #   直写 frame + 自绘入场动画 + 外部点击收起监控；AppState 宿主）
   AppState.swift           # UI 状态对象：显示器列表 + 全部切换操作 + isOperating 进行中状态
-  PanelView.swift          # 菜单栏气泡卡片面板（显示器枢纽卡=布局预览+点块展开参数/预设/底部栏，宿主 NSPopover）
+  PanelView.swift          # 面板（v2 控制中心式：亮度滑条卡 + 枢纽卡[布局图+参数] + 预设 + 底部栏）
   Components.swift         # 全站共享视觉组件（BrandColor/BubbleBackground/BubbleCard/
-                           #   SettingsCard/RowButton/ActivePill/IndeterminateBar/PlainIcon…）
-  BubbleMetrics.swift      # 圆角/字号/间距刻度 + 气泡深色填充色 + bubbleShadow()
+                           #   SettingsCard/RowButton/ActivePill/IndeterminateBar/BubbleHoverLift…）
+  BubbleMetrics.swift      # 设计令牌（圆角/字号/间距/悬浮阴影定档值/面板宽度）
   Models.swift             # 显示器数据模型（DisplayInfo/ResolutionOption/HotkeyBinding/Preset）
-  ShellRunner.swift        # displayplacer 调用封装
+  ShellRunner.swift        # displayplacer 调用封装（并发读管道防死锁）
   DisplayManager.swift     # 解析 + 切换算法 + 稳定检测 + 自动排列 + id 漂移重映射
-  AppSettings.swift        # 用户偏好单例（自启动/通知/自动刷新）+ 通知发送
+  AppSettings.swift        # 用户偏好单例（自启动/通知/自动刷新/F1-F2 亮度键开关）+ 通知发送
   PresetManager.swift      # 预设管理（保存/应用/删除/快捷键绑定，isApplying）
-  HotkeyManager.swift      # 全局快捷键（Carbon RegisterEventHotKey，零权限）
+  HotkeyManager.swift      # 预设全局快捷键（Carbon RegisterEventHotKey，零权限）
+  # —— v2 新增：DDC 亮度子系统 ——
+  PrivateAPI.swift         # dlopen/dlsym 私有 API 桥（IOAVService* + CoreDisplay；运行时解析）
+  DDC.swift                # DDC/CI 协议纯逻辑（包构造/校验和/读回复解析/步进；全部有测试）
+  DDCDiscovery.swift       # 外接屏发现 + CGDirectDisplayID→IOAVService 精确映射（m1ddc 法）
+  DDCWriter.swift          # actor：串行 DDC I/O + 写合并 + liveServices 守卫 + 睡眠守卫
+  BrightnessManager.swift  # @MainActor @Observable 亮度中枢（发现/持久化/滑条/步进）
+  BrightnessKeyTap.swift   # F1/F2 listen-only CGEventTap（不吞事件；⌥ 修饰；HUD 智能显示）
+  BrightnessHUD.swift      # 迷你亮度气泡（菜单栏图标下方，1.2s 续期淡出）
+  # —— 其余 ——
   DockPolicyManager.swift  # Dock 策略管理 + 设置窗口宿主（NSWindow）
   SettingsView.swift       # 设置窗口骨架（边栏 + 悬浮标题 + 滚动毛玻璃 + ScrollOffsetReader）
-  SettingsTabs.swift       # 设置窗口三个标签页（GeneralTab/PresetsTab/AboutTab/PresetRow）
+  SettingsTabs.swift       # 设置窗口标签页（General/Brightness/Presets/About + PresetRow）
   Localization.swift       # 中英双语（L10n 类 + TextKey 枚举，t() 支持 %d 与 %@）
-Resources/
-  AppIcon.icns              # 应用图标（make-app-icon.sh 产物）
-  AppIcon-source.png        # 图标源图（make-app-icon-design.swift 自绘产物，1024×1024）
-  displayplacer             # 不入库（.gitignore 排除）
+Tests/MoniSwitchTests/     # Swift Testing：DDC 协议向量/解析回归/漂移重映射/常量锁定
 Support/
-  Info.plist                # App 元信息
-  build-app.sh              # 打包脚本（编译 → .app → 签名 → .dmg，DMG 段调 create-dmg）
-  make-app-icon.sh          # 重建 AppIcon.icns（默认调自绘脚本；传源图路径走旧外部图流程）
-  make-app-icon-design.swift# 纯代码自绘图标（Liquid Glass 风格显示器，6 主题×2 红绿灯摆法，--all 出预览）
-  make-app-icon-square.swift# 把任意尺寸图标源规整为 1024×1024 正方形（采样背景色填充，避免黑边）
-  preview-site.sh           # 本地预览宣传页（复刻 Pages 组装到 /tmp + python3 http.server）
-docs/
-  index.html                # 项目宣传页（单文件站点，见「项目宣传页」章节）
-.github/workflows/
-  website.yml               # GitHub Pages 自动部署（docs/index.html + screenshots/ + 图标 → 站点根）
+  run-tests.sh             # 跑测试（绕宏插件增量 bug）
+  Info.plist / build-app.sh / make-app-icon*.swift / preview-site.sh（同 v1）
+Resources/ · docs/ · .github/workflows/（同 v1）
 ```
 
 ## Git 历史
@@ -84,6 +92,19 @@ docs/
 - v0.1.4 公开增量 = v0.1.3 以来的全部本地提交（通知根治/面板交互升级/自动排列/防漂移/自绘图标/HiDPI 根治/排列卡全屏可调/液态玻璃加入又回退（净零）/面板折叠与 hover/NSPopover 迁移/面板塌缩修复），release notes 按「从 v0.1.3 升级」视角撰写（dist/RELEASE_NOTES-v0.1.4.md）
 
 ## 已完成的功能
+
+- **v2 全面重构（2026-10，分支 `v2`，现行架构的单一事实源）**——用户全权委托推翻重设计，两轮选项拍板（范围=F1/F2 亮度合并 + 全面重构；UI=控制中心式 + HUD 智能显示）。**以下条目按 v2 之前的历史存档对待。**
+  - **DDC 亮度引擎**（DDC/Protocol/Discovery/Writer/Manager 五件套）：Apple Silicon 走私有 `IOAVService` I2C（`PrivateAPI.swift` dlopen+dlsym 运行时解析，**符号缺失优雅降级、纯 Swift 无 bridging header**）；写包 `[0x84,0x03,0x10,hi,lo,chk]`（种子 `0x6E^0x51`）、读请求种子 `0x6E`（**不含 0x51，与写不对称**）、读回复 11 字节第 10 位校验（种子 0x50）、max/cur 在 [6..7]/[8..9]——**全部向量有测试锁定**（Tests/DDCTests，期望值手算自 m1ddc 与 MonitorControl 双源）。屏→AVService 映射抄 **m1ddc 精确绑定法**（信息字典 IODisplayLocation → 注册表 adapter ID → IOMobileFramebuffer 下 Location==External 的 DCPAVServiceProxy；比 MonitorControl 的 EDID 20 分评分法简单确定）；MCDP29xx 坞走 0xB7。**只写不读**设计（DDC 读不可靠）：读仅在发现时尽力一次，值兜底链 = 读→持久化值→50%；持久化按 EDID UUID 身份（免疫 id 漂移）。
+  - **DDCWriter 工程守卫**（code-review 修复后定型）：actor 串行全部 DDC I/O；写合并 = 20ms 合并窗（await 让出）+ pending 覆盖（最新值优先）；写重试 3×10ms；**liveServices 写前校验 + waitForIdle 排空**——屏重配替换/释放旧 IOAVService 前必须先 `updateLiveServices(新集)` 再 `waitForIdle()`，迟到写请求由写前校验丢弃（**防 use-after-release 的两道防线，动 DDC 生命周期时勿拆**）；睡眠守卫（NSWorkspace willSleep/didWake，唤醒补发积压）。
+  - **F1/F2 亮度键 = listen-only CGEventTap**（BrightnessKeyTap）：只旁听不吞事件——内置屏原生调节永不受伤、最坏情况「无效果」；权限=「输入监控」（IOHIDRequestTypeListenEvent，比辅助功能轻）。事件解析抄 MediaKeyTap（NX_SYSDEFINED subtype 8 / data1 高 16 位键码 / 0xA 按下态；**亮度键码取 IOKit ev_keymap.h：UP=2/DOWN=3，别信 144/145 的网络传言**）。裸按=外接屏同步跟随原生步进（MonitorControl 全屏同步观感）；⌥=外接屏调节 + HUD（**listen-only 拦不住内置屏的原生响应，笔记本上 ⌥≠仅外接——文案已如实化，勿再写「仅调外接」**）；HUD 智能显示=⌥ 或无内置屏才弹（笔记本裸按只有系统 OSD，不双报）。tap 生命周期：**stop() 必须 CFRunLoopStop**（CFRunLoopRun 无外部信号永不返回=线程泄漏）；超时自愈重挂。
+  - **自有 NSPanel 悬浮面板壳**（PanelController 重写，633→270 行）：弃 NSPopover——背板材质层 hack（26/27 两套）、常驻隐形防闪、transient 关点竞态、容器闸门+preferredContentSize 尺寸桥**全部随 popover 消亡**。保留的既有结论：`sizingOptions=[]` 边界布局 + PanelView 根部顶端对齐弹性 frame（漂移构造性不可能——现在是直接顶边锚死写 frame）；PanelContentHeightKey 高度桥同步直写；模板图标 cell 高亮；全局+本地鼠标监控收起（LSUIElement 不激活，系统 dismiss 信号不会到达）；入场动画=淡入 0.2s + 内容 layer 顶部锚（0.5,1）缩放 0.92→1（**layer-backed NSView 隐式动画必须 NSAnimationContext.allowsImplicitAnimation**）；**收起动画 completionHandler 必须 alpha 守卫再 orderOut**（0.2s 内关-开竞态会杀新开面板）。
+  - **面板控制中心式**（PanelView v2）：亮度卡常驻顶部（每外接屏一行：图标圆框+名称 / ☀滑条+百分比，乐观更新+DDC 合并写；名称用注册表 ProductName 比 displayplacer 的 "27 inch external screen" 可辨），列宽 420→380；枢纽卡/预设/底部栏沿用 2026-10 枢纽卡改版全部交互范式（**二值布局+mask 揭示、折叠列表 allowsHitTesting、.position 挂链尾、装饰 overlay 不可命中——这些是硬约束，见注意事项**）。
+  - **设置页**：新增「亮度与按键」tab（F1/F2 开关联动启停、输入监控权限状态/请求/深链、⌥ 说明、DDC 兼容性说明）；AppSettings.brightnessKeysEnabled 默认开。
+  - **测试与工具链**：Package.swift tools 6.0 / macOS 14 / 语言模式 v5（**@Observable 迁移刻意暂缓**——ObservableObject 在 14 上无功能损失，属将来低优先清理）；Swift Testing（CLT 无 XCTest）；18 测试 4 套件（DDC 向量/解析回归/漂移重映射/常量锁定）。
+  - **顺带修复的潜伏 bug**：parseResolutions 正则不认 `scaling:on` 排在 color_depth 后的输出格式（会漏检全部 HiDPI 变体→切分辨率发错 scaling）；已由真实输出 fixture 回归测试锁定。
+  - **版权**：MonitorControl（MIT）与 m1ddc（MIT）思路+关键常量已借，代码注释带出处；**ddcctl 是 GPL-3.0 一行不抄**。
+
+<!-- ══════ v2 以下为历史存档（对应代码多已被 v2 替换/删除；教训有效，勿按其施工） ══════ -->
 
 - 菜单栏常驻，点击弹出显示器列表
 - 一键切换主屏、左右移动外接屏、扩展/镜像切换
@@ -139,11 +160,16 @@ docs/
 
 ## 已知 bug（待修复）
 
-（当前无——原「镜像/扩展操作通知不弹出」已在 v0.2.0 根治，见上「通知 bug 根治」条目）
+- F1/F2 亮度键监听依赖「输入监控」权限，未授权时静默不生效（设置页有状态与引导，属已知设计而非 bug）；笔记本上 ⌥+F1/F2 无法阻止内置屏原生调节（listen-only 结构性限制，文案已如实）
 
 ## 暂缓功能（下个版本）
 
-- 阴影参数定型：用户在真实壁纸（含浅色模式）人肉验收 `MoniswitchDebugShadowPreset` 后定档，删调试机制写死参数（打光/阴影增益方案已随 2026-10 第三轮整体回退，后续单独会话再做，见该条目）
+- v2 真机验收后待办：面板/滑条/入场动画/HUD 人肉过（hover 类无法合成事件验证）；宣传页版本号 bump + 截图重拍（两语言）；README 截图区更新
+- ObservableObject → @Observable 迁移（v2 刻意暂缓：macOS 14 上无功能损失，纯清理）
+- 拦截原生媒体键的进阶修饰键路由（MonitorControl 的 Ctrl=仅内置等组合）——需升级为 .defaultTap 吞事件 + 辅助功能权限，用户未要求
+- 音量/对比度 DDC 控制、内置屏亮度（DisplayServices）——用户拍板本期只做外接亮度，通道已通，加项边际成本低
+
+<!-- 阴影参数定型已完成（2026-09 用户定档 preset 1，2026-10 v2 烘焙写死并删调试键） -->
 
 ## 已恢复功能
 
@@ -165,7 +191,9 @@ docs/
 
 ## 注意事项
 
-- **任何「操控电脑」或「截图/像素采样测试」必须先请求许可（2026-09-16 用户约定，最高优先级）**：包括但不限于 打开/退出 App（open/pkill）、合成鼠标键盘事件（CGEventPost）、AppleScript/AX 自动化（点击 UI 等）、调整系统外观设置（如 Liquid Glass 透明度滑块）、修改系统偏好/写 defaults、LaunchServices 登记（lsregister）、screencapture 截图与像素采样。系统设置滑块类目标实测 AX 赋值不提交偏好、合成拖动不可靠（2026-09-20），此类操作优先请用户手动拨、agent 只做纯观察。执行前先向用户说明将要做什么、获准后再动；纯编译构建（swift build / build-app.sh 的本地产物生成）不在此列，但拿不准时同样先问。
+- **（v2 新增）DDC/私有 API 开发守卫**：① CF 对象在 @convention(c) 签名里一律 UnsafeMutableRawPointer（Swift 的 CFTypeRef=Any 进不了 C 函数指针；释放走 dlsym 的 CFRelease，ABI 同）；② `io_name_t(repeating:count:)` 的 count 必须字面量（表达式折叠不了，编译器直接哑火不报真错）；③ 本 SDK 的 `CGEventType` 无 `.systemDefined` case 名（用 rawValue 14）；④ static 存储属性闭包里用泛型 `Unmanaged` 会触发「covariant Self」编译器限制（用文件级游离函数写 C 回调）；⑤ `IORegistryEntrySearchCFProperty` 在 Swift 里直接返回值（非 Unmanaged，别 takeRetainedValue）；⑥ `withUnsafeMutableBytes` 闭包内读数组属性触发独占访问冲突（count 先存局部）；⑦ DDC service 生命周期必须走 DDCWriter 的 liveServices/waitForIdle 两道防线（见 v2 条目）；⑧ 数组 in-out 参数名（如 `max:`）会遮蔽全局函数，参数名别用 min/max。
+- **（v2 新增）Swift Testing 与测试约定**：CLT 无 XCTest；宏插件增量编译偶发 not found（run-tests.sh 定向清理规避，重跑即过）；测试期望值必须来自独立来源（协议向量手算自两处参考实现、fixture 录自本机真实输出），不许由实现反推。
+- **任何「操控电脑」或「截图/像素采样测试」必须先请求许可（2026-09-16 用户约定，最高优先级）**：包括但不限于 打开/退出 App（open/pkill）、合成鼠标键盘事件（CGEventPost）、AppleScript/AX 自动化（点击 UI 等）、调整系统外观设置（如 Liquid Glass 透明度滑块）、修改系统偏好/写 defaults、LaunchServices 登记（lsregister）、screencapture 截图与像素采样。系统设置滑块类目标实测 AX 赋值不提交偏好、合成拖动不可靠（2026-09-20），此类操作优先请用户手动拨、agent 只做纯观察。执行前先向用户说明将要做什么、获准后再动；纯编译构建（swift build / build-app.sh 的本地产物生成）不在此列，但拿不准时同样先问。**v2 起配套 knock-first skill：先探测用户状态（idle/前台 App）再列动作清单征求同意，结束发系统通知交还电脑。**
 - **设置窗口不要在根视图 `.tint(桥接 AppKit 动态色)`**（2026-08 实测踩坑）：曾加过 `.tint(Color(NSColor.controlAccentColor))`，在 macOS 15 实机上会让 `.menu` 样式 Picker 的箭头指示胶囊**实况渲染成红色**（系统强调色并非红；离屏 `dataWithPDF` 渲染不可复现——属实况合成路径对桥接动态色的解析失败，换 NSColor.systemGray 等其它桥接色同样有风险）。SwiftUI 控件默认就跟随系统强调色，根级 tint 本就冗余，已删。两个下拉框（语言/刷新间隔）改挂 `menuPickerNeutralTint()`（SwiftUI 静态 `Color.gray`，非桥接色）压中性灰指示器；若日后胶囊仍现异常色，兜底是 `.menuIndicator(.hidden)`。
 - **边栏未选中图标刻意比 `.secondary` 深一档**：`Color.primary.opacity(0.78)` + `medium` 字重（SidebarRow）。`.secondary` + regular 在 16pt 下笔画太细、与 regularMaterial 背景融合看不清（像素实测对比度 1.8:1 → 加深后 4.5:1）；选中态仍用 `BrandColor.accent`。
 - displayplacer 二进制不入 git，打包脚本从 Resources/ 目录拷入 .app
