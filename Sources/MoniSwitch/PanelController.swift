@@ -24,6 +24,11 @@ final class PanelController: NSObject, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
 
+    /// 菜单栏图标的屏幕全局 frame（亮度 HUD 锚定用）；图标未创建时 nil。
+    var statusItemFrame: CGRect? {
+        statusItem?.button?.window?.frame
+    }
+
     /// 上次 popover 收起的时刻。经典竞态：面板开着时点菜单栏图标，
     /// transient 行为会**先**关面板，**再**触发 button action——此时 isShown 已是
     /// false，若直接 toggle 会立即重开，表现为「点图标永远关不掉面板」。

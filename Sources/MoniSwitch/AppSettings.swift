@@ -34,6 +34,7 @@ final class AppSettings: ObservableObject {
         static let autoRefreshInterval = "autoRefreshInterval"
         static let detailedMenuInfo   = "detailedMenuInfo"
         static let notificationsEnabled = "notificationsEnabled"
+        static let brightnessKeysEnabled = "brightnessKeysEnabled"
     }
 
     /// 可选的自动刷新间隔（秒）。Picker 直接遍历它。
@@ -87,6 +88,20 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// F1/F2 亮度键同步外接屏（listen-only 事件监听，需「输入监控」权限；
+    /// 默认开，未授权时监听静默不生效，设置页有状态与引导）。
+    @Published var brightnessKeysEnabled: Bool {
+        didSet {
+            guard oldValue != brightnessKeysEnabled else { return }
+            UserDefaults.standard.set(brightnessKeysEnabled, forKey: Key.brightnessKeysEnabled)
+            if brightnessKeysEnabled {
+                BrightnessKeyTap.shared.start()
+            } else {
+                BrightnessKeyTap.shared.stop()
+            }
+        }
+    }
+
     /// 防止副作用（SMAppService/通知授权）失败回滚设值时再次触发 didSet 里的副作用。
     private var isApplying = false
 
@@ -99,6 +114,7 @@ final class AppSettings: ObservableObject {
         self.autoRefreshInterval = defaults.object(forKey: Key.autoRefreshInterval) as? Int ?? 10
         self.detailedMenuInfo    = defaults.object(forKey: Key.detailedMenuInfo) as? Bool ?? false
         self.notificationsEnabled = defaults.object(forKey: Key.notificationsEnabled) as? Bool ?? false
+        self.brightnessKeysEnabled = defaults.object(forKey: Key.brightnessKeysEnabled) as? Bool ?? true
     }
 
     // MARK: - 开机自启动

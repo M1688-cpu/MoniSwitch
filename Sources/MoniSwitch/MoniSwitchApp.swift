@@ -35,6 +35,8 @@ struct MoniSwitchApp: App {
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         PanelController.shared.setup()
+        // F1/F2 亮度键监听（listen-only；设置关/无输入监控权限时内部静默跳过）
+        BrightnessKeyTap.shared.start()
         hidePlaceholderSettingsWindow()
         // 占位 Settings scene 的窗口可能在启动后异步实体化（macOS 27 实测会以
         // 900x450 空白窗「MoniSwitch Settings」显示在桌面），用窗口遮挡状态变化
