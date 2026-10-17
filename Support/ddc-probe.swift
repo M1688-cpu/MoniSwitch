@@ -25,7 +25,7 @@ typealias InfoDictFn = @convention(c) (CGDirectDisplayID) -> UnsafeMutableRawPoi
 let createWithService = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceCreateWithService") as CreateWithServiceFn?
 let readI2C = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceReadI2C") as ReadI2CFn?
 let writeI2C = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceWriteI2C") as WriteI2CFn?
-let infoDict = load("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", "CoreDisplay_DisplayCreateInfoDictionary") as InfoDictFn?
+let infoDict = load("/System/Library/Frameworks/CoreDisplay.framework/CoreDisplay", "CoreDisplay_DisplayCreateInfoDictionary") as InfoDictFn?
 let allocator = kCFAllocatorDefault.map { Unmanaged.passUnretained($0).toOpaque() }
 
 // MARK: - DDC 纯逻辑（与 Sources/MoniSwitch/DDC.swift 同源）
@@ -130,11 +130,13 @@ func writeBrightness(_ service: UnsafeMutableRawPointer, _ value: UInt16) -> Boo
     let len = packet.count
     return packet.withUnsafeMutableBytes { buf in
         guard let base = buf.baseAddress else { return false }
-        for _ in 0..<3 {
+        // m1ddc 语义：连续写 DDC_ITERATIONS=2 次（10ms 间隔，同进程），部分屏忽略单次写
+        var anyOk = false
+        for _ in 0..<2 {
             usleep(10_000)
-            if writeI2C(service, 0x37, 0x51, base, UInt32(len)) == KERN_SUCCESS { return true }
+            if writeI2C(service, 0x37, 0x51, base, UInt32(len)) == KERN_SUCCESS { anyOk = true }
         }
-        return false
+        return anyOk
     }
 }
 

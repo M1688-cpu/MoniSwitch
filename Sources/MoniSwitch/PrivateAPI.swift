@@ -24,7 +24,10 @@ enum PrivateAPI {
     static let ioAVServiceCreateWithService: IOAVServiceCreateWithServiceFn? = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceCreateWithService")
     static let ioAVServiceReadI2C: IOAVServiceReadI2CFn? = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceReadI2C")
     static let ioAVServiceWriteI2C: IOAVServiceWriteI2CFn? = load("/System/Library/Frameworks/IOKit.framework/IOKit", "IOAVServiceWriteI2C")
-    static let displayCreateInfoDictionary: DisplayCreateInfoDictionaryFn? = load("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", "CoreDisplay_DisplayCreateInfoDictionary")
+    // 注意：CoreDisplay_DisplayCreateInfoDictionary 在 CoreDisplay.framework 而非
+    // CoreGraphics（2026-10-17 真机验证实锤：从 CoreGraphics dlsym 恒 nil，发现链
+    // 全部静默失效、面板亮度卡不出现）。IOAVService* 在 IOKit.framework 无误。
+    static let displayCreateInfoDictionary: DisplayCreateInfoDictionaryFn? = load("/System/Library/Frameworks/CoreDisplay.framework/CoreDisplay", "CoreDisplay_DisplayCreateInfoDictionary")
     static let cfRelease: CFReleaseFn? = load("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", "CFRelease")
 
     /// kCFAllocatorDefault 的指针形式（Create 函数的首参）。
