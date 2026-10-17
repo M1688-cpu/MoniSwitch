@@ -99,8 +99,17 @@ private final class HUDModel: ObservableObject {
 }
 
 /// 气泡内容：太阳图标 + 圆角进度条 + 百分比。
+/// HUD 宿主是独立 NSPanel（不继承面板的环境）：这里自行解析主题色板并注入
+/// （BubbleBackground/进度条取色来源与面板一致）；观察 AppSettings 使主题切换
+/// 在 HUD 常驻窗口上也实时生效。
 private struct BrightnessHUDView: View {
     @ObservedObject var model: HUDModel
+    @ObservedObject private var settings = AppSettings.shared
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var palette: PanelPalette {
+        PanelTheme.palette(id: settings.panelThemeID, dark: colorScheme == .dark)
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -112,7 +121,7 @@ private struct BrightnessHUDView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.primary.opacity(0.12))
                     Capsule()
-                        .fill(BrandColor.accent)
+                        .fill(palette.solid)
                         .frame(width: max(proxy.size.width * model.percent, 4))
                 }
             }
@@ -124,8 +133,10 @@ private struct BrightnessHUDView: View {
         }
         .padding(.horizontal, 14)
         .frame(width: 168, height: 44)
-        // 与面板气泡同设计语言：不透明填充（浅纯白/深卡片色）+ 悬浮阴影（壁纸承接）
+        // 与面板气泡同设计语言：不透明填充（浅色=派生近白淡染 / 深色=派生深底）
+        // + 悬浮阴影（壁纸承接）。HUD 是独立小窗、不参与面板的右上光源布光。
+        .environment(\.panelPalette, palette)
         .modifier(BubbleBackground())
-        .bubbleFloatingShadow()
+        .bubbleFloatingShadow(lightDirection: false)
     }
 }

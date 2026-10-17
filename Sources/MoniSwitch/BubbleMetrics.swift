@@ -6,8 +6,12 @@ import SwiftUI
 /// 徽章/hover/键帽（4/8/6）等圆角散落在 `SettingsView.swift`/`PanelView.swift`，
 /// 调一处要改多处且容易遗漏。现统一集中到此处，改一处即全站同步。
 enum BubbleMetrics {
-    /// 卡片/气泡主体圆角：SettingsCard、BubbleCard、bottomToolbar 共用。
+    /// 卡片/气泡主体圆角：BubbleCard、bottomToolbar（菜单栏面板侧）共用。
+    /// 设置窗口 SettingsCard 已分家至 settingsCardCornerRadius（2026-10-17 原生化改版）。
     static let cardCornerRadius: CGFloat = 20
+    /// 设置窗口分组卡圆角（原生分组样式，对齐系统设置 ~10；与面板气泡的 20 分家，
+    /// 两侧互不影响）。
+    static let settingsCardCornerRadius: CGFloat = 10
     /// 渐变图标徽章圆角：GradientIconSquare、BubbleCard 内联徽章共用。
     static let iconBadgeCornerRadius: CGFloat = 8
     /// 列表行 hover 高亮背景圆角。
@@ -18,6 +22,18 @@ enum BubbleMetrics {
     /// 气泡不透明填充色（深色模式）。
     /// 选 #2B2B2D：接近系统 NSBox/控件卡片色，深色下不刺眼；浅色模式用纯白（BubbleBackground 内分支）。
     static let bubbleDarkFill = Color(red: 0.17, green: 0.17, blue: 0.18)
+
+    /// 浮层表面底色回落值（2026-10-17 收拢）：主题未注入（设置窗口/「跟随系统」）
+    /// 时叠在气泡之上的浮层（参数二级气泡、MiniBubble、布局图点亮块）与卡片同源
+    /// ——浅色纯白 / 深色卡片色。主题生效时浮层取 `palette.surface`（见 PanelTheme）。
+    static func surfaceFill(dark: Bool) -> Color {
+        dark ? bubbleDarkFill : .white
+    }
+
+    /// 浮层/卡片表面淡描边不透明度（浅 0.10 / 深 0.18，与 BubbleBackground 同档）。
+    static func surfaceStrokeOpacity(dark: Bool) -> Double {
+        dark ? 0.18 : 0.10
+    }
 
     /// 边栏选中行背景：比灰底深一档的半透明黑（浅深色自适应）。
     static let sidebarSelectionOpacity: CGFloat = 0.10
@@ -64,17 +80,27 @@ enum BubbleMetrics {
     /// 未选中（非主屏）圆框填充：半透明主色，浅色模式呈浅灰暗态、深色模式自动提亮。
     static let deviceIconInactiveFillOpacity: CGFloat = 0.12
 
-    // MARK: 底部工具栏按钮级 hover
+    // MARK: 底部工具栏 hover 放大（2026-10-17 用户拍板「高光改放大」）
 
     /// 单个图标按钮 hover 放大倍率（仅缩放图标本体，2D 仿射不栅格化；
     /// 触区/布局不动，无边缘振荡问题——区别于整卡 bubbleHoverLift）。
     static let toolbarIconHoverScale: CGFloat = 1.15
-    /// hover 高亮底色不透明度（圆角矩形，叠在气泡底色上）。
-    static let toolbarHoverFillOpacity: CGFloat = 0.07
+    /// 三连工具气泡 hover 局部隆起高度（pt，顶/底边同步外扩）。开发期可用
+    /// `defaults write com.moniswitch.app MoniswitchDebugBulgeHeight -float <pt>`
+    /// 扫值（>0 生效），用户定档后写死删调试。
+    static var toolbarBulgeHeight: CGFloat {
+        let v = UserDefaults.standard.double(forKey: "MoniswitchDebugBulgeHeight")
+        return v > 0 ? v : 5
+    }
+    /// 隆起钟形归一化半宽（相对气泡宽度）。受轮廓的圆角区窗口约束不宜大于 ~0.18
+    /// （最左/右按钮中心距边缘仅 1/6，再宽会把隆起压进角区）。
+    static let toolbarBulgeHalfWidth: CGFloat = 0.17
+    /// 退出气泡 hover 整泡放大倍率（中心锚只向外扩，hover 命中区单调增长不振荡）。
+    static let toolbarQuitHoverScale: CGFloat = 1.07
     /// 按钮放大/还原弹簧。
     static let buttonHoverSpring = Animation.spring(response: 0.25, dampingFraction: 0.7)
 
-    // MARK: 悬停补充气泡（MirrorTargetTooltip）
+    // MARK: 悬停补充气泡（HoverDwellTooltip）
 
     /// 停留多久后弹出（对齐系统 tooltip 的 dwell 手感）。
     static let tooltipDwell: TimeInterval = 0.45
@@ -129,6 +155,41 @@ enum BubbleMetrics {
     /// 布局图固定高度（2026-10 120→160，用户拍板「加高+加宽」，屏块常驻名居中）。
     static let diagramHeight: CGFloat = 160
 
+    // MARK: 参数二级气泡（2026-10-17 末版：与一级气泡同宽同圆角、不压叠）
+
+    /// 二级气泡内容内边距。
+    static let secondaryBubblePadding: CGFloat = 12
+    /// 展开后与枢纽卡之间的常规卡片间距（取消压叠后不再上提；间隙计入揭示高度，
+    /// 收起态不占位）。高度与揭示同源，改这里不影响收起基线。
+    static let secondaryBubbleGap: CGFloat = cardSpacing
+
+    // MARK: 气泡布光（2026-10-17，光源位于界面右上角）
+
+    /// 右上角泛光色：浅色模式用极淡暖白（纯白卡亮度已到顶，暖色才留下色差）、
+    /// 深色模式用纯白提亮。沿「右上 → 左下」对角线性衰减。
+    static let lightBloomHex = "#FFF6E8"
+    /// 泛光起点不透明度（浅色 / 深色）。
+    static let lightBloomLightOpacity: Double = 0.10
+    static let lightBloomDarkOpacity: Double = 0.10
+    /// 浅色主题染色卡（近白淡染）的泛光：暖白会在淡彩卡上叠出脏调，换成中性白。
+    static let lightBloomThemedOpacity: Double = 0.07
+    /// 左下压暗色：带一点冷调，与暖调泛光形成方向性明暗。
+    static let lightShadeHex = "#0E1729"
+    /// 左下压暗终点不透明度（浅色 / 深色）。浅色只留 3.5%——用户拍板
+    /// 「接受极轻明暗」，再重就不是纯白卡了。
+    static let lightShadeLightOpacity: Double = 0.035
+    static let lightShadeDarkOpacity: Double = 0.18
+    /// 右上内缘 1px 高光描边不透明度（浅色卡上很淡，染色卡/深色卡上是主线索）。
+    static let lightRimLightOpacity: Double = 0.55
+    static let lightRimDarkOpacity: Double = 0.22
+    /// 朝左下的轻微落影：与右上光源呼应，给气泡补一层方向性深度
+    /// （叠在壁纸承接的双层阴影之上，不替换既有阴影定档）。
+    static let lightShadowLightOpacity: Double = 0.045
+    static let lightShadowDarkOpacity: Double = 0.14
+    static let lightShadowRadius: CGFloat = 7
+    static let lightShadowX: CGFloat = -2
+    static let lightShadowY: CGFloat = 4
+
     // MARK: 面板内嵌套滚动
 
     /// SelectionRow 选项列表限高：超过则列表内部滚动，面板高度可控（面板级 ScrollView 已废弃，勿混淆）。
@@ -156,10 +217,11 @@ enum BubbleMetrics {
 }
 
 extension View {
-    /// 气泡悬浮阴影：BubbleCard / 面板底部操作栏 / SettingsCard 共用，
+    /// 气泡悬浮阴影：BubbleCard / 面板底部操作栏 / 亮度 HUD 共用，
     /// 呈现「浮于背景之上」的层次。双层弥散（ambient 大半径低透明铺开 +
     /// key 小半径贴边勾勒），与底色的过渡比单层阴影更柔和、无硬边界感。
-    /// - Parameter opacity: 整体强度系数（1 = 面板标准；设置页卡片 0.85 稍浅）。
+    /// （设置窗口 SettingsCard 已改原生分组样式，不再用气泡阴影。）
+    /// - Parameter opacity: 整体强度系数（1 = 面板标准；HUD 等 0.7 稍浅）。
     func bubbleShadow(opacity: Double = 1) -> some View {
         shadow(color: .black.opacity(0.06 * opacity), radius: 11, x: 0, y: 5)
             .shadow(color: .black.opacity(0.09 * opacity), radius: 3.5, x: 0, y: 1.5)
@@ -168,10 +230,38 @@ extension View {
     /// 无背板语境的面板气泡悬浮阴影：阴影**直接落在壁纸上**（区别于投在系统玻璃
     /// 背板/窗口底色上的 bubbleShadow——后者仍归设置窗口卡片使用，两者语境不同
     /// 不要混用）。参数 = BubbleMetrics.floatingShadowSpec（用户定档烘焙值）。
-    func bubbleFloatingShadow() -> some View {
+    /// 2026-10-17 起再叠一层朝左下的轻落影，呼应右上光源（见「气泡布光」小节）：
+    /// 光从右上打来，影子自然偏左下——这是面板立体感的第二个线索（第一个是
+    /// BubbleLightingModifier 的背光侧压暗）。挂在这里而不是布光 overlay 里，
+    /// 是因为参数二级气泡的揭示层会 clipped，阴影必须落在裁切之外。
+    /// - Parameter lightDirection: 是否叠加右上光源的方向性落影。菜单栏面板的
+    ///   气泡传默认 true；亮度 HUD（独立小窗，不参与面板布光）传 false 保持原观感。
+    func bubbleFloatingShadow(lightDirection: Bool = true) -> some View {
+        modifier(BubbleFloatingShadowModifier(lightDirection: lightDirection))
+    }
+}
+
+/// 菜单栏面板气泡的壁纸承接阴影（含右上光源的方向性落影，见 bubbleFloatingShadow）。
+/// 用 ViewModifier 而非纯 extension 函数：方向性落影在深色壁纸上要比浅色更重一点，
+/// 需要读 colorScheme。
+private struct BubbleFloatingShadowModifier: ViewModifier {
+    var lightDirection: Bool = true
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
         let s = BubbleMetrics.floatingShadowSpec
-        return shadow(color: .black.opacity(s.opacity1), radius: s.radius1, x: 0, y: s.y1)
+        return content
+            .shadow(color: .black.opacity(s.opacity1), radius: s.radius1, x: 0, y: s.y1)
             .shadow(color: .black.opacity(s.opacity2), radius: s.radius2, x: 0, y: s.y2)
+            .shadow(color: .black.opacity(lightDirection
+                                              ? (colorScheme == .dark
+                                                    ? BubbleMetrics.lightShadowDarkOpacity
+                                                    : BubbleMetrics.lightShadowLightOpacity)
+                                              : 0),
+                    radius: BubbleMetrics.lightShadowRadius,
+                    x: BubbleMetrics.lightShadowX,
+                    y: BubbleMetrics.lightShadowY)
     }
 }
 

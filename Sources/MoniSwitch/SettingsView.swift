@@ -4,26 +4,18 @@ import AppKit
 /// 设置窗口：HStack 手拼「边栏 + 竖线 + 内容区」布局。
 ///
 /// 不用 NavigationSplitView：它在 macOS 上对 sidebar 列强制施加圆角剪裁 + 独立面板感
-///（透明标题栏下尤为明显），靠 modifier 调不掉——那是边栏"像悬浮圆角气泡"的根因。
-/// 改用 HStack：边栏(240pt) + 1pt 深灰竖线 + 内容区，三者平铺无圆角，
-/// 边栏与内容区同用 `.regularMaterial` 融为一体，仅由中间一条竖线分隔。
+///（透明标题栏下尤为明显），调不掉，是边栏「悬浮圆角气泡」观感的根因。
+/// 改用 HStack：边栏(240pt) + 1pt 分割线 + 内容区，三者平铺无圆角。
 ///
-/// 标题：去掉旧的 NSToolbar 居中"设置"白条（见 DockPolicyManager），
-/// 改由右侧内容区顶部的 `DetailHeader`（渐变图标 + 已选功能名）承担标题，
-/// 跟随 selectedTab 动态切换。标题经 safeAreaInset 悬浮于滚动内容之上：
-/// 静止时无背景（观感与旧固定标题一致）；滚动时内容从标题底下穿过，
-/// `HeaderFadeBackdrop` 渐入「顶实底虚」的 thinMaterial 渐变毛玻璃。
+/// 原生风格（2026-10-17 改版，对齐访达/系统设置）：
+/// - 边栏 = NSVisualEffectView sidebar 材质毛玻璃（随壁纸透出），背景顶到窗口顶，
+///   红绿灯浮在毛玻璃上（访达同款）；行样式保留自绘灰胶囊选中（已接近原生）。
+/// - 分割线 = separatorColor 语义色。
+/// - 内容区 = 不透明 windowBackgroundColor；标题经 safeAreaInset 悬浮于滚动内容
+///   之上（静止无背景，滚动时 thinMaterial 渐入，见 HeaderFadeBackdrop）。
+/// - 分组卡 = 原生分组样式（SettingsCard：卡上小字标签 + 纯色卡体圆角 10 无阴影）。
 ///
-/// 视觉风格：边栏用 ScrollView+VStack 自绘行（不用原生 List(.sidebar)，那会带白色
-/// vibrancy 背景 + 强调色选中胶囊），选中态深灰圆角、未选图标深灰（medium 字重）、
-/// 选中图标跟随系统强调色。
-/// 各分组用圆角卡片（BubbleBackground：不透明填充——浅色纯白 / 深色卡片色 + 淡描边 + 阴影），
-/// 头部图标用无背景纯图标（PlainIcon，深灰自适应），与正文文字层次一致、视觉极简。
-/// 圆角/字号刻度统一引用 `BubbleMetrics`，与菜单栏面板同步。
-/// 共享组件（SettingsCard/PlainIcon 等）在 Components.swift；三个标签页在 SettingsTabs.swift。
-///
-/// 边栏宽度锁死 240pt，不可拖拽。
-/// 右侧内容区按选中标签直接切换。
+/// 边栏宽度锁死 240pt，不可拖拽；右侧内容区按选中标签直接切换。
 struct SettingsView: View {
 
     enum Tab: String, CaseIterable, Identifiable, Hashable {
@@ -51,6 +43,7 @@ struct SettingsView: View {
     }
 
     @EnvironmentObject private var l10n: L10n
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: Tab? = .general
     /// 内容区已向上滚出的距离（各 tab 的 ScrollOffsetReader 上报，驱动顶部毛玻璃渐入）。
     @State private var contentScrollOffset: CGFloat = 0
@@ -80,16 +73,21 @@ struct SettingsView: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
             }
-            // 与右侧内容区完全相同的 regularMaterial，边栏不再单独发白。锁死宽度 240pt。
+            // 锁死宽度 240pt。
             .frame(width: 240)
-            .background(.regularMaterial)
+            // 原生边栏毛玻璃（2026-10-17 原生化改版）：NSVisualEffectView sidebar
+            // 材质随壁纸透出，访达/系统设置同款。背景 ignore 顶部安全区顶到窗口顶
+            // ——红绿灯浮在毛玻璃上（行内容仍由安全区避让红绿灯，仅背景贯通）。
+            .background {
+                SidebarVibrancy()
+                    .ignoresSafeArea(.container, edges: .top)
+            }
 
-            // —— 中间一条从上到下的深灰竖线：边栏与内容区的唯一分界 ——
-            // 0.22 比 0.12 明显加深，浅色下呈清晰深灰、深色下自适应变浅灰，两端都不刺眼。
-            // 仅竖线 ignore 顶部安全区：让竖线一通到顶（无白色断口），但边栏/内容区保留正常
-            // 顶部留白、避开红绿灯按钮（红绿灯 x 范围落在 240pt 边栏内，边栏不顶到标题栏即不挡）。
+            // —— 中间一条从上到下的分割线：边栏与内容区的唯一分界 ——
+            // separatorColor 系统语义色（浅深色自适应、与原生分栏一致），仍单独
+            // ignore 顶部安全区一通到顶（无白色断口）。
             Rectangle()
-                .fill(Color.primary.opacity(0.22))
+                .fill(Color(nsColor: .separatorColor))
                 .frame(width: 1)
                 .ignoresSafeArea(.container, edges: .top)
 
@@ -115,8 +113,10 @@ struct SettingsView: View {
                             .ignoresSafeArea(.container, edges: .top)
                     }
             }
-            // 内容区变灰：.regularMaterial 浅色淡灰、深色深灰，自动适配。
-            .background(.regularMaterial)
+            // 内容区底色（2026-10-17 用户拍板「右边直接改白」）：浅色纯白、深色保持
+            // 系统深灰；分层方向与原生系统设置对调——「白底灰卡」（SettingsCard 改
+            // windowBackgroundColor 浅灰填充）而非「灰底白卡」。
+            .background(colorScheme == .light ? Color.white : Color(nsColor: .windowBackgroundColor))
         }
         // 不在根视图加 .tint(Color(NSColor.controlAccentColor))：SwiftUI 控件默认就跟随系统
         // 强调色，这条桥接 AppKit 动态色的 tint 是冗余的；且 macOS 15 实机上它会让下拉框箭头
@@ -280,6 +280,23 @@ struct ScrollOffsetReader: NSViewRepresentable {
 }
 
 // MARK: - 边栏
+
+/// 原生边栏毛玻璃：NSVisualEffectView 的 sidebar 材质（behindWindow 混合，随壁纸
+/// 透出），访达/系统设置边栏同款。SwiftUI 的 Material 枚举没有 sidebar 档，
+/// 需桥接 AppKit（纯 Swift，无 bridging header）。浅深色与窗口激活态系统自适应。
+private struct SidebarVibrancy: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .sidebar
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        // 材质/混合模式静态，无需更新。
+    }
+}
 
 /// 边栏行：纯 SF Symbol 图标（无方块背景）+ 标题。对齐 macOS 系统设置侧栏风格——
 /// 选中页图标用系统强调色、未选用次要灰；选中态再叠半透明深灰圆角底。

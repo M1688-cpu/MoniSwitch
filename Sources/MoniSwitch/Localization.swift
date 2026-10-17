@@ -24,8 +24,6 @@ enum TextKey: String {
     case positionLabel          = "positionLabel"          // 位置（排列表单行标题）
     case sideLeft               = "sideLeft"               // 左侧（位置分段控件）
     case sideRight              = "sideRight"              // 右侧（位置分段控件）
-    case mirrorMain             = "mirrorMain"             // 镜像主屏
-    case extendDisplay          = "extendDisplay"          // 扩展显示
     case refreshList            = "refreshList"            // 刷新列表
     case settings               = "settings"               // 设置…
     case quit                   = "quit"                   // 退出 MoniSwitch
@@ -39,25 +37,40 @@ enum TextKey: String {
     case settingsTitle          = "settingsTitle"          // 设置
     case tabGeneral             = "tabGeneral"             // 通用
     case tabAbout               = "tabAbout"               // 关于
-    case groupLanguage          = "groupLanguage"          // 语言
+    case groupGeneral           = "groupGeneral"           // 通用（语言+启动合并卡）
     case languageLabel          = "languageLabel"          // 界面语言
     case appDescription         = "appDescription"         // 一句话简介
     case versionLabel           = "versionLabel"           // 版本
 
-    // 设置 - 启动
-    case groupStartup           = "groupStartup"           // 启动
+    // 设置 - 启动（2026-10-17 分区重排：语言+启动合并进「通用」卡，groupLanguage/groupStartup 键废弃删除）
     case launchAtLogin          = "launchAtLogin"          // 登录时启动 MoniSwitch
+    case launchAtLoginFootnote  = "launchAtLoginFootnote"  // 启动行副文本
 
     // 设置 - 显示器
     case groupDisplays          = "groupDisplays"          // 显示器
     case autoRefresh            = "autoRefresh"            // 自动刷新显示器列表
+    case autoRefreshFootnote    = "autoRefreshFootnote"    // 自动刷新行副文本
     case refreshInterval        = "refreshInterval"        // 刷新间隔
     case intervalSeconds        = "intervalSeconds"        // N 秒
     case detailedMenuInfo       = "detailedMenuInfo"       // 菜单显示刷新率与 HiDPI
+    case detailedMenuFootnote   = "detailedMenuFootnote"   // 详细信息行副文本
 
     // 设置 - 通知
     case groupNotifications     = "groupNotifications"     // 通知
     case notifyOnSwitch         = "notifyOnSwitch"         // 切换完成后发送通知
+    case notifyFootnote         = "notifyFootnote"         // 通知行副文本
+
+    // 设置 - 面板主题（2026-10-17 内置主题：Chrome 色卡式 7 组三档 + 跟随系统）
+    case groupTheme             = "groupTheme"             // 主题色（选择卡标题）
+    case themeFollowSystem      = "themeFollowSystem"      // 跟随系统（默认项）
+    case themeFootnote          = "themeFootnote"          // 主题行副文本（三档用途说明）
+    case themeRose              = "themeRose"              // 玫瑰红
+    case themeSage              = "themeSage"              // 鼠尾草绿
+    case themeOrange            = "themeOrange"            // 橙色
+    case themeTan               = "themeTan"               // 棕褐
+    case themeBlue              = "themeBlue"              // 蓝色
+    case themeBlueGray          = "themeBlueGray"          // 蓝灰
+    case themeTealGray          = "themeTealGray"          // 青灰
 
     // 通知正文（按操作类型）
     case notifPrimary           = "notifPrimary"           // 已切换主屏
@@ -101,7 +114,8 @@ enum TextKey: String {
     // 面板气泡卡片（.window 样式专用）
     case setAsPrimary           = "setAsPrimary"           // 设为主屏（非主屏参数块操作行）
     case currentLayoutBadge     = "currentLayoutBadge"     // 当前（预设与当前布局一致的角标）
-    case mirrorTarget           = "mirrorTarget"           // 镜像目标：@
+    case mirrorActionHint       = "mirrorActionHint"       // 镜像按钮悬停提示：镜像到 @（纯图标按钮的功能说明）
+    case extendActionHint       = "extendActionHint"       // 扩展按钮悬停提示：扩展显示：各屏独立排列
     case autoArrange            = "autoArrange"            // 自动排列按钮
 
     // 亮度与按键（v2：F1/F2 外接屏亮度同步，设置页新 tab）
@@ -158,8 +172,6 @@ final class L10n: ObservableObject {
         .positionLabel:    [.zh: "位置",                        .en: "Position"],
         .sideLeft:         [.zh: "左侧",                        .en: "Left"],
         .sideRight:        [.zh: "右侧",                        .en: "Right"],
-        .mirrorMain:       [.zh: "镜像主屏",                      .en: "Mirror main display"],
-        .extendDisplay:    [.zh: "扩展显示",                      .en: "Extend display"],
         .refreshList:      [.zh: "刷新列表",                      .en: "Refresh list"],
         .settings:         [.zh: "设置…",                         .en: "Settings…"],
         .quit:             [.zh: "退出 MoniSwitch",               .en: "Quit MoniSwitch"],
@@ -171,22 +183,36 @@ final class L10n: ObservableObject {
         .settingsTitle:    [.zh: "设置",                          .en: "Settings"],
         .tabGeneral:       [.zh: "通用",                          .en: "General"],
         .tabAbout:         [.zh: "关于",                          .en: "About"],
-        .groupLanguage:    [.zh: "语言",                          .en: "Language"],
+        .groupGeneral:     [.zh: "通用",                          .en: "General"],
         .languageLabel:    [.zh: "界面语言",                      .en: "Interface language"],
         .appDescription:   [.zh: "菜单栏里的显示器快捷切换小工具", .en: "A menu bar tool to switch displays quickly"],
         .versionLabel:     [.zh: "版本",                          .en: "Version"],
 
-        .groupStartup:     [.zh: "启动",                          .en: "Startup"],
         .launchAtLogin:    [.zh: "登录时启动 MoniSwitch",         .en: "Launch MoniSwitch at login"],
+        .launchAtLoginFootnote: [.zh: "开机后常驻菜单栏",          .en: "Lives in the menu bar after login"],
 
         .groupDisplays:    [.zh: "显示器",                        .en: "Displays"],
         .autoRefresh:      [.zh: "自动刷新显示器列表",            .en: "Auto-refresh display list"],
+        .autoRefreshFootnote: [.zh: "插拔、唤醒后自动同步屏幕列表", .en: "Sync the list after replug or wake"],
         .refreshInterval:  [.zh: "刷新间隔",                      .en: "Refresh interval"],
         .intervalSeconds:  [.zh: "%d 秒",                         .en: "Every %ds"],
         .detailedMenuInfo: [.zh: "菜单显示刷新率与 HiDPI",        .en: "Show refresh rate & HiDPI in menu"],
+        .detailedMenuFootnote: [.zh: "参数行附带刷新率与 HiDPI 标注", .en: "Tag refresh rate & HiDPI on rows"],
 
         .groupNotifications:[.zh: "通知",                         .en: "Notifications"],
         .notifyOnSwitch:   [.zh: "切换完成后发送通知",            .en: "Notify after switching"],
+        .notifyFootnote:   [.zh: "切换成功后弹系统横幅",          .en: "Show a banner after each switch"],
+
+        .groupTheme:       [.zh: "主题色",                        .en: "Theme"],
+        .themeFollowSystem:[.zh: "跟随系统",                      .en: "Follow System"],
+        .themeFootnote:    [.zh: "所选色系会派生为面板的卡底、高亮与实心强调；深色模式自动适配。", .en: "Each theme is derived into the panel background, highlights and solid accents; dark mode adapts automatically."],
+        .themeRose:        [.zh: "玫瑰红",                        .en: "Rose"],
+        .themeSage:        [.zh: "鼠尾草绿",                      .en: "Sage"],
+        .themeOrange:      [.zh: "橙色",                          .en: "Orange"],
+        .themeTan:         [.zh: "棕褐",                          .en: "Tan"],
+        .themeBlue:        [.zh: "蓝色",                          .en: "Blue"],
+        .themeBlueGray:    [.zh: "蓝灰",                          .en: "Blue Gray"],
+        .themeTealGray:    [.zh: "青灰",                          .en: "Teal Gray"],
 
         .notifPrimary:     [.zh: "已切换主屏",                    .en: "Primary display switched"],
         .notifMirror:      [.zh: "已镜像主屏",                    .en: "Mirrored to main display"],
@@ -233,7 +259,8 @@ final class L10n: ObservableObject {
         .openPrivacyPane:  [.zh: "打开系统设置",                   .en: "Open System Settings"],
         .ddcUnsupportedHint: [.zh: "经坞站/转换器连接或部分电视不支持 DDC 亮度控制，此类屏幕不会出现在亮度列表中。", .en: "Displays connected through docks/adapters and some TVs don't support DDC brightness control; they won't appear in the brightness list."],
         .currentLayoutBadge:[.zh: "当前",                        .en: "Current"],
-        .mirrorTarget:     [.zh: "镜像目标：%@",                  .en: "Mirror target: %@"],
+        .mirrorActionHint: [.zh: "镜像到 %@",                     .en: "Mirror to %@"],
+        .extendActionHint: [.zh: "扩展显示：各屏独立排列",          .en: "Extend: independent desktops"],
         .autoArrange:      [.zh: "自动排列（横向排开，消除重叠）",  .en: "Auto-arrange (line up, fix overlap)"],
     ]
 }

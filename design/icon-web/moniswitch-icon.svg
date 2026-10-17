@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">MoniSwitch app icon</title>
+  <desc id="desc">A dark squircle holding a widescreen display. The screen is lit with a cyan-to-coral aurora gradient and carries a frosted glass toggle switch. A tiny warm power light glows on the lower bezel.</desc>
+
+  <defs>
+    <path id="tileShape" d="M285 100H739C841 100 924 183 924 285V739C924 841 841 924 739 924H285C183 924 100 841 100 739V285C100 183 183 100 285 100Z"/>
+    <clipPath id="tileClip"><use href="#tileShape"/></clipPath>
+    <clipPath id="screenClip"><rect x="246" y="316" width="532" height="312" rx="20"/></clipPath>
+
+    <linearGradient id="tile" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#17171F"/>
+      <stop offset="0.55" stop-color="#0B0B11"/>
+      <stop offset="1" stop-color="#050507"/>
+    </linearGradient>
+
+    <radialGradient id="ambient" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8B5CF6" stop-opacity="0.50"/>
+      <stop offset="0.36" stop-color="#B84BE8" stop-opacity="0.24"/>
+      <stop offset="0.66" stop-color="#E0447C" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#E0447C" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="coolGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4FD0FF" stop-opacity="0.10"/>
+      <stop offset="0.55" stop-color="#3B82F6" stop-opacity="0.035"/>
+      <stop offset="1" stop-color="#3B82F6" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="topSheen" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="0.62" stop-color="#FFFFFF" stop-opacity="0.012"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="rim" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.24"/>
+      <stop offset="0.35" stop-color="#FFFFFF" stop-opacity="0.06"/>
+      <stop offset="0.7" stop-color="#FFFFFF" stop-opacity="0.025"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.07"/>
+    </linearGradient>
+
+    <linearGradient id="bezel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2E2E38"/>
+      <stop offset="0.36" stop-color="#1B1B22"/>
+      <stop offset="1" stop-color="#111116"/>
+    </linearGradient>
+
+    <linearGradient id="stand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#41414C"/>
+      <stop offset="0.35" stop-color="#26262E"/>
+      <stop offset="0.75" stop-color="#17171C"/>
+      <stop offset="1" stop-color="#101014"/>
+    </linearGradient>
+
+    <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4FD0FF"/>
+      <stop offset="0.24" stop-color="#5B70FF"/>
+      <stop offset="0.55" stop-color="#A241FF"/>
+      <stop offset="0.8" stop-color="#FF47AB"/>
+      <stop offset="1" stop-color="#FF9866"/>
+    </linearGradient>
+
+    <linearGradient id="screenGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="0.42" stop-color="#FFFFFF" stop-opacity="0.035"/>
+      <stop offset="0.75" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="specular" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.33" stop-color="#FFFFFF" stop-opacity="0.010"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.52" stop-color="#FFFFFF" stop-opacity="0.025"/>
+      <stop offset="0.68" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="screenShade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.68" stop-color="#12001F" stop-opacity="0"/>
+      <stop offset="1" stop-color="#12001F" stop-opacity="0.24"/>
+    </linearGradient>
+
+    <radialGradient id="screenBloom" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.07"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.015"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="ledGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFD9C0" stop-opacity="0.65"/>
+      <stop offset="0.4" stop-color="#FFB99B" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#FFA07C" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="deskShadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.6"/>
+      <stop offset="0.6" stop-color="#000000" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="knob" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#FAF9FF"/>
+      <stop offset="1" stop-color="#E9E6F2"/>
+    </linearGradient>
+
+    <filter id="frontShadow" x="-35%" y="-40%" width="170%" height="190%">
+      <feDropShadow dx="0" dy="26" stdDeviation="28" flood-color="#000000" flood-opacity="0.66"/>
+    </filter>
+    <filter id="standShadow" x="-60%" y="-80%" width="220%" height="260%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="knobShadow" x="-60%" y="-60%" width="220%" height="240%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+
+  <use href="#tileShape" fill="url(#tile)"/>
+
+  <g clip-path="url(#tileClip)">
+    <ellipse cx="430" cy="225" rx="390" ry="235" fill="url(#topSheen)"/>
+    <ellipse cx="330" cy="300" rx="430" ry="330" fill="url(#coolGlow)"/>
+    <ellipse cx="512" cy="570" rx="600" ry="500" fill="url(#ambient)"/>
+    <ellipse cx="512" cy="740" rx="190" ry="32" fill="url(#deskShadow)"/>
+
+    <!-- stand, tucked behind the display -->
+    <g filter="url(#standShadow)">
+      <rect x="484" y="628" width="56" height="68" rx="14" fill="url(#stand)"/>
+      <rect x="412" y="694" width="200" height="20" rx="10" fill="url(#stand)"/>
+      <path d="M420 694H604" fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="2" stroke-linecap="round"/>
+      <path d="M492 644H532" fill="none" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <!-- display -->
+    <g filter="url(#frontShadow)">
+      <rect x="232" y="302" width="560" height="340" rx="34" fill="url(#bezel)"/>
+      <rect x="232" y="302" width="560" height="340" rx="34" fill="none" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="2.5"/>
+      <g clip-path="url(#screenClip)">
+        <rect x="246" y="316" width="532" height="312" rx="20" fill="url(#aurora)"/>
+        <ellipse cx="350" cy="380" rx="240" ry="172" fill="url(#screenBloom)"/>
+        <rect x="246" y="316" width="532" height="312" rx="20" fill="url(#screenGloss)"/>
+        <rect x="246" y="316" width="532" height="312" rx="20" fill="url(#specular)"/>
+        <rect x="246" y="316" width="532" height="312" rx="20" fill="url(#screenShade)"/>
+      </g>
+      <rect x="246" y="316" width="532" height="312" rx="20" fill="none" stroke="#FFFFFF" stroke-opacity="0.34" stroke-width="2.2"/>
+
+      <!-- camera -->
+      <circle cx="512" cy="309" r="2.6" fill="#07070A"/>
+      <circle cx="512" cy="309" r="2.6" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="1"/>
+
+      <!-- the switch -->
+      <g>
+        <rect x="422" y="458" width="180" height="84" rx="42" fill="#FFFFFF" fill-opacity="0.22"/>
+        <rect x="422" y="458" width="180" height="84" rx="42" fill="none" stroke="#FFFFFF" stroke-opacity="0.66" stroke-width="2.5"/>
+        <g filter="url(#knobShadow)">
+          <circle cx="556" cy="500" r="30" fill="url(#knob)"/>
+        </g>
+        <circle cx="556" cy="500" r="29" fill="none" stroke="#FFFFFF" stroke-opacity="0.78" stroke-width="1.2"/>
+        <circle cx="549" cy="492" r="5" fill="#FFFFFF" opacity="0.55"/>
+      </g>
+
+      <!-- power light -->
+      <circle cx="512" cy="635.5" r="6.5" fill="url(#ledGlow)"/>
+      <circle cx="512" cy="635.5" r="2.2" fill="#FFF0E2"/>
+    </g>
+
+  </g>
+
+  <use href="#tileShape" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
+</svg>

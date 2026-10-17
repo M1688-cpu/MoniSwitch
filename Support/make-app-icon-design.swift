@@ -1,7 +1,11 @@
 #!/usr/bin/env swift
 //
 // make-app-icon-design.swift
-// 自绘 MoniSwitch 应用图标（1024×1024，Liquid Glass 风格）
+// 旧版自绘 MoniSwitch 应用图标（1024×1024，Liquid Glass 风格）
+//
+// ⚠️ Legacy：现行 MoniSwitch 图标已换为 design/icon-web/moniswitch-icon.svg
+// 导出的 Resources/AppIcon-source.png；本脚本只在
+// Support/make-app-icon.sh --redraw 实验/回归路径下使用，默认流程不再调用。
 //
 // 图标构成：圆角 squircle 渐变底（对角渐变 + 顶部玻璃高光 + rim light 描边）
 // + 显示器（屏幕壁纸渐变、红绿灯、石墨机身、支架底座）。

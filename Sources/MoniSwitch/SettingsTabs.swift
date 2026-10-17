@@ -5,6 +5,80 @@ import AppKit
 // 窗口骨架（边栏 + 悬浮标题 + 毛玻璃）在 SettingsView.swift；
 // 共享卡片/图标组件在 Components.swift。
 
+// MARK: - 主题色卡圆点（设置页专用）
+
+/// 主题选择圆点：三区圆复刻 Chrome 色卡的分区方式——左上象限最深（实心档）/
+/// 右上象限中间（高亮档）/下半圆最浅（背景档）。**现在直接取该主题在当前外观下
+/// 的生效色板**（浅色为 L* 派生、深色为原派生），所见即面板所得，不再画色源原值；
+/// 「跟随系统」画系统强调色上半圆 + 中性色下半圆。
+/// 分区用「矩形 + Circle 裁剪」实现（对齐/frame 驱动，不依赖 addArc 的方向语义）。
+/// 选中态 = 外圈强调色描边；名称走 .help tooltip 与无障碍标签（与 Chrome 色卡
+/// 同为无文字圆点，7 个名称不占卡面空间）。
+private struct ThemeSwatchButton: View {
+    enum Swatch {
+        case theme(PanelTheme)
+        case followSystem
+    }
+
+    let label: String
+    let isSelected: Bool
+    let swatch: Swatch
+    let action: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovered = false
+
+    private let diameter: CGFloat = 26
+
+    var body: some View {
+        Button(action: action) {
+            swatchCircle
+                .frame(width: diameter, height: diameter)
+                .clipShape(Circle())
+                .overlay(
+                    // 选中环在外、留 3pt 呼吸；未选中给一圈极淡边界（浅色下淡彩
+                    // 圆点在灰卡上几乎无边缘）。纯装饰环摘除命中区（全站范式）。
+                    Circle().stroke(isSelected ? BrandColor.accent : Color.primary.opacity(isHovered ? 0.28 : 0.12),
+                                    lineWidth: isSelected ? 2 : 1)
+                        .padding(-3)
+                        .allowsHitTesting(false)
+                )
+                .scaleEffect(isHovered ? 1.08 : 1)
+                .animation(BubbleMetrics.buttonHoverSpring, value: isHovered)
+                .help(label)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .onHover { isHovered = $0 }
+    }
+
+    @ViewBuilder
+    private var swatchCircle: some View {
+        switch swatch {
+        case .theme(let theme):
+            let p = theme.palette(dark: colorScheme == .dark)
+            let background = p.background
+                ?? (colorScheme == .dark ? BubbleMetrics.bubbleDarkFill : Color.white)
+            ZStack(alignment: .top) {
+                // 底圆 = 生效卡底（浅色近白淡染 / 深色派生深底）。
+                Circle().fill(background)
+                // 上半：左半矩形实心档、右半矩形高亮档，经 Circle 裁剪成两个象限扇区。
+                HStack(spacing: 0) {
+                    Rectangle().fill(p.solid)
+                    Rectangle().fill(p.highlight)
+                }
+                .frame(height: diameter / 2)
+            }
+        case .followSystem:
+            ZStack(alignment: .top) {
+                Circle().fill(Color(nsColor: .controlBackgroundColor))
+                Rectangle().fill(BrandColor.accent)
+                    .frame(height: diameter / 2)
+            }
+        }
+    }
+}
+
 // MARK: - 通用标签
 
 struct GeneralTab: View {
@@ -17,34 +91,64 @@ struct GeneralTab: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // —— 语言 ——
-                SettingsCard(title: l10n.t(.groupLanguage), systemImage: "globe") {
-                    settingRow(l10n.t(.languageLabel)) {
-                        Picker("", selection: $l10n.lang) {
-                            ForEach(Language.allCases) { lang in
-                                Text(lang.displayName).tag(lang)
+                // —— 通用（语言 + 启动合并卡；2026-10-17 分区重排方案 A）——
+                SettingsCard(title: l10n.t(.groupGeneral)) {
+                    VStack(spacing: 0) {
+                        settingRow(l10n.t(.languageLabel)) {
+                            Picker("", selection: $l10n.lang) {
+                                ForEach(Language.allCases) { lang in
+                                    Text(lang.displayName).tag(lang)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .menuPickerNeutralTint()
+                            .labelsHidden()
+                            .frame(width: 150)
+                        }
+                        Divider().padding(.vertical, 6)
+                        settingRow(l10n.t(.launchAtLogin),
+                                   footnote: l10n.t(.launchAtLoginFootnote)) {
+                            Toggle("", isOn: $settings.launchAtLogin)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+                    }
+                }
+
+                // —— 主题色（2026-10-17 内置主题：三区圆点选择 + 跟随系统默认项）——
+                SettingsCard(title: l10n.t(.groupTheme)) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 34), spacing: 8)], spacing: 8) {
+                            ThemeSwatchButton(
+                                label: l10n.t(.themeFollowSystem),
+                                isSelected: settings.panelThemeID == PanelTheme.systemID,
+                                swatch: .followSystem
+                            ) {
+                                settings.panelThemeID = PanelTheme.systemID
+                            }
+                            ForEach(PanelTheme.all) { theme in
+                                ThemeSwatchButton(
+                                    label: l10n.t(theme.nameKey),
+                                    isSelected: settings.panelThemeID == theme.id,
+                                    swatch: .theme(theme)
+                                ) {
+                                    settings.panelThemeID = theme.id
+                                }
                             }
                         }
-                        .pickerStyle(.menu)
-                        .menuPickerNeutralTint()
-                        .labelsHidden()
-                        .frame(width: 150)
+                        Text(l10n.t(.themeFootnote))
+                            .font(.system(size: BubbleMetrics.fontCaption))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .padding(.vertical, 4)
                 }
 
-                // —— 启动 ——
-                SettingsCard(title: l10n.t(.groupStartup), systemImage: "power") {
-                    settingRow(l10n.t(.launchAtLogin)) {
-                        Toggle("", isOn: $settings.launchAtLogin)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                    }
-                }
-
-                // —— 显示器 ——
-                SettingsCard(title: l10n.t(.groupDisplays), systemImage: "display") {
+                // —— 显示器（三行合并卡，行间 Divider，行下小字说明副文本）——
+                SettingsCard(title: l10n.t(.groupDisplays)) {
                     VStack(spacing: 0) {
-                        settingRow(l10n.t(.autoRefresh)) {
+                        settingRow(l10n.t(.autoRefresh),
+                                   footnote: l10n.t(.autoRefreshFootnote)) {
                             Toggle("", isOn: $settings.autoRefreshEnabled)
                                 .labelsHidden()
                                 .toggleStyle(.switch)
@@ -65,7 +169,8 @@ struct GeneralTab: View {
                             }
                         }
                         Divider().padding(.vertical, 6)
-                        settingRow(l10n.t(.detailedMenuInfo)) {
+                        settingRow(l10n.t(.detailedMenuInfo),
+                                   footnote: l10n.t(.detailedMenuFootnote)) {
                             Toggle("", isOn: $settings.detailedMenuInfo)
                                 .labelsHidden()
                                 .toggleStyle(.switch)
@@ -74,8 +179,9 @@ struct GeneralTab: View {
                 }
 
                 // —— 通知 ——
-                SettingsCard(title: l10n.t(.groupNotifications), systemImage: "bell") {
-                    settingRow(l10n.t(.notifyOnSwitch)) {
+                SettingsCard(title: l10n.t(.groupNotifications)) {
+                    settingRow(l10n.t(.notifyOnSwitch),
+                               footnote: l10n.t(.notifyFootnote)) {
                         Toggle("", isOn: $settings.notificationsEnabled)
                             .labelsHidden()
                             .toggleStyle(.switch)
@@ -90,12 +196,23 @@ struct GeneralTab: View {
         }
     }
 
-    /// 统一的设置行：左侧标签 + 右侧控件，无每行小图标（图标由卡片头部承担）。
+    /// 统一的设置行：左侧标签（可带小字说明副文本）+ 右侧控件（原生分组卡行式样）。
+    /// 副文本是 2026-10-17 分区重排的可读性核心：短句说明该行的实际效果，
+    /// 控件右缘对齐不受副文本影响（HStack 中心对齐）。
     @ViewBuilder
-    private func settingRow<Control: View>(_ title: String, @ViewBuilder control: () -> Control) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: BubbleMetrics.fontBody))
+    private func settingRow<Control: View>(_ title: String,
+                                           footnote: String? = nil,
+                                           @ViewBuilder control: () -> Control) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: BubbleMetrics.fontBody))
+                if let footnote {
+                    Text(footnote)
+                        .font(.system(size: BubbleMetrics.fontCaption))
+                        .foregroundStyle(.secondary)
+                }
+            }
             Spacer()
             control()
         }
@@ -119,25 +236,18 @@ struct BrightnessTab: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // —— F1/F2 开关 ——
-                SettingsCard(title: l10n.t(.groupBrightnessKeys), systemImage: "sun.max") {
-                    VStack(spacing: 0) {
-                        settingRow(l10n.t(.brightnessKeysRow)) {
-                            Toggle("", isOn: $settings.brightnessKeysEnabled)
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                        }
-                        Divider().padding(.vertical, 6)
-                        Text(l10n.t(.brightnessKeysHint))
-                            .font(.system(size: BubbleMetrics.fontCaption))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 2)
+                // —— F1/F2 开关（用法说明并入行下副文本；2026-10-17 分区重排方案 A）——
+                SettingsCard(title: l10n.t(.groupBrightnessKeys)) {
+                    settingRow(l10n.t(.brightnessKeysRow),
+                               footnote: l10n.t(.brightnessKeysHint)) {
+                        Toggle("", isOn: $settings.brightnessKeysEnabled)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
                     }
                 }
 
-                // —— 输入监控权限 ——
-                SettingsCard(title: l10n.t(.groupPermission), systemImage: "lock.shield") {
+                // —— 输入监控权限（DDC 兼容性说明并入本卡尾部脚注）——
+                SettingsCard(title: l10n.t(.groupPermission)) {
                     VStack(spacing: 0) {
                         HStack(spacing: 8) {
                             Image(systemName: permissionGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
@@ -161,16 +271,13 @@ struct BrightnessTab: View {
                             }
                         }
                         .padding(.vertical, 4)
+                        Divider().padding(.vertical, 6)
+                        Text(l10n.t(.ddcUnsupportedHint))
+                            .font(.system(size: BubbleMetrics.fontCaption))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 2)
                     }
-                }
-
-                // —— 兼容性说明 ——
-                SettingsCard(title: l10n.t(.groupDisplays), systemImage: "info.circle") {
-                    Text(l10n.t(.ddcUnsupportedHint))
-                        .font(.system(size: BubbleMetrics.fontCaption))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 2)
                 }
 
                 Spacer(minLength: 0)
@@ -180,12 +287,21 @@ struct BrightnessTab: View {
         }
     }
 
-    /// 与 GeneralTab 同款的设置行。
+    /// 与 GeneralTab 同款的设置行（含可选副文本）。
     @ViewBuilder
-    private func settingRow<Control: View>(_ title: String, @ViewBuilder control: () -> Control) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: BubbleMetrics.fontBody))
+    private func settingRow<Control: View>(_ title: String,
+                                           footnote: String? = nil,
+                                           @ViewBuilder control: () -> Control) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: BubbleMetrics.fontBody))
+                if let footnote {
+                    Text(footnote)
+                        .font(.system(size: BubbleMetrics.fontCaption))
+                        .foregroundStyle(.secondary)
+                }
+            }
             Spacer()
             control()
         }
@@ -277,7 +393,7 @@ struct PresetsTab: View {
         ScrollView {
             VStack(spacing: 16) {
                 // —— 保存当前布局 / 已保存预设，合并在同一张卡片 ——
-                SettingsCard(title: l10n.t(.groupPresets), systemImage: "square.stack") {
+                SettingsCard(title: l10n.t(.groupPresets)) {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(l10n.t(.presetCaptureHint))
                             .font(.system(size: BubbleMetrics.fontControl))

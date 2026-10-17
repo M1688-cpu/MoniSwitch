@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="Resources/AppIcon-source.png?v=0.1.4" width="56" alt="MoniSwitch" align="middle"> MoniSwitch
+  <img src="Resources/AppIcon-source.png?v=2.0.0" width="56" alt="MoniSwitch" align="middle"> MoniSwitch
 </h1>
 
 <p align="center">
@@ -12,7 +12,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" alt="platform">
-  <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey" alt="arch">
+  <img src="https://img.shields.io/badge/arch-Apple%20Silicon-lightgrey" alt="arch">
   <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
@@ -175,11 +175,12 @@ MoniSwitch/
 ├── Resources/
 │   ├── displayplacer              # Bundled display-control binary (not committed)
 │   ├── AppIcon.icns               # App icon
-│   └── AppIcon-source.png         # Icon source (rendered by make-app-icon-design.swift)
+│   └── AppIcon-source.png         # Icon source (exported from design/icon-web/moniswitch-icon.svg)
 ├── Support/
 │   ├── Info.plist                 # App metadata (LSUIElement etc.)
 │   ├── build-app.sh               # One-shot packaging script
-│   └── make-app-icon.sh           # Rebuild AppIcon.icns (pure-code render by default)
+│   └── make-app-icon.sh           # Rebuild AppIcon.icns (prebuilt 1024 source by default; --redraw = legacy)
+├── design/icon-web/               # Icon design source (SVG + preview page + PNG exports)
 ├── screenshots/                   # README screenshots (en/zh pairs, same filenames)
 ├── README.md                      # This file (default, English)
 ├── README.zh-CN.md                # Simplified Chinese README

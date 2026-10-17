@@ -212,8 +212,9 @@ final class PanelController: NSObject {
 
     // MARK: - 高度桥（PanelView 的 PanelContentHeightKey → onPreferenceChange 调用）
 
-    /// 内容高度变化 → 顶边锚死改写窗口 frame（同步直写；增长方向无动画 =
-    /// 「二值布局跳变」防漂移策略的延续，视觉动画由内容自身 mask 揭示承担）。
+    /// 内容高度变化 → 顶边锚死改写窗口 frame（同步直写）。SwiftUI 布局动画期间
+    /// 每帧上报中间高度，这里逐帧跟随（顶边不动、向下生长/收缩）——展开/收起
+    /// 两方向对称丝滑的关键；顶边锚死 + 内容顶端钉死，居中漂移构造性不可能。
     func updateContentHeight(_ height: CGFloat) {
         guard let panel, abs(panel.frame.height - height) > 0.5 else { return }
         contentHeight = height

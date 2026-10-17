@@ -22,19 +22,29 @@ enum BrandColor {
 /// 现在直接用纯色填充：浅色=纯白，深色=BubbleMetrics.bubbleDarkFill（接近系统卡片色）。
 /// `.foregroundStyle(.primary)` 在不透明背景下仍能正常自适应（浅=黑字、深=白字），无需特殊处理。
 ///
-/// 设置卡片、菜单栏 BubbleCard/bottomToolbar 共用。
+/// 内置主题（2026-10-17）：环境里注入了主题色板时，卡底改用色板派生底——
+/// 浅色=A 方案近白淡染（L*94）+ 实心档淡描边，深色=C 方案原派生深底；未注入
+/// （设置窗口）或「跟随系统」时维持白/深卡色与中性描边。菜单栏
+/// BubbleCard/bottomToolbar/亮度 HUD 共用。
 struct BubbleBackground: ViewModifier {
+    /// 自定义轮廓（2026-10-17）：默认圆角矩形；三连工具气泡传局部隆起轮廓
+    /// （BulgingBubbleShape，随 hover 动画逐帧变形），填充与描边共用同一轮廓。
+    var shape: AnyShape? = nil
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.panelPalette) private var palette
 
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: BubbleMetrics.cardCornerRadius)
-        // 浅色纯白、深色用固定卡片色（避免纯白在深色窗口上刺眼）。
-        let fill: Color = colorScheme == .light ? .white : BubbleMetrics.bubbleDarkFill
-        // 描边：不透明卡片在窗口上需要稍清晰边界，浅色用 0.10，深色用 0.18 提亮边缘。
-        let strokeOpacity: Double = colorScheme == .light ? 0.10 : 0.18
+        let shape = self.shape ?? AnyShape(RoundedRectangle(cornerRadius: BubbleMetrics.cardCornerRadius))
+        // 主题染色优先；未染（nil）回落默认：浅色纯白、深色固定卡片色。
+        let fill: Color = palette.background
+            ?? (colorScheme == .light ? .white : BubbleMetrics.bubbleDarkFill)
+        // 描边：不透明卡片在窗口上需要稍清晰边界，浅色用 0.10，深色用 0.18 提亮边缘；
+        // 主题染色的浅色卡用实心档淡描边（palette.cardBorder），与卡底同色相。
+        let stroke: Color = palette.cardBorder
+            ?? Color.primary.opacity(BubbleMetrics.surfaceStrokeOpacity(dark: colorScheme == .dark))
         return content
             .background(fill, in: shape)
-            .overlay(shape.stroke(Color.primary.opacity(strokeOpacity), lineWidth: 1))
+            .overlay(shape.stroke(stroke, lineWidth: 1))
     }
 }
 
@@ -48,6 +58,7 @@ struct BubbleCard<Content: View>: View {
     /// 分区标题；nil = 无标题卡（2026-10 布局图枢纽卡：图即内容，标题字样删除）。
     let title: String?
     @ViewBuilder let content: Content
+    @Environment(\.panelPalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -56,16 +67,19 @@ struct BubbleCard<Content: View>: View {
                     .font(.system(size: BubbleMetrics.fontCaption, weight: .semibold))
                     .tracking(BubbleMetrics.sectionLabelTracking)
                     .textCase(.uppercase)
-                    .foregroundStyle(BubbleMetrics.sectionLabelColor)
+                    .foregroundStyle(palette.sectionLabel ?? BubbleMetrics.sectionLabelColor)
                     .lineLimit(1)
             }
             content
         }
         .padding(16)
-        // 不透明填充（浅色纯白 / 深色卡片色）+ 自适应淡描边（与设置卡片同源）。
+        // 不透明填充（浅色纯白 / 主题浅色近白淡染 / 深色卡片色）+ 自适应淡描边。
         // 2026-09 曾试改 thin/ultraThinMaterial「玻璃卡片」被用户否决：卡片发灰、
-        // 整板观感退化为类 macOS 15 毛玻璃——气泡必须保持纯白，不要再用材质填充。
+        // 整板观感退化为类 macOS 15 毛玻璃——气泡必须保持不透明，不要再用材质填充。
         .modifier(BubbleBackground())
+        // 右上光源布光（2026-10-17）：泛光 + 左下压暗 + 内缘高光 + 方向性落影，
+        // 纯呈现 overlay、不占布局（详见 BubbleLightingModifier）。
+        .bubbleLighting()
         // 四周悬浮阴影（无背板语境：直接落在壁纸上，用壁纸承接参数）。
         .bubbleFloatingShadow()
         // hover 整卡微放大 + 上浮 + 阴影增强（最外层，全仿射保原生锐度）。仅菜单栏面板使用。
@@ -73,28 +87,37 @@ struct BubbleCard<Content: View>: View {
     }
 }
 
-/// 设置分组卡片：头部（纯图标 + 标题）+ 自定义内容。
-/// 视觉与菜单栏 BubbleCard 同源：BubbleBackground（不透明填充）+ 悬浮阴影。
+/// 设置分组卡片（2026-10-17 原生化改版，系统设置范式）：小字 semibold 标签置于
+/// 卡**上方**，卡体纯色填充、圆角 10、无阴影无描边——原生分组卡靠底色差呈现层次，
+/// 不再与菜单栏 BubbleCard 共用气泡视觉（BubbleBackground/悬浮阴影归面板专用）。
+/// 卡体颜色（2026-10-17 用户拍板「白底灰卡」）：浅色 = windowBackgroundColor 浅灰
+/// （内容区已改纯白），深色 = controlBackgroundColor；两侧均与内容区差一档。
+/// 行内容由调用方给，行间 Divider 由调用方排（原生分组的行分隔样式）。
 struct SettingsCard<Content: View>: View {
     let title: String
-    let systemImage: String
     @ViewBuilder let content: Content
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 9) {
-                PlainIcon(systemImage: systemImage, size: 16)
-                Text(title)
-                    .font(.system(size: BubbleMetrics.fontBody, weight: .semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: BubbleMetrics.fontBody, weight: .semibold))
+                .foregroundStyle(.primary)
+                .padding(.leading, 8)
+                .lineLimit(1)
+            VStack(alignment: .leading, spacing: BubbleMetrics.rowSpacing) {
+                content
             }
-            content
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .background(
+                colorScheme == .light
+                    ? Color(nsColor: .windowBackgroundColor)
+                    : Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: BubbleMetrics.settingsCardCornerRadius)
+            )
         }
-        .padding(16)
-        .modifier(BubbleBackground())
-        // 悬浮阴影稍浅（强度系数 0.85，与菜单栏 BubbleCard 同款双层弥散）。
-        .bubbleShadow(opacity: 0.85)
     }
 }
 
@@ -195,17 +218,19 @@ extension View {
     }
 }
 
-/// 激活态胶囊：active 时强调色实心 + 白字，非激活时透明底 + 主色字。
+/// 激活态胶囊：active 时实心强调色 + 对比文字，非激活时透明底 + 主色字。
 /// 镜像/扩展切换按钮与位置分段控件的段共用，激活态视觉由此统一。
+/// 主题分档（2026-10-17）：激活实心 = 色板实心档（最深），未激活悬停底 = 高亮档
+/// （中间档）；未注入主题时两档都回落系统强调色（原观感）。
 /// - `strokeWhenInactive`：非激活时是否给整胶囊加淡描边（镜像/扩展按钮用；
 ///   位置分段的描边由外层分段容器统一承担，传 false）。
-/// - 未激活态悬停时给一层 14% 强调色胶囊底（与行高亮同款），两类控件一并获得
-///   悬停反馈；激活态本就是强调色实心，不再叠加。
 struct ActivePill<Content: View>: View {
     let active: Bool
     var verticalPadding: CGFloat = 3
     var strokeWhenInactive = false
     @ViewBuilder let content: Content
+
+    @Environment(\.panelPalette) private var palette
 
     /// 悬停态跟踪。显式 init：加 @State 后默认成员构造器会变 private，
     /// 手写保持 PanelView 侧调用签名不变。
@@ -226,12 +251,12 @@ struct ActivePill<Content: View>: View {
             .padding(.vertical, verticalPadding)
             .background {
                 if active {
-                    Capsule().fill(BrandColor.accent)
+                    Capsule().fill(palette.solid)
                 } else {
                     // hover 底色在下、描边在上，静止态层次不变。
                     ZStack {
                         if isHovered {
-                            Capsule().fill(BrandColor.accent.opacity(0.14))
+                            Capsule().fill(palette.highlight.opacity(palette.subtleHoverOpacity))
                         }
                         if strokeWhenInactive {
                             Capsule().stroke(Color.secondary.opacity(0.3), lineWidth: 1)
@@ -239,25 +264,27 @@ struct ActivePill<Content: View>: View {
                     }
                 }
             }
-            .foregroundStyle(active ? Color.white : Color.primary)
+            .foregroundStyle(active ? palette.solidText : Color.primary)
             .contentShape(Rectangle())
             .onHover { isHovered = $0 }
             .animation(.easeInOut(duration: 0.12), value: isHovered)
     }
 }
 
-/// 行 hover 高亮修饰器：用局部 @State 跟踪悬停态，叠加半透明强调色背景。
-/// 强调色直接读 BrandColor.accent（桥接的动态色，系统强调色切换时自动更新）。
+/// 行 hover 高亮修饰器：用局部 @State 跟踪悬停态，叠加半透明高亮色背景。
+/// 高亮色取主题色板高亮档（中间档）；未注入主题时为系统强调色
+///（桥接的动态色，系统强调色切换时自动更新）。
 private struct HoverRowHighlightModifier: ViewModifier {
     /// 高亮向两侧外扩点数（见 hoverRowHighlight 注释）。
     var horizontalExpansion: CGFloat = 6
     @State private var isHovered = false
+    @Environment(\.panelPalette) private var palette
 
     func body(content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: BubbleMetrics.hoverCornerRadius)
-                    .fill(BrandColor.accent.opacity(isHovered ? 0.14 : 0))
+                    .fill(palette.highlight.opacity(isHovered ? palette.hoverOpacity : 0))
                     .animation(.easeInOut(duration: 0.12), value: isHovered)
                     // 负 padding 让高亮矩形向两侧外扩：只扩视觉、不占布局空间，
                     // 文字与行内其他元素的位置不受影响。
@@ -309,6 +336,107 @@ extension View {
     /// 用于菜单栏面板的全部大气泡（BubbleCard 各卡片 + 底部工具栏两气泡）。
     func bubbleHoverLift() -> some View {
         modifier(BubbleHoverLiftModifier())
+    }
+}
+
+// MARK: - 气泡布光（右上光源）
+
+/// 面板统一布光（2026-10-17 用户拍板「每张气泡各自布光」）：假设一盏位于整个
+/// 界面右上角的光，对每张气泡施加三层纯呈现 overlay + 一层方向性落影：
+///  1. 泛光：右上暖白 → 左下的对角渐变（向背光侧逐段衰减到 0）；
+///  2. 压暗：左下角极淡冷调暗角——纯白卡亮度已到顶，**立体感只能靠背光侧压暗**；
+///  3. 内缘高光：右上 → 左下的 1px 渐变描边（浅色纯白卡上很淡，染色卡/深色卡
+///     上是主要线索）；
+///  4. 落影：朝左下偏移的轻阴影，呼应光向（叠在既有壁纸承接阴影之上，不替换
+///     用户定档的 floatingShadowSpec）。
+///
+/// 全部 clip 在气泡圆角内：不参与布局、不挡命中；静态光效与 reduceMotion 无关
+/// （它不是「动效」，减弱动态效果时不应把打光关掉）。所有数值见 BubbleMetrics
+/// 的「气泡布光」小节。
+struct BubbleLightingModifier: ViewModifier {
+    /// 气泡圆角（一级气泡 20；调用方若用其他圆角需显式传入）。
+    var cornerRadius: CGFloat = BubbleMetrics.cardCornerRadius
+    /// 自定义轮廓（2026-10-17）：默认按 cornerRadius 取圆角矩形；三连工具气泡传
+    /// 局部隆起轮廓，三层光效随轮廓逐帧变形（与填充/描边共用同一 Shape 实例）。
+    var shape: AnyShape? = nil
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.panelPalette) private var palette
+
+    func body(content: Content) -> some View {
+        let dark = colorScheme == .dark
+        // 浅色主题染色卡 = 近白淡染：暖白泛光会把淡彩叠脏，换中性白；深色与
+        // 跟随系统（palette.background == nil）保持原暖白布光。
+        let themedLight = !dark && palette.background != nil
+        let shape = self.shape ?? AnyShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        let bloom = themedLight
+            ? Color.white.opacity(BubbleMetrics.lightBloomThemedOpacity)
+            : Color(hex: BubbleMetrics.lightBloomHex)
+                .opacity(dark ? BubbleMetrics.lightBloomDarkOpacity : BubbleMetrics.lightBloomLightOpacity)
+        let shade = Color(hex: BubbleMetrics.lightShadeHex)
+            .opacity(dark ? BubbleMetrics.lightShadeDarkOpacity : BubbleMetrics.lightShadeLightOpacity)
+        let rim = Color.white
+            .opacity(dark ? BubbleMetrics.lightRimDarkOpacity : BubbleMetrics.lightRimLightOpacity)
+
+        return content
+            .overlay {
+                ZStack {
+                    // 1. 右上 → 左下的泛光（bloom 逐段衰减）。
+                    shape.fill(
+                        LinearGradient(stops: [
+                            .init(color: bloom, location: 0),
+                            .init(color: bloom.opacity(0.28), location: 0.55),
+                            .init(color: bloom.opacity(0), location: 1),
+                        ], startPoint: .topTrailing, endPoint: .bottomLeading)
+                    )
+                    // 2. 背光侧（左下）压暗：不透明度 0 → 终值的对角暗角。
+                    shape.fill(
+                        LinearGradient(stops: [
+                            .init(color: shade.opacity(0), location: 0.38),
+                            .init(color: shade, location: 1),
+                        ], startPoint: .topTrailing, endPoint: .bottomLeading)
+                    )
+                    // 3. 内缘高光：右上的边被照亮，左下的边自然消失。
+                    // AnyShape 不符合 InsettableShape（无 strokeBorder）：自定义轮廓
+                    // 退用 stroke 中心线（1px 线宽下与内描边差 0.5px，不可感知）；
+                    // 默认圆角矩形路径保持原 strokeBorder。
+                    if let customShape = self.shape {
+                        customShape.stroke(
+                            LinearGradient(stops: [
+                                .init(color: rim, location: 0),
+                                .init(color: rim.opacity(0), location: 0.55),
+                            ], startPoint: .topTrailing, endPoint: .bottomLeading),
+                            lineWidth: 1
+                        )
+                    } else {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(stops: [
+                                    .init(color: rim, location: 0),
+                                    .init(color: rim.opacity(0), location: 0.55),
+                                ], startPoint: .topTrailing, endPoint: .bottomLeading),
+                                lineWidth: 1
+                            )
+                    }
+                }
+                // 装饰层不参与命中（全站范式）。
+                .allowsHitTesting(false)
+            }
+    }
+}
+
+extension View {
+    /// 右上光源布光：泛光 + 左下压暗 + 内缘高光 + 方向性落影。
+    /// 用于菜单栏面板的全部气泡（BubbleCard 各卡片、参数二级气泡、底部两气泡）；
+    /// 亮度 HUD 与设置窗口不参与（独立窗口 / 原生观感）。
+    func bubbleLighting(cornerRadius: CGFloat = BubbleMetrics.cardCornerRadius) -> some View {
+        modifier(BubbleLightingModifier(cornerRadius: cornerRadius))
+    }
+
+    /// 右上光源布光（自定义轮廓版）：三连工具气泡的局部隆起轮廓等非圆角矩形
+    /// 气泡用——三层光效随轮廓变形（Shape 的 animatableData 驱动逐帧插值）。
+    func bubbleLighting<S: Shape>(shape: S) -> some View {
+        modifier(BubbleLightingModifier(shape: AnyShape(shape)))
     }
 }
 

@@ -35,6 +35,7 @@ final class AppSettings: ObservableObject {
         static let detailedMenuInfo   = "detailedMenuInfo"
         static let notificationsEnabled = "notificationsEnabled"
         static let brightnessKeysEnabled = "brightnessKeysEnabled"
+        static let panelThemeID       = "panelThemeID"
     }
 
     /// 可选的自动刷新间隔（秒）。Picker 直接遍历它。
@@ -102,6 +103,16 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// 面板内置主题 id（2026-10-17）：`PanelTheme.systemID` = 跟随系统（默认），
+    /// 其余为 PanelTheme.all 里的 7 组低饱和三档色系。设置页选择后立即生效并持久化。
+    /// 启动时校验 id：主题被删除（如 2026-10-17 二次筛选）则回落跟随系统并清理存档。
+    @Published var panelThemeID: String {
+        didSet {
+            guard oldValue != panelThemeID else { return }
+            UserDefaults.standard.set(panelThemeID, forKey: Key.panelThemeID)
+        }
+    }
+
     /// 防止副作用（SMAppService/通知授权）失败回滚设值时再次触发 didSet 里的副作用。
     private var isApplying = false
 
@@ -115,6 +126,14 @@ final class AppSettings: ObservableObject {
         self.detailedMenuInfo    = defaults.object(forKey: Key.detailedMenuInfo) as? Bool ?? false
         self.notificationsEnabled = defaults.object(forKey: Key.notificationsEnabled) as? Bool ?? false
         self.brightnessKeysEnabled = defaults.object(forKey: Key.brightnessKeysEnabled) as? Bool ?? true
+        let storedTheme = defaults.string(forKey: Key.panelThemeID) ?? PanelTheme.systemID
+        if storedTheme == PanelTheme.systemID || PanelTheme.all.contains(where: { $0.id == storedTheme }) {
+            self.panelThemeID = storedTheme
+        } else {
+            // 已删除/未知主题 id：回落跟随系统，并把存档改成有效值（防设置页无选中项）。
+            self.panelThemeID = PanelTheme.systemID
+            defaults.set(PanelTheme.systemID, forKey: Key.panelThemeID)
+        }
     }
 
     // MARK: - 开机自启动

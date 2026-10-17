@@ -2,6 +2,12 @@
 
 本目录存放随 App 一起打包的资源文件。
 
+## 应用图标
+
+- `AppIcon-source.png`：1024×1024 源图（透明留白），设计源在 `design/icon-web/moniswitch-icon.svg`。
+- `AppIcon.icns`：由 `bash Support/make-app-icon.sh` 从 source 生成；`build-app.sh` 会把它拷进 .app。
+- 换图标：导出新的 1024 PNG → 覆盖 `AppIcon-source.png` → 重建 icns → 重新打包。
+
 ## displayplacer 二进制
 
 `displayplacer` 是 MoniSwitch 用来实际切换显示器的核心依赖。

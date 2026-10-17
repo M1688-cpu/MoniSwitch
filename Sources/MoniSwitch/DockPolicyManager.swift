@@ -43,19 +43,24 @@ final class DockPolicyManager: NSObject, NSWindowDelegate {
             let hosting = NSHostingController(rootView: rootView)
 
             let window = NSWindow(contentViewController: hosting)
-            // 注意：不设置 window.title，避免 NavigationSplitView 继承窗口标题。
-            window.title = ""
-            // 固定尺寸窗口（680×760，横向更宽）；用 fullSizeContentView 让内容延伸到标题栏下方。
-            window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
-            // 透明标题栏：去掉顶部"设置"白色条，让 NavigationSplitView 的边栏毛玻璃向上贯通
-            // 覆盖整个标题区（红绿灯按钮浮在毛玻璃上），对齐系统设置/图二图三的无标题观感。
+            // 窗口标题供 Mission Control/辅助功能读取（titleVisibility 仍隐藏，
+            // 标题栏观感由内容区 DetailHeader 承担；NavigationSplitView 已弃用，
+            // 无旧「标题继承到边栏重复渲染」问题）。
+            window.title = l10n.t(.settingsTitle)
+            // fullSizeContentView 让内容延伸到标题栏下方（边栏毛玻璃顶到窗口顶）。
+            // .resizable 必须显式带上：NSWindow(contentViewController:) 默认含
+            // resizable，整串覆写 styleMask 时漏掉它窗口就不可拉伸（2026-10-17
+            // 补——此前注释声称可调但掩码实际没开）。
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            // 透明标题栏：去掉顶部"设置"白色条，让边栏毛玻璃向上贯通
+            // 覆盖整个标题区（红绿灯按钮浮在毛玻璃上），对齐系统设置/访达的无标题观感。
             // 标题改由右侧内容区顶部的「图标 + 已选功能名」承担（见 SettingsView.DetailHeader）。
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.setContentSize(NSSize(width: 680, height: 760))
-            // 锁死尺寸，不可拉伸。三处必须同步：只改 setContentSize 会被 maxSize 钳回。
-            window.minSize = NSSize(width: 680, height: 760)
-            window.maxSize = NSSize(width: 680, height: 760)
+            // 可拉伸（2026-10-17 原生化改版：原生设置类窗口均可调尺寸），仅保下限
+            // 防布局挤压（边栏 240 固定 + 内容区最小 ~380 宽）。不再锁 maxSize。
+            window.minSize = NSSize(width: 620, height: 560)
             // 仅允许在原生标题栏（红绿灯按钮条）拖动窗口，避免边栏/内容区背景任意拖动。
             window.isMovableByWindowBackground = false
             window.isReleasedWhenClosed = false   // 复用窗口对象

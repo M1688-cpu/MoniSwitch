@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="Resources/AppIcon-source.png?v=0.1.4" width="56" alt="MoniSwitch" align="middle"> MoniSwitch
+  <img src="Resources/AppIcon-source.png?v=2.0.0" width="56" alt="MoniSwitch" align="middle"> MoniSwitch
 </h1>
 
 <p align="center">
@@ -12,7 +12,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014%2B-blue" alt="platform">
-  <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-lightgrey" alt="arch">
+  <img src="https://img.shields.io/badge/arch-Apple%20Silicon-lightgrey" alt="arch">
   <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
 </p>
@@ -175,11 +175,12 @@ MoniSwitch/
 ├── Resources/
 │   ├── displayplacer              # 打包的显示控制二进制（不入库）
 │   ├── AppIcon.icns               # 应用图标
-│   └── AppIcon-source.png         # 图标源图（make-app-icon-design.swift 自绘产物）
+│   └── AppIcon-source.png         # 图标源图（由 design/icon-web/moniswitch-icon.svg 导出）
 ├── Support/
 │   ├── Info.plist                 # App 元信息（LSUIElement 等）
 │   ├── build-app.sh               # 一键打包脚本
-│   └── make-app-icon.sh           # 重建 AppIcon.icns（默认纯代码自绘）
+│   └── make-app-icon.sh           # 重建 AppIcon.icns（默认用现成 1024 源图；--redraw 为旧版自绘）
+├── design/icon-web/               # 图标设计源（SVG + 预览页 + PNG 导出）
 ├── screenshots/                   # README 截图（en/zh 两套，文件名一一对应）
 ├── README.md                      # 默认 README（英文）
 ├── README.zh-CN.md                # 简体中文 README（本文件）
