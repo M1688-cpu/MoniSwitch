@@ -76,7 +76,7 @@
     </filter>
 
     <clipPath id="screenClip">
-      <rect x="994" y="172" width="446" height="276" rx="16"/>
+      <rect x="994" y="186" width="446" height="276" rx="16"/>
     </clipPath>
 
     <clipPath id="iconClip">
@@ -129,13 +129,13 @@
   <!-- feature chips -->
   <g font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13.5" font-weight="500" fill="#D9D9E4">
     <rect x="110" y="486" width="132" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.13"/>
-    <text x="128" y="509">Main display</text>
+    <text x="176" y="509" text-anchor="middle">Main display</text>
     <rect x="254" y="486" width="162" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.13"/>
-    <text x="272" y="509">Arrange &amp; mirror</text>
+    <text x="335" y="509" text-anchor="middle">Arrange &amp; mirror</text>
     <rect x="428" y="486" width="156" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.13"/>
-    <text x="446" y="509">DDC brightness</text>
+    <text x="506" y="509" text-anchor="middle">DDC brightness</text>
     <rect x="596" y="486" width="112" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.045" stroke="#FFFFFF" stroke-opacity="0.13"/>
-    <text x="614" y="509">7 themes</text>
+    <text x="652" y="509" text-anchor="middle">7 themes</text>
   </g>
 
   <!-- footer -->
@@ -153,16 +153,16 @@
       <rect x="958" y="150" width="518" height="348" rx="28" fill="url(#bezel)" stroke="#FFFFFF" stroke-opacity="0.13"/>
       <rect x="978" y="170" width="478" height="308" rx="18" fill="#09090F"/>
       <g clip-path="url(#screenClip)">
-        <rect x="994" y="172" width="446" height="276" fill="url(#aurora)"/>
-        <rect x="994" y="172" width="446" height="276" fill="url(#screenGloss)"/>
+        <rect x="994" y="186" width="446" height="276" fill="url(#aurora)"/>
+        <rect x="994" y="186" width="446" height="276" fill="url(#screenGloss)"/>
         <circle cx="1090" cy="228" r="150" fill="#FFFFFF" fill-opacity="0.10" filter="url(#softGlow)"/>
         <circle cx="1380" cy="420" r="140" fill="#FF86C8" fill-opacity="0.18" filter="url(#softGlow)"/>
         <!-- glass toggle on the screen -->
-        <rect x="1166" y="278" width="92" height="44" rx="22" fill="#FFFFFF" fill-opacity="0.30" stroke="#FFFFFF" stroke-opacity="0.55"/>
-        <circle cx="1236" cy="300" r="16" fill="#FFFFFF"/>
-        <circle cx="1236" cy="300" r="16" fill="#FFFFFF" fill-opacity="0.35" filter="url(#softGlow)"/>
+        <rect x="1166" y="292" width="92" height="44" rx="22" fill="#FFFFFF" fill-opacity="0.30" stroke="#FFFFFF" stroke-opacity="0.55"/>
+        <circle cx="1236" cy="314" r="16" fill="#FFFFFF"/>
+        <circle cx="1236" cy="314" r="16" fill="#FFFFFF" fill-opacity="0.35" filter="url(#softGlow)"/>
         <!-- screen bezel highlight -->
-        <rect x="994" y="172" width="446" height="276" rx="16" fill="none" stroke="#FFFFFF" stroke-opacity="0.14"/>
+        <rect x="994" y="186" width="446" height="276" rx="16" fill="none" stroke="#FFFFFF" stroke-opacity="0.14"/>
       </g>
       <!-- camera -->
       <circle cx="1217" cy="161" r="2.4" fill="#FFFFFF" fill-opacity="0.35"/>
