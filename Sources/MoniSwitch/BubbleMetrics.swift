@@ -38,7 +38,7 @@ enum BubbleMetrics {
     /// 边栏选中行背景：比灰底深一档的半透明黑（浅深色自适应）。
     static let sidebarSelectionOpacity: CGFloat = 0.10
 
-    /// 气泡分区标题颜色：低饱和浅灰（参考 Tutti 的小型大写标签），浅/深模式通用。
+    /// 气泡分区标题颜色：低饱和浅灰（小型大写标签风格），浅/深模式通用。
     static let sectionLabelColor = Color(hex: "#94A3B8")
 
     /// 设置页顶部滚动毛玻璃：渐入斜坡——内容滚出多少 pt 内透明度从 0 到 1。
