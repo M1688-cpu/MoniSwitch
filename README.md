@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="docs/poster.svg?v=2">
-    <img src="docs/poster.svg?v=2" width="100%" alt="MoniSwitch — Every display. One switch. A dark aurora poster with a monitor, brightness slider and layout cards.">
+  <a href="docs/poster.svg?v=3">
+    <img src="docs/poster.svg?v=3" width="100%" alt="MoniSwitch — Every display. One switch. A dark aurora poster with a monitor, brightness slider and layout cards.">
   </a>
 </p>
 

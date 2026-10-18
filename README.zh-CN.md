@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="docs/poster.svg?v=2">
-    <img src="docs/poster.svg?v=2" width="100%" alt="MoniSwitch — 每块屏，一个开关。深色极光海报，含显示器、亮度滑条和布局卡片。">
+  <a href="docs/poster.svg?v=3">
+    <img src="docs/poster.svg?v=3" width="100%" alt="MoniSwitch — 每块屏，一个开关。深色极光海报，含显示器、亮度滑条和布局卡片。">
   </a>
 </p>
 
