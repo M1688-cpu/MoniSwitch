@@ -9,345 +9,718 @@
   <meta property="og:description" content="Switch the main display, move external screens, toggle extend/mirror — all from the menu bar.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://m1688-cpu.github.io/MoniSwitch/icon.png">
+  <meta name="theme-color" content="#f3f2ea">
   <link rel="icon" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
+  <link rel="preload" as="image" href="screenshots/backgrounds/hero.jpg" fetchpriority="high">
   <style>
-    /* ============ 设计令牌（mole.fit 羊皮纸色系 + 用户指定底色 #f3f2ea） ============ */
+    /* ============================================================
+       MoniSwitch site — warm paper, floating glass, quiet depth
+       Grid lines: 64px, strongest near the centre, fading outward
+       ============================================================ */
     :root {
-      --paper: #f3f2ea;        /* 页面底色（用户指定） */
-      --ivory: #faf9f5;        /* 卡片/浮层 */
-      --ink: #26241e;          /* 暖黑墨色 */
-      --muted: #6b6a64;        /* 次级文字（stone） */
-      --accent: #0066cc;       /* Apple 系统蓝，呼应 App「跟随系统强调色」 */
+      --paper: #f3f2ea;
+      --paper-deep: #ece9df;
+      --ivory: #faf9f5;
+      --ivory-2: #f6f4ed;
+      --ink: #211f1a;
+      --ink-soft: #3a372f;
+      --muted: #6f6c62;
+      --muted-2: #8a867a;
+      --accent: #0066cc;
       --accent-deep: #004fa8;
-      --line: #d8d5c8;         /* 卡片描边 */
-      --line-faint: #edebe1;   /* 分隔线 */
-      --shadow-card: 0 1px 2px rgba(38, 36, 30, .04), 0 8px 24px -16px rgba(38, 36, 30, .10);
-      --shadow-card-hover: 0 2px 4px rgba(38, 36, 30, .05), 0 18px 40px -18px rgba(38, 36, 30, .18);
-      --shadow-float: 0 10px 20px -8px rgba(38, 36, 30, .12), 0 36px 72px -24px rgba(38, 36, 30, .20);
-      --serif: Charter, Georgia, "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", Palatino, serif;
-      --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-      --wrap: 1120px;
-      --section-gap: 84px;
-      --radius: 16px;
+      --line: rgba(33, 31, 26, .13);
+      --line-soft: rgba(33, 31, 26, .085);
+      --line-strong: rgba(33, 31, 26, .18);
+      --line-faint: rgba(33, 31, 26, .055);
+      --grid: rgba(33, 31, 26, .065);
+      --btn: #211f1a;
+      --btn-hover: #3b382f;
+      --shadow-card: 0 1px 2px rgba(33, 31, 26, .04), 0 18px 42px -30px rgba(33, 31, 26, .24);
+      --shadow-card-hover: 0 2px 4px rgba(33, 31, 26, .05), 0 30px 62px -32px rgba(33, 31, 26, .32);
+      --shadow-float: 0 24px 48px -24px rgba(33, 31, 26, .24), 0 70px 130px -56px rgba(33, 31, 26, .34);
+      --serif: "Iowan Old Style", "Baskerville", "Palatino Linotype", Palatino, "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", Georgia, serif;
+      /* SF Pro Text first: -apple-system can fall back to Songti for Chinese
+         body copy in WebKit/Safari, which made the section subtitle serif while
+         the cards stayed sans. Naming PingFang SC explicitly keeps both sans. */
+      --sans: "SF Pro Text", "PingFang SC", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      --wrap: 1160px;
+      --wrap-wide: 1240px;
+      --gutter: 32px;
+      --radius: 20px;
+      --radius-lg: 30px;
+      --section-gap: 112px;
+      --ease: cubic-bezier(.16, 1, .3, 1);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { scroll-behavior: smooth; }
+    html[lang="zh-CN"] body { line-height: 1.8; }
     body {
+      position: relative;
       background: var(--paper);
       color: var(--ink);
-      font-family: var(--serif);
+      font-family: var(--sans);
       font-size: 17px;
-      line-height: 1.75;
+      line-height: 1.7;
+      overflow-x: clip;
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
     }
-    /* 中文正文行高放宽（mole.fit 同款刻度） */
-    html[lang="zh-CN"] body { line-height: 1.8; }
-    html[lang="zh-CN"] .hero-h1 { letter-spacing: -0.5px; }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, var(--grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+      background-size: 64px 64px;
+      -webkit-mask-image: radial-gradient(ellipse 84% 70% at 50% 36%, #000 0%, rgba(0, 0, 0, .84) 40%, rgba(0, 0, 0, .34) 66%, transparent 84%);
+      mask-image: radial-gradient(ellipse 84% 70% at 50% 36%, #000 0%, rgba(0, 0, 0, .84) 40%, rgba(0, 0, 0, .34) 66%, transparent 84%);
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: .045;
+      mix-blend-mode: multiply;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+    }
+    .page-glow {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(70% 46% at 50% 0%, rgba(255, 255, 255, .92) 0%, rgba(255, 255, 255, 0) 72%),
+        radial-gradient(46% 38% at 50% 7%, rgba(198, 211, 205, .22) 0%, rgba(198, 211, 205, 0) 70%);
+    }
 
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; text-underline-offset: 3px; }
     img { display: block; max-width: 100%; }
-    .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 32px; }
+    button { font: inherit; }
+    ::selection { background: rgba(0, 102, 204, .16); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+    .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); }
+    .wrap-wide { max-width: var(--wrap-wide); margin: 0 auto; padding: 0 var(--gutter); }
+    main, footer { position: relative; z-index: 1; }
     .sans { font-family: var(--sans); }
+    .serif { font-family: var(--serif); }
 
-    /* ============ 顶部导航 ============ */
+    /* ============ floating glass navigation ============ */
     .site-head {
-      position: sticky; top: 0; z-index: 50;
-      background: transparent;
-      transition: background .3s ease, border-color .3s ease, backdrop-filter .3s ease;
-      border-bottom: 1px solid transparent;
+      position: sticky;
+      top: 0;
+      z-index: 60;
+      padding: 18px 0 0;
+      pointer-events: none;
     }
-    .site-head.scrolled {
-      background: rgba(243, 242, 234, .82);
-      -webkit-backdrop-filter: saturate(1.4) blur(14px);
-      backdrop-filter: saturate(1.4) blur(14px);
-      border-bottom-color: var(--line-faint);
-    }
+    .head-shell { max-width: var(--wrap-wide); margin: 0 auto; padding: 0 var(--gutter); }
     .head-inner {
-      display: flex; align-items: center; gap: 28px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      width: max-content;
+      max-width: 100%;
       height: 60px;
+      margin: 0 auto;
+      padding: 0 10px 0 14px;
+      border: 1px solid var(--line-soft);
+      border-radius: 999px;
+      background: rgba(250, 249, 245, .70);
+      -webkit-backdrop-filter: saturate(1.45) blur(20px);
+      backdrop-filter: saturate(1.45) blur(20px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .58), 0 16px 38px -34px rgba(33, 31, 26, .45);
+      pointer-events: auto;
+      transition: background .3s ease, border-color .3s ease, box-shadow .3s ease;
     }
-    .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+    .site-head.scrolled .head-inner {
+      background: rgba(250, 249, 245, .90);
+      border-color: var(--line);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 18px 42px -32px rgba(33, 31, 26, .5);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); flex: none; }
     .brand:hover { text-decoration: none; }
-    .brand img { width: 26px; height: 26px; border-radius: 6.5px; box-shadow: 0 1px 3px rgba(38,36,30,.18); }
-    .brand .name { font-family: var(--sans); font-weight: 600; font-size: 15.5px; letter-spacing: -.01em; }
-    .head-nav { display: flex; gap: 22px; margin-left: 8px; }
-    .head-nav a {
-      font-family: var(--sans); font-size: 14px; color: var(--muted);
-      padding: 4px 2px; transition: color .2s;
-    }
+    .brand img { width: 26px; height: 26px; border-radius: 7px; box-shadow: 0 1px 3px rgba(33, 31, 26, .18); }
+    .brand .name { font-family: var(--sans); font-weight: 650; font-size: 15.5px; letter-spacing: -.02em; }
+    .head-nav { display: flex; gap: 24px; align-items: center; }
+    .head-nav a { font-size: 13.5px; font-weight: 500; color: var(--muted); padding: 5px 1px; transition: color .2s; }
     .head-nav a:hover { color: var(--ink); text-decoration: none; }
-    .head-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    .head-right { display: flex; align-items: center; gap: 12px; margin-left: auto; flex: none; }
 
-    /* 语言切换（deckclip 式 EN/中） */
     .lang {
-      display: inline-flex; align-items: center;
-      border: 1px solid var(--line); border-radius: 999px;
-      overflow: hidden; background: var(--ivory);
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line-soft);
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(243, 242, 234, .55);
     }
     .lang button {
-      font-family: var(--sans); font-size: 12.5px; font-weight: 600;
-      color: var(--muted); background: transparent; border: 0;
-      padding: 5px 12px; cursor: pointer; line-height: 1.4;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      padding: 5px 11px;
+      cursor: pointer;
+      line-height: 1.4;
       transition: background .2s, color .2s;
     }
     .lang button.active { background: var(--ink); color: var(--paper); }
 
-    /* 按钮 */
+    /* ============ buttons ============ */
     .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      font-family: var(--sans); font-size: 15px; font-weight: 600;
-      border-radius: 999px; padding: 12px 24px; line-height: 1.3;
-      transition: transform .2s ease, box-shadow .2s ease, background .2s ease, border-color .2s;
-      cursor: pointer; border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: var(--sans);
+      font-size: 15px;
+      font-weight: 650;
+      border-radius: 999px;
+      padding: 13px 24px;
+      line-height: 1.25;
+      border: 1px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      text-decoration: none;
+      transition: transform .28s var(--ease), box-shadow .28s var(--ease), background .25s, border-color .25s, color .25s;
     }
     .btn:hover { text-decoration: none; transform: translateY(-1px); }
     .btn:active { transform: translateY(0); }
-    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 8px 20px -10px rgba(0, 102, 204, .55); }
-    .btn-primary:hover { background: var(--accent-deep); }
-    .btn-ghost { border-color: var(--line); color: var(--ink); background: var(--ivory); }
-    .btn-ghost:hover { border-color: #c4c1b2; box-shadow: var(--shadow-card); }
-    .btn-sm { padding: 8px 18px; font-size: 14px; }
-    .btn svg { flex: none; }
-
-    /* ============ Hero ============ */
-    .hero { padding: 88px 0 40px; text-align: center; }
-    .eyebrow {
-      font-family: var(--sans); font-size: 13px; font-weight: 600;
-      letter-spacing: .14em; text-transform: uppercase;
-      color: var(--accent); margin-bottom: 18px;
+    .btn-dark { background: var(--btn); color: #fbfaf6; box-shadow: 0 14px 28px -16px rgba(33, 31, 26, .60); }
+    .btn-dark:hover { background: var(--btn-hover); box-shadow: 0 18px 34px -16px rgba(33, 31, 26, .55); }
+    .btn-glass {
+      background: rgba(250, 249, 245, .52);
+      border-color: var(--line);
+      color: var(--ink);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
     }
-    .eyebrow .num { color: var(--muted); font-weight: 500; margin-right: 10px; letter-spacing: .08em; }
+    .btn-glass:hover { background: rgba(250, 249, 245, .82); border-color: var(--line-strong); }
+    .btn-lg { font-size: 15.5px; padding: 14px 26px; }
+    .btn-sm { font-size: 13px; padding: 9px 17px; }
+    .btn svg { flex: none; }
+    .btn .arrow { transition: transform .3s var(--ease); }
+    .btn:hover .arrow { transform: translateX(3px); }
+
+    /* ============ hero ============ */
+    .hero { position: relative; padding: 96px 0 0; }
+    .hero-inner { text-align: center; }
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 14px 6px 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: 999px;
+      background: rgba(250, 249, 245, .48);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 550;
+      letter-spacing: .005em;
+      animation: heroRise .8s .02s var(--ease) both;
+    }
+    .hero-pill .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(0, 102, 204, .10);
+      animation: pulse 2.8s ease-in-out infinite;
+    }
     .hero-h1 {
-      font-size: clamp(44px, 7vw, 88px);
-      line-height: 1.06; letter-spacing: -1.4px;
-      font-weight: 700;
-      max-width: 15em; margin: 0 auto 22px;
+      max-width: 13.5em;
+      margin: 28px auto 24px;
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: clamp(46px, 7.5vw, 100px);
+      line-height: 1.02;
+      letter-spacing: -.035em;
+      animation: heroRise .9s .06s var(--ease) both;
+    }
+    .hero-h1 .line { display: block; }
+    @media (min-width: 701px) { .hero-h1 .line { white-space: nowrap; } }
+    .hero-h1 .line2 { font-style: italic; font-weight: 500; letter-spacing: -.03em; padding-bottom: .06em; animation: lineBlur .9s .12s var(--ease) both; }
+    .hero-h1 .text-gradient {
+      background: linear-gradient(180deg, #26241e 6%, #6e6a5f 94%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
     }
     .hero-sub {
-      color: var(--muted); font-size: clamp(16px, 2vw, 18.5px);
-      max-width: 620px; margin: 0 auto 34px;
+      max-width: 660px;
+      margin: 0 auto 34px;
+      color: var(--muted);
+      font-size: clamp(16px, 1.65vw, 19px);
+      line-height: 1.66;
+      animation: heroRise .9s .14s var(--ease) both;
     }
-    .hero-cta { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
-    .hero-pills { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 64px; }
+    .hero-cta {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      animation: heroRise .9s .20s var(--ease) both;
+    }
+    .hero-pills {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 26px 0 0;
+      animation: heroRise .9s .26s var(--ease) both;
+    }
     .pill {
-      font-family: var(--sans); font-size: 12.5px; font-weight: 500;
-      color: var(--muted); background: var(--ivory);
-      border: 1px solid var(--line); border-radius: 999px;
-      padding: 4px 12px; line-height: 1.5;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      background: rgba(250, 249, 245, .44);
+      border: 1px solid var(--line-soft);
+      border-radius: 999px;
+      padding: 4px 11px;
+      line-height: 1.5;
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
     }
 
-    /* Hero 三联海报：中央面板 + 两侧设置窗景深 */
-    .hero-shots {
+    /* ============ hero stage ============ */
+    .hero-stage {
       position: relative;
-      display: grid; grid-template-columns: 1fr 1.25fr 1fr;
-      align-items: center; gap: 0;
-      max-width: 1020px; margin: 0 auto;
+      margin-top: 64px;
+      aspect-ratio: 2 / 1;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      isolation: isolate;
+      background: #151a22;
+      border: 1px solid rgba(33, 31, 26, .18);
+      box-shadow: var(--shadow-float);
     }
-    .shot { border-radius: 14px; position: relative; }
-    .shot img { width: 100%; height: auto; border-radius: 14px; }
-    .shot-side { z-index: 1; opacity: .96; }
-    .shot-side img { box-shadow: var(--shadow-float); border: 1px solid rgba(38, 36, 30, .08); }
-    .shot-side.left { transform: translateY(38px) rotate(-2deg) scale(.96); transform-origin: right center; }
-    .shot-side.right { transform: translateY(46px) rotate(2deg) scale(.96); transform-origin: left center; }
-    .shot-main { z-index: 2; padding: 0 26px; }
-    .shot-main img {
-      box-shadow: 0 14px 28px -10px rgba(38, 36, 30, .16),
-                  0 56px 110px -30px rgba(38, 36, 30, .28);
-      border: 1px solid rgba(38, 36, 30, .08);
+    .hero-stage.reveal { filter: none; }
+    .stage-bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 52%;
+      transform: translate3d(calc(var(--mx, 0) * -11px), calc(var(--my, 0) * -7px), 0) scale(1.055);
+      filter: saturate(.94) contrast(.98) brightness(1.01);
+      transition: transform .25s ease-out;
+      will-change: transform;
+    }
+    .stage-shade {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 58% 66% at 50% 56%, rgba(18, 20, 17, .22) 0%, rgba(18, 20, 17, .07) 54%, rgba(18, 20, 17, 0) 76%),
+        linear-gradient(180deg, rgba(255, 255, 255, .09) 0%, rgba(255, 255, 255, 0) 30%, rgba(18, 20, 17, .14) 100%);
+    }
+    .stage-windows {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      transform: translate3d(calc(var(--mx, 0) * 9px), calc(var(--my, 0) * 6px), 0);
+      transition: transform .25s ease-out;
+      will-change: transform;
+    }
+    .stage-shot {
+      position: absolute;
+      margin: 0;
+      opacity: 0;
+      transition: opacity 1s var(--ease), transform 1.1s var(--ease);
+      will-change: transform, opacity;
+    }
+    .stage-shot img {
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 20px 30px rgba(18, 20, 17, .18));
+    }
+    .shot-left {
+      left: 4.2%;
+      top: 12%;
+      width: 35%;
+      --rot: -4deg;
+      z-index: 1;
+      transform: translateY(28px) rotate(var(--rot)) scale(.975);
+      transition-delay: .12s;
+    }
+    .shot-main {
+      left: 50%;
+      top: 7%;
+      width: 26%;
+      --rot: 0deg;
+      z-index: 3;
+      transform: translateX(-50%) translateY(30px) scale(.975);
+      transition-delay: .04s;
+    }
+    .shot-right {
+      right: 4.2%;
+      top: 13%;
+      width: 34%;
+      --rot: 4deg;
+      z-index: 1;
+      transform: translateY(28px) rotate(var(--rot)) scale(.975);
+      transition-delay: .18s;
+    }
+    .hero-stage.in .stage-shot { opacity: 1; }
+    .hero-stage.in .shot-left { transform: translateY(0) rotate(var(--rot)) scale(1); }
+    .hero-stage.in .shot-main { transform: translateX(-50%) translateY(0) scale(1); }
+    .hero-stage.in .shot-right { transform: translateY(0) rotate(var(--rot)) scale(1); }
+    .stage-edge {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      border-radius: inherit;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .36), inset 0 0 90px rgba(18, 20, 17, .10);
     }
 
-    /* ============ 小节通用 ============ */
+    /* ============ section scaffolding ============ */
     section.block { padding: var(--section-gap) 0 0; }
-    section.block:last-of-type { padding-bottom: 96px; }
-    .sec-head { max-width: 640px; margin-bottom: 40px; }
+    section.block:last-of-type { padding-bottom: 110px; }
+    .sec-head { max-width: 680px; margin-bottom: 44px; }
     .sec-head.center { margin-left: auto; margin-right: auto; text-align: center; }
-    .sec-title { font-size: clamp(28px, 4vw, 34px); font-weight: 700; letter-spacing: -0.3px; line-height: 1.25; margin-bottom: 12px; }
-    .sec-sub { color: var(--muted); font-size: 16.5px; }
-    .anchor { scroll-margin-top: 76px; }
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+    .sec-head.center .eyebrow { justify-content: center; }
+    .eyebrow .num { color: var(--muted-2); font-weight: 500; letter-spacing: .08em; }
+    .sec-title {
+      margin-bottom: 16px;
+      font-family: var(--serif);
+      font-size: clamp(34px, 4.4vw, 54px);
+      font-weight: 600;
+      line-height: 1.12;
+      letter-spacing: -.027em;
+      color: var(--ink);
+    }
+    .sec-title em, .hero-h1 .line2 { font-style: italic; font-weight: 500; }
+    html[lang="zh-CN"] .hero-h1 { font-size: clamp(40px, 6.8vw, 86px); letter-spacing: -.03em; }
+    html[lang="zh-CN"] .sec-title em, html[lang="zh-CN"] .hero-h1 .line2 { font-style: normal; }
+    .sec-sub { max-width: 610px; color: var(--muted); font-size: 16.5px; line-height: 1.65; }
+    .sec-head.center .sec-sub { margin: 0 auto; }
+    .anchor { scroll-margin-top: 90px; }
 
-    /* ============ 功能卡（deckclip 网格） ============ */
-    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    /* ============ feature cards ============ */
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
     .card {
-      background: var(--ivory);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
+      position: relative;
+      overflow: hidden;
       padding: 26px 26px 24px;
+      border: 1px solid var(--line-soft);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(250, 249, 245, .985) 0%, rgba(249, 247, 241, .94) 100%);
       box-shadow: var(--shadow-card);
-      transition: transform .25s ease, box-shadow .25s ease, border-color .25s;
+      transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .3s;
     }
-    .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); border-color: #cbc8b8; }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: radial-gradient(120% 80% at 86% 0%, rgba(255, 255, 255, .86) 0%, rgba(255, 255, 255, 0) 46%);
+    }
+    .card:hover { transform: translateY(-5px); border-color: var(--line); box-shadow: var(--shadow-card-hover); }
     .card .icon {
-      width: 42px; height: 42px; border-radius: 11px;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(0, 102, 204, .09);
-      color: var(--accent); margin-bottom: 16px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      margin-bottom: 18px;
+      border-radius: 12px;
+      background: rgba(0, 102, 204, .085);
+      color: var(--accent);
     }
-    .card h3 { font-family: var(--sans); font-size: 16.5px; font-weight: 650; letter-spacing: -.005em; margin-bottom: 6px; }
-    .card p { font-size: 14.5px; line-height: 1.65; color: var(--muted); font-family: var(--sans); }
+    .card h3 { position: relative; margin-bottom: 8px; font-size: 16.5px; font-weight: 650; letter-spacing: -.012em; }
+    .card p { position: relative; color: var(--muted); font-size: 14.5px; line-height: 1.65; }
 
-    /* ============ 截图画廊 ============ */
-    .shots-note {
-      font-family: var(--sans); font-size: 13.5px; color: var(--muted);
-      margin-top: 26px; text-align: center;
-    }
+    /* ============ screenshot gallery ============ */
     .gallery {
       display: grid;
-      grid-template-columns: 0.9fr 1fr 1fr;
-      grid-template-rows: auto auto;
-      gap: 26px 22px;
+      grid-template-columns: 0.544fr 0.902fr 0.907fr;
+      gap: 46px 26px;
       align-items: start;
     }
-    .g-item .frame {
-      border-radius: 14px; overflow: hidden;
-      border: 1px solid rgba(38, 36, 30, .08);
-      background: var(--ivory);
-      box-shadow: var(--shadow-card);
-      transition: box-shadow .25s ease, transform .25s ease;
+    .g-item { min-width: 0; margin: 0; }
+    .g-shot { display: flex; justify-content: center; align-items: flex-start; }
+    .g-shot img {
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 26px 34px rgba(33, 31, 26, .14));
+      transition: transform .45s var(--ease), filter .45s var(--ease);
     }
-    .g-item:hover .frame { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
-    .g-item img { width: 100%; height: auto; }
-    .g-tall { grid-row: 1 / span 2; }
-    .g-wide { grid-column: 2 / span 2; }
-    .g-cap { margin-top: 12px; text-align: center; }
-    .g-cap .t { font-family: var(--sans); font-size: 14px; font-weight: 650; }
-    .g-cap .s { font-family: var(--sans); font-size: 12.5px; color: var(--muted); line-height: 1.55; }
-
-    /* ============ 下载区 ============ */
-    .download-panel {
-      background: var(--ivory);
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      box-shadow: var(--shadow-card);
-      padding: 56px 48px;
+    .g-item:hover .g-shot img {
+      transform: translateY(-5px) scale(1.008);
+      filter: drop-shadow(0 34px 46px rgba(33, 31, 26, .20));
+    }
+    .g-cap { margin-top: 18px; padding: 0 4px; text-align: center; }
+    .g-cap .t { font-size: 14.5px; font-weight: 650; letter-spacing: -.008em; }
+    .g-cap .s { max-width: 34em; margin: 4px auto 0; color: var(--muted); font-size: 12.8px; line-height: 1.6; }
+    .g-wide { grid-column: 1 / -1; }
+    .g-wide .g-shot img { filter: drop-shadow(0 32px 44px rgba(33, 31, 26, .14)); }
+    .g-wide:hover .g-shot img { transform: translateY(-5px) scale(1.004); }
+    .shots-note {
+      margin-top: 30px;
+      color: var(--muted);
+      font-size: 13.5px;
       text-align: center;
     }
-    .dl-cta { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin: 30px 0 18px; }
-    .dl-pills { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 34px; }
-    .dl-note {
-      max-width: 640px; margin: 0 auto;
-      border-top: 1px solid var(--line-faint);
-      padding-top: 26px;
-      font-family: var(--sans); font-size: 13.5px; color: var(--muted); line-height: 1.7;
-    }
-    .dl-note b { color: var(--ink); font-weight: 600; }
-    .credit { margin-top: 20px; font-family: var(--sans); font-size: 13px; color: var(--muted); }
 
-    /* ============ 页脚 ============ */
-    footer {
+    /* ============ download ============ */
+    .download-panel {
+      position: relative;
+      overflow: hidden;
+      padding: 64px 48px 54px;
+      border: 1px solid var(--line-soft);
+      border-radius: 32px;
+      background: linear-gradient(180deg, rgba(250, 249, 245, .99) 0%, rgba(246, 244, 237, .94) 100%);
+      box-shadow: var(--shadow-card);
+      text-align: center;
+    }
+    .download-panel::before {
+      content: "";
+      position: absolute;
+      inset: -45% -20% auto;
+      height: 70%;
+      pointer-events: none;
+      background: radial-gradient(50% 60% at 50% 0%, rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, 0) 70%);
+    }
+    .download-panel > * { position: relative; }
+    .download-panel .eyebrow { justify-content: center; }
+    .download-panel .sec-title { margin-bottom: 12px; }
+    .download-panel .sec-sub { margin: 0 auto; }
+    .dl-cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 30px 0 20px; }
+    .dl-pills { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 38px; }
+    .dl-note {
+      max-width: 660px;
+      margin: 0 auto;
+      padding-top: 26px;
       border-top: 1px solid var(--line-faint);
-      padding: 34px 0 44px;
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.7;
     }
-    .foot-inner {
-      display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-      font-family: var(--sans); font-size: 13px; color: var(--muted);
-    }
+    .dl-note b { color: var(--ink); font-weight: 650; }
+    .credit { margin-top: 20px; color: var(--muted-2); font-size: 13px; }
+
+    /* ============ footer ============ */
+    footer { border-top: 1px solid var(--line-faint); padding: 34px 0 44px; }
+    .foot-inner { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
     .foot-inner .sep { opacity: .5; }
     .foot-inner .right { margin-left: auto; }
 
-    /* ============ 入场动效 ============ */
-    .reveal { opacity: 0; transform: translateY(20px); transition: opacity .7s cubic-bezier(.2, .6, .2, 1), transform .7s cubic-bezier(.2, .6, .2, 1); }
-    .reveal.in { opacity: 1; transform: none; }
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      .reveal { opacity: 1; transform: none; transition: none; }
-      .btn, .card, .g-item .frame { transition: none; }
+    /* ============ motion ============ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(26px);
+      filter: blur(5px);
+      transition: opacity .9s var(--ease), transform .9s var(--ease), filter .9s var(--ease);
+    }
+    .reveal.in { opacity: 1; transform: none; filter: none; }
+
+    @keyframes heroRise {
+      from { opacity: 0; transform: translateY(18px); filter: blur(6px); }
+      to { opacity: 1; transform: none; filter: blur(0); }
+    }
+    @keyframes lineBlur {
+      from { opacity: 0; filter: blur(10px); transform: translateY(10px); }
+      to { opacity: 1; filter: blur(0); transform: none; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: .55; transform: scale(.88); }
+      50% { opacity: 1; transform: scale(1.12); }
     }
 
-    /* ============ 响应式 ============ */
-    @media (max-width: 880px) {
-      :root { --section-gap: 68px; }
-      .wrap { padding: 0 22px; }
-      .head-nav { display: none; }
-      .hero { padding-top: 64px; }
-      .feature-grid { grid-template-columns: repeat(2, 1fr); }
-      .gallery { grid-template-columns: 1fr 1fr; }
-      .g-tall { grid-row: auto; grid-column: 1 / span 2; max-width: 460px; margin: 0 auto; width: 100%; }
-      .g-wide { grid-column: 1 / span 2; }
-      .download-panel { padding: 42px 26px; }
+    /* ============ responsive ============ */
+    @media (max-width: 1080px) {
+      :root { --section-gap: 96px; }
+      .hero { padding-top: 82px; }
+      .head-inner { gap: 20px; }
+      .head-nav { gap: 18px; }
+      .shot-left { width: 36%; }
+      .shot-right { width: 35%; }
+      .shot-main { width: 27%; }
     }
-    @media (max-width: 640px) {
-      .feature-grid { grid-template-columns: 1fr; }
-      .hero-shots { grid-template-columns: 1fr; }
-      .shot-side { display: none; }
-      .shot-main { padding: 0; }
-      .gallery { grid-template-columns: 1fr; }
-      .g-tall, .g-wide { grid-column: auto; max-width: 440px; margin: 0 auto; width: 100%; }
+    @media (max-width: 1100px) {
+      .feature-grid { grid-template-columns: repeat(2, 1fr); }
+      .gallery { grid-template-columns: 1fr; gap: 42px; }
+      .g-wide { grid-column: auto; }
+      .g-item { max-width: 520px; margin: 0 auto; width: 100%; }
+      .g-panel { max-width: 430px; }
+      .g-wide { max-width: 560px; }
+      .g-cap .s { max-width: 30em; }
+    }
+    @media (max-width: 880px) {
+      :root { --section-gap: 82px; --gutter: 24px; }
+      .head-nav { display: none; }
+      .head-inner { width: 100%; gap: 14px; padding-right: 8px; }
+      .hero { padding-top: 68px; }
+      .hero-h1 { max-width: 11.5em; }
+      .hero-stage { margin-top: 46px; aspect-ratio: 16 / 10; border-radius: 24px; }
+      .shot-left { left: 3%; width: 36%; }
+      .shot-right { right: 3%; width: 35%; }
+      .shot-main { width: 27%; }
+      .download-panel { padding: 48px 28px 42px; border-radius: 26px; }
       .foot-inner { justify-content: center; text-align: center; }
       .foot-inner .right { margin-left: 0; }
+    }
+    @media (max-width: 700px) {
+      .hero-stage { aspect-ratio: 4 / 5; border-radius: 22px; }
+      .shot-left, .shot-right { display: none; }
+      .shot-main { width: 64%; top: 10%; }
+      .stage-bg { object-position: 50% 52%; }
+      .stage-shade { background:
+        radial-gradient(ellipse 70% 55% at 50% 54%, rgba(18, 20, 17, .20) 0%, rgba(18, 20, 17, .05) 58%, rgba(18, 20, 17, 0) 78%),
+        linear-gradient(180deg, rgba(255, 255, 255, .08) 0%, rgba(255, 255, 255, 0) 34%, rgba(18, 20, 17, .12) 100%); }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      :root { --gutter: 18px; --section-gap: 68px; }
+      body { font-size: 16px; }
+      .head-inner { height: 54px; padding-left: 10px; }
+      .head-right { gap: 8px; }
+      .lang button { padding: 4px 9px; }
+      .head-cta { padding: 8px 13px; }
+      .hero { padding-top: 56px; }
+      .hero-h1 { font-size: clamp(36px, 10.2vw, 44px); letter-spacing: -.035em; }
+      .hero-sub { font-size: 15.5px; }
+      .hero-cta .btn { width: 100%; max-width: 320px; }
+      .hero-stage { margin-top: 38px; }
+      .shot-main { width: 70%; top: 9%; }
+      .download-panel { padding: 38px 20px 34px; border-radius: 22px; }
+      .dl-cta .btn { width: 100%; max-width: 320px; }
+      footer .foot-inner { flex-direction: column; gap: 5px; }
+      .foot-inner .sep { display: none; }
+      html[lang="zh-CN"] .hero-h1 { font-size: clamp(29px, 8vw, 34px); letter-spacing: -.05em; }
+    }
+    @media (max-width: 380px) {
+      .head-inner { gap: 8px; }
+      .brand .name { display: none; }
+    }
+
+    /* ============ reduced motion ============ */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+      .reveal { opacity: 1; transform: none; filter: none; }
+      .hero-stage .stage-shot { opacity: 1 !important; }
+      .shot-left { transform: rotate(-4deg) !important; }
+      .shot-right { transform: rotate(4deg) !important; }
+      .shot-main { transform: translateX(-50%) !important; }
+      .stage-bg, .stage-windows { transform: none !important; }
+      .card:hover, .g-item:hover .g-shot img, .btn:hover { transform: none !important; }
     }
   </style>
 </head>
 <body>
 
-  <!-- ============ 导航 ============ -->
+  <div class="page-glow" aria-hidden="true"></div>
+
+  <!-- ============ navigation ============ -->
   <header class="site-head" id="siteHead">
-    <div class="wrap head-inner">
-      <a class="brand" href="./">
-        <img src="icon.png" alt="MoniSwitch icon">
-        <span class="name">MoniSwitch</span>
-      </a>
-      <nav class="head-nav">
-        <a href="#features" data-i18n="nav.features">Features</a>
-        <a href="#screenshots" data-i18n="nav.screenshots">Screenshots</a>
-        <a href="#download" data-i18n="nav.download">Download</a>
-      </nav>
-      <div class="head-right">
-        <div class="lang" role="group" aria-label="Language">
-          <button type="button" id="langEn" aria-pressed="true">EN</button>
-          <button type="button" id="langZh" aria-pressed="false">中</button>
+    <div class="head-shell">
+      <div class="head-inner">
+        <a class="brand" href="./">
+          <img src="icon.png" alt="MoniSwitch icon">
+          <span class="name">MoniSwitch</span>
+        </a>
+        <nav class="head-nav" aria-label="Primary">
+          <a href="#features" data-i18n="nav.features">Features</a>
+          <a href="#screenshots" data-i18n="nav.screenshots">Screenshots</a>
+          <a href="#download" data-i18n="nav.download">Download</a>
+        </nav>
+        <div class="head-right">
+          <div class="lang" role="group" aria-label="Language">
+            <button type="button" id="langEn" aria-pressed="true">EN</button>
+            <button type="button" id="langZh" aria-pressed="false">中</button>
+          </div>
+          <a class="btn btn-dark btn-sm head-cta" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg">
+            <span data-i18n="nav.cta">Download</span>
+            <svg class="arrow" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8h10M8.5 3.5 13 8l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
         </div>
-        <a class="btn btn-primary btn-sm" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg" data-i18n="nav.cta">Download</a>
       </div>
     </div>
   </header>
 
   <main>
-    <!-- ============ Hero ============ -->
-    <section class="hero wrap">
-      <p class="eyebrow" data-i18n="hero.eyebrow">macOS menu-bar display switcher</p>
-      <h1 class="hero-h1">
-        <span data-i18n="hero.h1a">MoniSwitch, the display</span><br>
-        <span data-i18n="hero.h1b">switcher for macOS.</span>
-      </h1>
-      <p class="hero-sub" data-i18n="hero.sub">Switch the main display, move external screens left or right, toggle extend/mirror, and dim external displays — all from the menu bar, without a trip to System Settings → Displays.</p>
-      <div class="hero-cta">
-        <a class="btn btn-primary" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg">
-          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5v8m0 0L4.8 6.3M8 9.5l3.2-3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          <span data-i18n="hero.cta1">Download for macOS</span>
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/M1688-cpu/MoniSwitch">
-          <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .8a7.3 7.3 0 0 0-2.3 14.2c.36.07.5-.15.5-.35v-1.22c-2.02.44-2.45-.97-2.45-.97-.33-.84-.81-1.07-.81-1.07-.66-.45.05-.44.05-.44.73.05 1.11.75 1.11.75.65 1.11 1.7.79 2.12.6.06-.47.25-.79.46-.97-1.61-.18-3.3-.8-3.3-3.58 0-.79.28-1.44.74-1.95-.08-.18-.32-.91.07-1.9 0 0 .6-.2 1.98.74a6.9 6.9 0 0 1 3.6 0c1.37-.94 1.97-.74 1.97-.74.4.99.15 1.72.07 1.9.46.51.74 1.16.74 1.95 0 2.79-1.7 3.4-3.31 3.58.26.22.49.65.49 1.32v1.95c0 .2.13.43.5.35A7.3 7.3 0 0 0 8 .8Z"/></svg>
-          <span data-i18n="hero.cta2">View on GitHub</span>
-        </a>
-      </div>
-      <div class="hero-pills">
-        <span class="pill">macOS 14+</span>
-        <span class="pill">Apple Silicon</span>
-        <span class="pill">v2.0.0</span>
-        <span class="pill">MIT</span>
-      </div>
-      <div class="hero-shots reveal">
-        <div class="shot shot-side left">
-          <img src="screenshots/en/settings-general.png" alt="Settings window — General" data-shot loading="lazy">
+    <!-- ============ hero ============ -->
+    <section class="hero" aria-labelledby="heroTitle">
+      <div class="wrap hero-inner">
+        <p class="hero-pill"><span class="dot" aria-hidden="true"></span><span data-i18n="hero.eyebrow">macOS menu-bar display switcher</span></p>
+        <h1 class="hero-h1" id="heroTitle">
+          <span class="line text-gradient" data-i18n="hero.h1a">MoniSwitch, the display</span>
+          <span class="line line2 text-gradient" data-i18n="hero.h1b">switcher for macOS.</span>
+        </h1>
+        <p class="hero-sub" data-i18n="hero.sub">Switch the main display, move external screens left or right, toggle extend/mirror, and dim external displays — all from the menu bar, without a trip to System Settings → Displays.</p>
+        <div class="hero-cta">
+          <a class="btn btn-dark btn-lg" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg">
+            <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5v8m0 0L4.8 6.3M8 9.5l3.2-3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span data-i18n="hero.cta1">Download for macOS</span>
+            <svg class="arrow" width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8h10M8.5 3.5 13 8l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="btn btn-glass btn-lg" href="https://github.com/M1688-cpu/MoniSwitch">
+            <svg width="17" height="17" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .8a7.3 7.3 0 0 0-2.3 14.2c.36.07.5-.15.5-.35v-1.22c-2.02.44-2.45-.97-2.45-.97-.33-.84-.81-1.07-.81-1.07-.66-.45.05-.44.05-.44.73.05 1.11.75 1.11.75.65 1.11 1.7.79 2.12.6.06-.47.25-.79.46-.97-1.61-.18-3.3-.8-3.3-3.58 0-.79.28-1.44.74-1.95-.08-.18-.32-.91.07-1.9 0 0 .6-.2 1.98.74a6.9 6.9 0 0 1 3.6 0c1.37-.94 1.97-.74 1.97-.74.4.99.15 1.72.07 1.9.46.51.74 1.16.74 1.95 0 2.79-1.7 3.4-3.31 3.58.26.22.49.65.49 1.32v1.95c0 .2.13.43.5.35A7.3 7.3 0 0 0 8 .8Z"/></svg>
+            <span data-i18n="hero.cta2">View on GitHub</span>
+          </a>
         </div>
-        <div class="shot shot-main">
-          <img src="screenshots/en/panel-overview.png" alt="MoniSwitch menu-bar panel" data-shot width="452" height="562">
+        <div class="hero-pills" aria-label="Requirements">
+          <span class="pill">macOS 14+</span>
+          <span class="pill">Apple Silicon</span>
+          <span class="pill">v2.0.0</span>
+          <span class="pill">MIT</span>
         </div>
-        <div class="shot shot-side right">
-          <img src="screenshots/en/settings-presets.png" alt="Settings window — Presets" data-shot loading="lazy">
+      </div>
+
+      <div class="wrap-wide">
+        <div class="hero-stage reveal" id="heroStage">
+          <img class="stage-bg" src="screenshots/backgrounds/hero.jpg" alt="" aria-hidden="true" fetchpriority="high" decoding="async">
+          <div class="stage-shade" aria-hidden="true"></div>
+          <div class="stage-windows">
+            <figure class="stage-shot shot-left">
+              <img src="screenshots/en/settings-general-cutout.png" width="1480" height="1640" alt="Settings — General" data-shot loading="eager" decoding="async">
+            </figure>
+            <figure class="stage-shot shot-main">
+              <img src="screenshots/en/panel-overview-cutout.png" width="541" height="722" alt="MoniSwitch menu-bar panel" data-shot loading="eager" decoding="async">
+            </figure>
+            <figure class="stage-shot shot-right">
+              <img src="screenshots/en/settings-presets-cutout.png" width="964" height="1063" alt="Settings — Presets" data-shot loading="eager" decoding="async">
+            </figure>
+          </div>
+          <div class="stage-edge" aria-hidden="true"></div>
         </div>
       </div>
     </section>
 
-    <!-- ============ 功能 ============ -->
+    <!-- ============ features ============ -->
     <section class="block wrap anchor" id="features">
       <div class="sec-head reveal">
         <p class="eyebrow"><span class="num">00</span><span data-i18n="features.label">Features</span></p>
-        <h2 class="sec-title" data-i18n-html="features.title">Deep engineering,<br>surface simplicity.</h2>
+        <h2 class="sec-title" data-i18n-html="features.title">Deep engineering,<br><em>surface simplicity.</em></h2>
         <p class="sec-sub" data-i18n="features.sub">A native bubble-card panel living in your menu bar — every display action one or two clicks away.</p>
       </div>
       <div class="feature-grid">
@@ -367,7 +740,7 @@
         </div>
         <div class="card reveal">
           <div class="icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h9a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Z"/><path d="M9 14.5h4.5"/><path d="M10.7 6.8 11.6 8.7l2.1.3-1.5 1.5.35 2.1-1.85-1-1.85 1 .35-2.1-1.5-1.5 2.1-.3z" fill="currentColor" stroke="none"/><path d="M17.5 19.5c2.2-.5 4-2.3 4-4.6V10l-2 -.8"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h9a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2Z"/><path d="M9 14.5h4.5"/><path d="M10.7 6.8 11.6 8.7l2.1.3-1.5 1.5.35 2.1-1.85-1-1.85 1 .35-2.1-1.5-1.5 2.1-.3z" fill="currentColor" stroke="none"/><path d="M17.5 19.5c2.2-.5 4-2.3 4-4.6V10l-2-.8"/></svg>
           </div>
           <h3 data-i18n="f3.t">Layout presets &amp; hotkeys</h3>
           <p data-i18n="f3.d">Save a whole configuration — main display, positions, mirroring — as a preset, then restore it with one click or a global hotkey bound to it.</p>
@@ -396,58 +769,63 @@
       </div>
     </section>
 
-    <!-- ============ 截图 ============ -->
-    <section class="block wrap anchor" id="screenshots">
-      <div class="sec-head center reveal">
-        <p class="eyebrow"><span class="num">01</span><span data-i18n="shots.label">Screenshots</span></p>
-        <h2 class="sec-title" data-i18n="shots.title">Small panel, every control.</h2>
+    <!-- ============ screenshots ============ -->
+    <section class="block anchor" id="screenshots">
+      <div class="wrap">
+        <div class="sec-head center reveal">
+          <p class="eyebrow"><span class="num">01</span><span data-i18n="shots.label">Screenshots</span></p>
+          <h2 class="sec-title" data-i18n-html="shots.title">Small panel, <em>every control.</em></h2>
+        </div>
       </div>
-      <div class="gallery">
-        <figure class="g-item g-tall reveal">
-          <div class="frame"><img src="screenshots/en/panel-expanded.png" alt="Display controls expanded" data-shot loading="lazy"></div>
-          <figcaption class="g-cap">
-            <div class="t" data-i18n="s1.t">Display controls expanded</div>
-            <div class="s" data-i18n="s1.d">Click a display block to unfold position, resolution, refresh rate, Set as Main and mirror/extend. Brightness lives at the top of the panel.</div>
-          </figcaption>
-        </figure>
-        <figure class="g-item reveal">
-          <div class="frame"><img src="screenshots/en/settings-general.png" alt="Settings — General" data-shot loading="lazy"></div>
-          <figcaption class="g-cap">
-            <div class="t" data-i18n="s2.t">Settings · General</div>
-            <div class="s" data-i18n="s2.d">Language, launch at login, auto-refresh, notifications.</div>
-          </figcaption>
-        </figure>
-        <figure class="g-item reveal">
-          <div class="frame"><img src="screenshots/en/settings-presets.png" alt="Settings — Presets" data-shot loading="lazy"></div>
-          <figcaption class="g-cap">
-            <div class="t" data-i18n="s3.t">Settings · Presets</div>
-            <div class="s" data-i18n="s3.d">Save / apply / delete, plus one recordable global hotkey per preset.</div>
-          </figcaption>
-        </figure>
-        <figure class="g-item g-wide reveal">
-          <div class="frame"><img src="screenshots/dmg-install.png" alt="DMG drag-and-drop install" loading="lazy"></div>
-          <figcaption class="g-cap">
-            <div class="t" data-i18n="s4.t">Drag-and-drop install</div>
-            <div class="s" data-i18n="s4.d">Open the DMG and drag MoniSwitch into Applications — that's the whole installer.</div>
-          </figcaption>
-        </figure>
+      <div class="wrap-wide">
+        <div class="gallery">
+          <figure class="g-item g-panel reveal">
+            <div class="g-shot"><img src="screenshots/en/panel-expanded-cutout.png" width="541" height="994" alt="Display controls expanded" data-shot loading="lazy" decoding="async"></div>
+            <figcaption class="g-cap">
+              <div class="t" data-i18n="s1.t">Display controls expanded</div>
+              <div class="s" data-i18n="s1.d">Click a display block to unfold position, resolution, refresh rate, Set as Main and mirror/extend. Brightness lives at the top of the panel.</div>
+            </figcaption>
+          </figure>
+          <figure class="g-item reveal">
+            <div class="g-shot"><img src="screenshots/en/settings-general-cutout.png" width="1480" height="1640" alt="Settings — General" data-shot loading="lazy" decoding="async"></div>
+            <figcaption class="g-cap">
+              <div class="t" data-i18n="s2.t">Settings · General</div>
+              <div class="s" data-i18n="s2.d">Language, launch at login, auto-refresh, notifications.</div>
+            </figcaption>
+          </figure>
+          <figure class="g-item reveal">
+            <div class="g-shot"><img src="screenshots/en/settings-presets-cutout.png" width="964" height="1063" alt="Settings — Presets" data-shot loading="lazy" decoding="async"></div>
+            <figcaption class="g-cap">
+              <div class="t" data-i18n="s3.t">Settings · Presets</div>
+              <div class="s" data-i18n="s3.d">Save / apply / delete, plus one recordable global hotkey per preset.</div>
+            </figcaption>
+          </figure>
+          <figure class="g-item g-wide reveal">
+            <div class="g-shot"><img src="screenshots/dmg-install-cutout.png" width="1232" height="828" alt="DMG drag-and-drop install" loading="lazy" decoding="async"></div>
+            <figcaption class="g-cap">
+              <div class="t" data-i18n="s4.t">Drag-and-drop install</div>
+              <div class="s" data-i18n="s4.d">Open the DMG and drag MoniSwitch into Applications — that's the whole installer.</div>
+            </figcaption>
+          </figure>
+        </div>
+        <p class="shots-note reveal" data-i18n="shots.note">The UI switches between English and 简体中文 in one click — these screenshots follow this page's language.</p>
       </div>
-      <p class="shots-note" data-i18n="shots.note">The UI switches between English and 简体中文 in one click — these screenshots follow this page's language.</p>
     </section>
 
-    <!-- ============ 下载 ============ -->
+    <!-- ============ download ============ -->
     <section class="block wrap anchor" id="download">
       <div class="download-panel reveal">
         <p class="eyebrow"><span class="num">02</span><span data-i18n="dl.label">Download</span></p>
         <h2 class="sec-title" data-i18n="dl.title">Get MoniSwitch</h2>
         <p class="sec-sub" data-i18n="dl.sub">Free and open source. Direct DMG download — no App Store, no account.</p>
         <div class="dl-cta">
-          <a class="btn btn-primary" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg">
+          <a class="btn btn-dark btn-lg" href="https://github.com/M1688-cpu/MoniSwitch/releases/latest/download/MoniSwitch.dmg">
             <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5v8m0 0L4.8 6.3M8 9.5l3.2-3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11v2a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
             <span data-i18n="dl.cta1">Download MoniSwitch.dmg</span>
+            <svg class="arrow" width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2.5 8h10M8.5 3.5 13 8l-4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </a>
-          <a class="btn btn-ghost" href="https://github.com/M1688-cpu/MoniSwitch/releases" data-i18n="dl.cta2">All releases</a>
-          <a class="btn btn-ghost" href="https://github.com/M1688-cpu/MoniSwitch#install" data-i18n="dl.cta3">Build from source</a>
+          <a class="btn btn-glass btn-lg" href="https://github.com/M1688-cpu/MoniSwitch/releases" data-i18n="dl.cta2">All releases</a>
+          <a class="btn btn-glass btn-lg" href="https://github.com/M1688-cpu/MoniSwitch#install" data-i18n="dl.cta3">Build from source</a>
         </div>
         <div class="dl-pills">
           <span class="pill">macOS 14+</span>
@@ -461,7 +839,7 @@
     </section>
   </main>
 
-  <!-- ============ 页脚 ============ -->
+  <!-- ============ footer ============ -->
   <footer>
     <div class="wrap foot-inner">
       <span data-i18n="footer.copy">MIT License © MoniSwitch author</span>
@@ -472,6 +850,8 @@
       <span class="right" data-i18n="footer.hosted">Site hosted on GitHub Pages</span>
     </div>
   </footer>
+
+  <noscript><style>.reveal{opacity:1;transform:none;filter:none}.hero-stage .stage-shot{opacity:1}</style></noscript>
 
   <script>
     // ============ 双语文案字典（默认英文，与 README 默认语言一致） ============
@@ -485,7 +865,7 @@
         "hero.sub": "Switch the main display, move external screens left or right, toggle extend/mirror, and dim external displays — all from the menu bar, without a trip to System Settings → Displays.",
         "hero.cta1": "Download for macOS", "hero.cta2": "View on GitHub",
         "features.label": "Features",
-        "features.title": "Deep engineering,<br>surface simplicity.",
+        "features.title": "Deep engineering,<br><em>surface simplicity.</em>",
         "features.sub": "A native bubble-card panel living in your menu bar — every display action one or two clicks away.",
         "f1.t": "One-click main display",
         "f1.d": "Click any display in the panel to make it the main one — the screen the menu bar and Dock live on. No digging through System Settings.",
@@ -499,7 +879,7 @@
         "f5.d": "Displays are drawn to scale in a live mini-map. Click a block to jump straight to that screen's parameters; hovering a row highlights its block.",
         "f6.t": "Native, bilingual, accent-aware",
         "f6.d": "A pure menu-bar app with no Dock icon. The panel tracks your accent color, adds native DDC/CI brightness and seven themes, and switches between English and 简体中文 in one click.",
-        "shots.label": "Screenshots", "shots.title": "Small panel, every control.",
+        "shots.label": "Screenshots", "shots.title": "Small panel, <em>every control.</em>",
         "s1.t": "Display controls expanded",
         "s1.d": "Click a display block to unfold position, resolution, refresh rate, Set as Main and mirror/extend. Brightness lives at the top of the panel.",
         "s2.t": "Settings · General", "s2.d": "Language, launch at login, auto-refresh, notifications.",
@@ -509,7 +889,7 @@
         "dl.label": "Download", "dl.title": "Get MoniSwitch",
         "dl.sub": "Free and open source. Direct DMG download — no App Store, no account.",
         "dl.cta1": "Download MoniSwitch.dmg", "dl.cta2": "All releases", "dl.cta3": "Build from source",
-        "dl.note": "<b>First launch may warn</b> that the app is \"from an unidentified developer\". MoniSwitch ships as a direct DMG without Apple notarization — common for open-source freeware, and the code is fully open for review. Approve it once in System Settings → Privacy & Security → Open Anyway, and you won't be prompted again.",
+        "dl.note": "<b>First launch may warn</b> that the app is \"from an unidentified developer\". MoniSwitch ships as a direct DMG without Apple notarization — common for open-source freeware, and the code is fully open for review. Approve it once in System Settings → Privacy &amp; Security → Open Anyway, and you won't be prompted again.",
         "dl.credit": "Under the hood, MoniSwitch is a friendly GUI over displayplacer (MIT, © Jake Hilborn), bundled with the app — it works out of the box.",
         "footer.copy": "MIT License © MoniSwitch author", "footer.hosted": "Site hosted on GitHub Pages"
       },
@@ -522,7 +902,7 @@
         "hero.sub": "切换主显示器、调整外接屏左右位置、切换扩展/镜像，还能直接调外接屏亮度——全在菜单栏完成，不必再进「系统设置 → 显示器」。",
         "hero.cta1": "下载 macOS 版", "hero.cta2": "在 GitHub 查看",
         "features.label": "功能",
-        "features.title": "工程做深，<br>界面做浅。",
+        "features.title": "工程做深，<br><em>界面做浅。</em>",
         "features.sub": "常驻菜单栏的原生气泡卡片面板，每个显示器操作都在一两次点击之内。",
         "f1.t": "一键切换主屏",
         "f1.d": "面板里点任意显示器即可设为主屏——白条和程序坞所在的那个。不必翻系统设置。",
@@ -536,7 +916,7 @@
         "f5.d": "按真实比例绘制的实时小地图：点击屏块直达该屏参数，悬停列表行时对应屏块高亮。",
         "f6.t": "原生 · 双语 · 跟随强调色",
         "f6.d": "纯菜单栏常驻、无程序坞图标。面板跟随系统强调色，新增原生 DDC/CI 亮度与七组主题，界面在中英文间一键切换。",
-        "shots.label": "截图", "shots.title": "小面板，全掌控。",
+        "shots.label": "截图", "shots.title": "小面板，<em>全掌控。</em>",
         "s1.t": "展开显示器参数",
         "s1.d": "点击屏块展开位置、分辨率、刷新率、设为主屏和镜像/扩展；亮度卡常驻面板顶部。",
         "s2.t": "设置 · 通用", "s2.d": "语言 / 自启动 / 自动刷新 / 通知。",
@@ -560,19 +940,16 @@
       document.title = dict._title;
       document.querySelector('meta[name="description"]').setAttribute("content", dict._desc);
 
-      // 文本节点（textContent，防注入）
       document.querySelectorAll("[data-i18n]").forEach(el => {
         const key = el.getAttribute("data-i18n");
         if (dict[key] !== undefined) el.textContent = dict[key];
       });
-      // 含 <br>/<b> 标记的富文本（内容全部来自本文件内置字典，安全）
       document.querySelectorAll("[data-i18n-html]").forEach(el => {
         const key = el.getAttribute("data-i18n-html");
         if (dict[key] !== undefined) el.innerHTML = dict[key];
       });
-      // 截图跟随语言（en/zh 两套文件名一一对应；dmg-install 两语言共用，不带 data-shot）
       document.querySelectorAll("img[data-shot]").forEach(img => {
-        img.src = img.src.replace(/\/screenshots\/(en|zh)\//, `/screenshots/${lang}/`);
+        img.src = img.src.replace(/\/screenshots\/(en|zh)\//, "/screenshots/" + lang + "/");
       });
 
       document.getElementById("langEn").classList.toggle("active", lang === "en");
@@ -585,7 +962,6 @@
     document.getElementById("langEn").addEventListener("click", () => setLang("en"));
     document.getElementById("langZh").addEventListener("click", () => setLang("zh"));
 
-    // 启动语言：记忆偏好 > 默认英文（与 README 默认语言一致）
     let initial = "en";
     try {
       const saved = localStorage.getItem(LANG_KEY);
@@ -597,16 +973,15 @@
     const revealEls = document.querySelectorAll(".reveal");
     if ("IntersectionObserver" in window) {
       const io = new IntersectionObserver(entries => {
-        entries.forEach((entry, i) => {
+        entries.forEach(entry => {
           if (entry.isIntersecting) {
-            // 同批元素按 DOM 顺序错峰 60ms，避免齐步走
             const delay = Array.from(revealEls).indexOf(entry.target) % 6 * 60;
             entry.target.style.transitionDelay = delay + "ms";
             entry.target.classList.add("in");
             io.unobserve(entry.target);
           }
         });
-      }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+      }, { threshold: 0.08, rootMargin: "0px 0px -7% 0px" });
       revealEls.forEach(el => io.observe(el));
     } else {
       revealEls.forEach(el => el.classList.add("in"));
@@ -614,9 +989,35 @@
 
     // ============ 导航滚动态 ============
     const head = document.getElementById("siteHead");
-    const onScroll = () => head.classList.toggle("scrolled", window.scrollY > 8);
+    const onScroll = () => head.classList.toggle("scrolled", window.scrollY > 12);
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
+
+    // ============ Hero 展板轻视差 ============
+    const stage = document.getElementById("heroStage");
+    if (stage && window.matchMedia("(pointer: fine)").matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      let raf = 0;
+      let targetX = 0;
+      let targetY = 0;
+      const render = () => {
+        stage.style.setProperty("--mx", targetX.toFixed(3));
+        stage.style.setProperty("--my", targetY.toFixed(3));
+        raf = 0;
+      };
+      const move = e => {
+        const r = stage.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        targetX = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - .5) * 2));
+        targetY = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height - .5) * 2));
+        if (!raf) raf = requestAnimationFrame(render);
+      };
+      stage.addEventListener("pointermove", move, { passive: true });
+      stage.addEventListener("pointerleave", () => {
+        targetX = 0;
+        targetY = 0;
+        if (!raf) raf = requestAnimationFrame(render);
+      });
+    }
   </script>
 </body>
 </html>
