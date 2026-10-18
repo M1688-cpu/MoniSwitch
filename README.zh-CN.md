@@ -31,23 +31,23 @@
 
 MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不是系统菜单。每块屏按真实比例画在布局图里，常用操作一到两次点击就能完成；面板高度随内容自适应，没有内部滚动条，也不用反复打开「系统设置 → 显示器」。
 
-**v2.0 是一次面板层面的重写**，同时补上了显示器使用中另一半高频需求：外接屏亮度。每块支持 DDC/CI 的外接屏在面板顶部都有一条滑条，F1/F2 亮度键会把内置屏的原生步进同步到外接屏，七组低饱和主题让整块面板在浅色与深色下都能换色。
+**v2.0 是一次面板层面的重写**，同时补上了显示器使用中另一半高频需求：外接屏亮度。每块支持 DDC/CI 的外接屏在面板顶部都有一条滑条，F1/F2 亮度键会调节鼠标所在屏的 DDC 亮度，七组低饱和主题让整块面板在浅色与深色下都能换色。
 
 ## v2.0 新增
 
 - **原生外接屏亮度。** 每块外接屏一条 DDC/CI 滑条，在 Apple Silicon 上走私有 `IOAVService` 的 I2C 通路——与 MonitorControl、m1ddc 同一条路线。没有内核扩展、没有后台 DDC 辅助进程，也不需要 `ddcctl`。
-- **F1/F2 同步跟随。** listen-only `CGEventTap` 只旁听亮度键，把原生步进同步到外接屏。事件不会被吞掉，内置屏保持系统原生响应；按住 `⌥` 时显示小气泡 HUD。
+- **F1/F2 跟着鼠标走。** active `CGEventTap` 监听亮度键，调节鼠标所在屏的 DDC 亮度；内置屏与不支持 DDC 的屏保持系统原生响应。按住 `⌥` 一次调节全部外接屏，并显示小气泡 HUD。
 - **全新的面板壳，不是换皮。** 弃用 `NSPopover`，改为 MoniSwitch 自有的无边框 `NSPanel`：顶边锚在菜单栏图标下方，淡入并从顶部缩放展开，点面板外任意位置收起。
 - **控制中心式布局。** 亮度卡常驻顶部，按真实比例绘制的布局图是枢纽；点击屏块，在第二张气泡卡里展开该屏参数。预设卡与底部工具栏顺次排在下面。
 - **七组主题 + 跟随系统。** 鼠尾草绿、玫瑰红、橙、棕褐、蓝、蓝灰、青灰；每组派生卡底、高亮和实心强调三档色，并分别计算浅色与深色版本。
-- **重做的设置窗口。** 原生边栏材质、分组卡片，并新增「亮度与按键」页：F1/F2 监听开关、输入监控权限状态、DDC 兼容性说明都在这里。
+- **重做的设置窗口。** 原生边栏材质、分组卡片，并新增「亮度与按键」页：F1/F2 监听开关、辅助功能权限状态、DDC 兼容性说明都在这里。
 
 ## 功能
 
 | 模块 | 你能做什么 |
 | --- | --- |
 | **显示器** | 选主屏、把外接屏放左/右、扩展或镜像、一键横排、切换分辨率与刷新率。 |
-| **亮度** | 外接屏原生 DDC/CI 滑条、F1/F2 同步、迷你 HUD，并按 EDID 身份记住每块屏的值。 |
+| **亮度** | 外接屏原生 DDC/CI 滑条、F1/F2 调鼠标所在屏、迷你 HUD，并按 EDID 身份记住每块屏的值。 |
 | **预设** | 把整套布局（主屏、位置、镜像）存成预设，一键或一个全局快捷键恢复。 |
 | **面板** | 无边框悬浮面板、按真实比例布局图、可折叠参数组、弹簧动画与悬停浮起。 |
 | **设置** | 中英双语、登录时启动、自动刷新、通知、主题、预设与权限，集中在一个窗口。 |
@@ -66,7 +66,7 @@ MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不
 
 - **Apple Silicon 原生 DDC/CI。** DDC 栈通过私有 `IOAVService` API 直接与显示器的 I2C 控制通道通信，运行时用 `dlopen`/`dlsym` 解析符号，符号缺失时优雅降级。
 - **每块外接屏一条滑条。** 自动发现支持 DDC 的外接屏，把 `CGDirectDisplayID` 映射到对应的 `IOAVService`；亮度值按 EDID UUID 持久化，拔插后不会重置。
-- **F1/F2 不拦截系统事件。** 监听器只观察媒体键事件，从不吞掉它。笔记本上内置屏仍然原样响应；按住 `⌥` 再按 F1/F2，会显示亮度 HUD 并调节外接屏。
+- **F1/F2 对准鼠标所在屏。** 裸按 F1/F2 调节鼠标下的 DDC 外接屏；只有可控制的外接屏会吞掉事件，其余屏原样放行，内置屏继续走系统原生亮度与 OSD。按住 `⌥` 再按 F1/F2，可一次调节全部外接屏。
 - **HUD 不打扰。** 小气泡出现在菜单栏图标下方，按住键时续期，松开后 1.2 秒淡出。
 - **DDC 兼容性说清楚。** 经部分扩展坞、转接器或电视连接的屏幕不暴露 DDC 亮度；这类屏不会出现在亮度列表中，设置页会直接解释原因，而不是给一条调不动的滑条。
 
@@ -82,7 +82,7 @@ MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不
 ### 设置窗口，去繁就简
 
 - **通用** —— 界面语言、登录时启动、主题色、自动刷新（含间隔）、菜单中的刷新率/HiDPI 标注、切换后通知。
-- **亮度与按键** —— F1/F2 监听开关、输入监控权限状态与跳转、DDC 兼容性说明。
+- **亮度与按键** —— F1/F2 监听开关、辅助功能权限状态与跳转、DDC 兼容性说明。
 - **预设（Beta）** —— 保存当前布局、应用/删除预设、录制或清除全局快捷键。
 - **关于** —— 图标、版本和一句话简介。
 
@@ -107,7 +107,7 @@ MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不
     <td width="50%" align="center" valign="top">
       <img src="screenshots/zh/settings-general.png" width="400" alt="MoniSwitch 设置-通用：语言、登录时启动、主题色、自动刷新与通知">
       <br><b>设置 · 通用</b>
-      <br><sub>语言、登录时启动、七组主题、刷新与通知，收在原生分组卡片里。</sub>
+      <br><sub>语言、登录时启动、七组主题、刷新与通知，收在原生设置布局里。</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="screenshots/zh/settings-presets.png" width="400" alt="MoniSwitch 设置-预设：保存布局、应用/删除预设、录制全局快捷键">
@@ -123,9 +123,9 @@ MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不
 <table>
   <tr>
     <td width="50%" align="center" valign="top">
-      <img src="screenshots/zh/settings-brightness.png" width="400" alt="MoniSwitch 设置-亮度与按键：F1/F2 同步开关、输入监控权限和 DDC 兼容性说明">
+      <img src="screenshots/zh/settings-brightness.png" width="400" alt="MoniSwitch 设置-亮度与按键：F1/F2 开关、权限状态和 DDC 兼容性说明">
       <br><b>设置 · 亮度与按键</b>
-      <br><sub>F1/F2 监听、输入监控权限和 DDC 兼容性说明放在同一页。截图是未授权状态，App 会提供直达系统设置的入口。</sub>
+      <br><sub>F1/F2 监听、所需权限和 DDC 兼容性说明放在同一页。截图是未授权状态，App 会提供直达系统设置的入口。</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="screenshots/zh/settings-about.png" width="400" alt="MoniSwitch 设置-关于：应用图标、名称、简介和版本 2.0.0">
@@ -191,7 +191,7 @@ bash Support/run-tests.sh
    - **分辨率 / 刷新率** —— 点整行展开选项列表；HiDPI 变体会标注。
    - **设为主屏** —— 把菜单栏和 Dock 移到这块屏。
    - **镜像 / 扩展** —— 非主屏参数气泡底部的两个图标按钮；悬停有说明。
-4. 用顶部亮度条，或直接按 F1/F2。按住 `⌥` 再按 F1/F2 会显示 HUD 并调节外接屏。
+4. 用顶部亮度条，或直接按 F1/F2：裸按调节鼠标所在屏，按住 `⌥` 调节全部外接屏。
 5. 点 **预设** 恢复保存的布局；与当前布局一致的预设带「当前」角标。
 6. 点面板外任意位置收起面板。齿轮按钮打开设置，电源按钮退出 App。
 
@@ -200,13 +200,13 @@ bash Support/run-tests.sh
 - **macOS 14 Sonoma 或更高。**
 - **Apple Silicon。** 当前发布的是 arm64 构建；Intel 支持在路线图中。
 - **支持 DDC/CI 的外接显示器** 才能使用亮度功能。部分 USB-C 扩展坞、转接器和电视不暴露 DDC 亮度；这类屏会被跳过，而不是显示一条调不动的滑条。
-- **输入监控权限**（可选，仅 F1/F2 监听需要）。不授权时，滑条和预设照常工作，只有亮度键监听不生效。
+- **辅助功能权限**（可选，仅 F1/F2 监听需要）。不授权时，滑条和预设照常工作，只有亮度键监听不生效。
 
 ## 权限与隐私
 
 MoniSwitch 不接分析、不埋点、不访问网络服务。显示器切换走随包分发的 `displayplacer`，亮度走本地 DDC/CI 通道，预设和设置在 `UserDefaults` 里。
 
-唯一可能申请的隐私权限是 **输入监控**，用于 listen-only 的 F1/F2 `CGEventTap`。切换后通知默认关闭；打开时 macOS 还会申请通知权限。这个 tap 从不吞掉媒体键事件。不想授权的话，在 **设置 → 亮度与按键** 里关掉 F1/F2 监听即可，其他功能不受影响。
+唯一可能申请的隐私权限是 **辅助功能**，用于 active 的 F1/F2 `CGEventTap`。切换后通知默认关闭；打开时 macOS 还会申请通知权限。只有当鼠标位于可 DDC 控制的外接屏上时，这个 tap 才会吞掉媒体键事件；其余情况事件原样放行。不想授权的话，在 **设置 → 亮度与按键** 里关掉 F1/F2 监听即可，其他功能不受影响。
 
 ## 关于未公证提示
 
@@ -218,7 +218,7 @@ MoniSwitch 是一个 SwiftUI + AppKit 的菜单栏 App，核心能力分成三�
 
 - **排列** —— [displayplacer](https://github.com/jakehilborn/displayplacer)（MIT，© Jake Hilborn）的图形界面。切换主屏时把目标屏的 `origin` 移到 `(0,0)`，其余屏按相同向量平移；镜像使用 displayplacer 的 `id:A+B` 语法；自动排列把所有屏横向排开，同时保持镜像组合并。
 - **亮度** —— Apple Silicon 上的原生 DDC/CI 引擎。运行时解析私有 `IOAVService` 符号，为每块外接屏找到对应的 service，再通过串行 `actor` 写入 `[0x84, 0x03, 0x10, hi, lo, checksum]` 包；写请求会合并，并在 service 释放前做生命周期守卫。协议向量和解析行为都有测试覆盖。
-- **按键** —— F1/F2 的 listen-only `CGEventTap`。读取媒体键事件后把步进同步给外接屏，事件本身原样留给系统。它申请的是输入监控，而不是辅助功能。
+- **按键** —— F1/F2 的 active `CGEventTap`。读取媒体键事件后按鼠标位置定位目标屏，对可控制的外接屏写 DDC 亮度；内置屏与不支持 DDC 的屏收到的是原样事件。它需要辅助功能权限，而不是输入监控。
 
 面板本身是一块无边框 `NSPanel`，`sizingOptions = []`，SwiftUI 根视图钉在顶部，高度桥把内容实测高度写回窗口。这样面板才能随内容平滑长高/收起，而内容不会垂直漂移。
 
@@ -229,7 +229,7 @@ MoniSwitch 是一个 SwiftUI + AppKit 的菜单栏 App，核心能力分成三�
 - **构建：** Swift Package Manager，纯文本 `Package.swift`，无 Xcode 工程
 - **测试：** Swift Testing（DDC 协议向量、displayplacer 解析 fixture、预设漂移重映射、面板主题派生）
 - **分发：** 非沙盒，本地 ad-hoc 签名，DMG 直链
-- **亮度：** 私有 `IOAVService`，经 `dlopen`/`dlsym` 运行时解析，Apple Silicon；F1/F2 走 listen-only `CGEventTap`
+- **亮度：** 私有 `IOAVService`，经 `dlopen`/`dlsym` 运行时解析，Apple Silicon；F1/F2 走 active `CGEventTap`（辅助功能权限）
 - **图标：** SVG 源在 `design/icon-web/`，导出到 `Resources/AppIcon-source.png` 与 `AppIcon.icns`
 
 ## 项目结构
@@ -260,7 +260,7 @@ MoniSwitch/
 │   ├── DDCDiscovery.swift         # 外接屏 → IOAVService 映射
 │   ├── DDCWriter.swift            # 串行 DDC I/O actor、合并写与生命周期守卫
 │   ├── BrightnessManager.swift    # 亮度中枢（发现、持久化、滑条、步进）
-│   ├── BrightnessKeyTap.swift     # listen-only F1/F2 CGEventTap
+│   ├── BrightnessKeyTap.swift     # active F1/F2 CGEventTap（按鼠标所在屏）
 │   └── BrightnessHUD.swift        # 菜单栏图标下方的迷你亮度气泡
 ├── Tests/MoniSwitchTests/         # Swift Testing 测试套件
 ├── Resources/                     # 随包 displayplacer、AppIcon.icns、图标源
@@ -323,7 +323,7 @@ DDC/CI 必须能到达显示器。部分 USB-C 扩展坞、转接器、KVM 和�
 <details>
 <summary><b>F1/F2 还会调内置屏吗？</b></summary>
 
-会。监听器是 listen-only，从不吞掉事件，所以内置屏保持系统原生响应，外接屏跟随同样的步进。按住 `⌥` 再按 F1/F2 会显示 HUD 并面向外接屏调节。
+鼠标在可 DDC 控制的外接屏上时，MoniSwitch 会吞掉 F1/F2 并直接调节那块屏的 DDC 亮度；其余情况事件原样放行，所以内置屏保持系统原生响应。按住 `⌥` 再按 F1/F2，可一次调节全部外接屏。
 </details>
 
 <details>

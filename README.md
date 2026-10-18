@@ -31,23 +31,23 @@ Switch the main screen, arrange mirrors, restore whole layouts, and dim external
 
 MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a system menu. Every display is drawn to scale, every switch is one or two clicks away, and the panel resizes itself around what you open — no inner scroll area, no digging through System Settings → Displays.
 
-**v2.0 is a ground-up rewrite of the panel** and adds the other half of owning a monitor: external-display brightness. Each DDC/CI-capable screen gets a slider at the top of the panel, the F1/F2 brightness keys carry the built-in display's native steps to every external screen, and seven low-saturation themes recolor the whole panel in light and dark mode.
+**v2.0 is a ground-up rewrite of the panel** and adds the other half of owning a monitor: external-display brightness. Each DDC/CI-capable screen gets a slider at the top of the panel, the F1/F2 brightness keys adjust the display under the pointer, and seven low-saturation themes recolor the whole panel in light and dark mode.
 
 ## What's new in v2.0
 
 - **External brightness, natively.** A DDC/CI slider per external display, implemented on Apple Silicon through the private `IOAVService` I2C path — the same route MonitorControl and m1ddc use. No kernel extension, no background DDC helper, no `ddcctl`.
-- **F1/F2 follows you.** A listen-only `CGEventTap` watches the brightness keys and mirrors the native step to external screens. Nothing is intercepted; the built-in display keeps its normal behavior. Hold `⌥` to show a small HUD while you adjust.
+- **F1/F2 follows you.** An active `CGEventTap` watches the brightness keys and adjusts the DDC brightness of the display under the pointer; the built-in screen and non-DDC screens keep their native response. Hold `⌥` to adjust every external screen at once, with a small HUD.
 - **A new panel, not a reskin.** The old `NSPopover` is gone. MoniSwitch now owns a borderless `NSPanel`: the panel is anchored under the menu-bar icon, fades and scales in from the top, and dismisses on any outside click.
 - **Control-Center layout.** Brightness is pinned at the top, the to-scale layout preview is the hub, and clicking a display block unfolds that screen's parameters in a second bubble card. Presets and the bottom toolbar follow.
 - **Seven themes + follow system.** Sage, rose, orange, brown, blue, blue-grey and cyan-grey — each derived into a card background, a highlight and a solid accent, with separate light and dark derivations.
-- **A rebuilt Settings window.** Native sidebar material, grouped cards, and a new **Brightness & Keys** tab for the F1/F2 listener, its Input Monitoring permission and DDC compatibility notes.
+- **A rebuilt Settings window.** Native sidebar material, grouped cards, and a new **Brightness & Keys** tab for the F1/F2 listener, its Accessibility permission and DDC compatibility notes.
 
 ## Features
 
 | Area | What you get |
 | --- | --- |
 | **Displays** | Pick the main display, place externals left/right, extend or mirror, auto-arrange side by side, and switch resolution or refresh rate. |
-| **Brightness** | Native DDC/CI sliders for external screens, F1/F2 sync, a compact HUD, and per-display values remembered by EDID identity. |
+| **Brightness** | Native DDC/CI sliders for external screens, F1/F2 for the display under the pointer, a compact HUD, and per-display values remembered by EDID identity. |
 | **Presets** | Save the whole layout — main screen, positions, mirroring — and restore it in one click or with a global hotkey. |
 | **Panel** | A borderless floating panel with a to-scale layout map, collapsible parameter groups, spring animations and hover lift. |
 | **Settings** | Bilingual UI (English / 简体中文), launch at login, auto-refresh, notifications, themes, presets and permissions. |
@@ -66,7 +66,7 @@ MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a s
 
 - **Native DDC/CI on Apple Silicon.** The DDC stack speaks the monitor's I2C control channel directly through the private `IOAVService` API, resolved at runtime with `dlopen`/`dlsym` and degrading gracefully if a symbol is missing.
 - **One slider per external screen.** MoniSwitch discovers DDC-capable externals, maps `CGDirectDisplayID` to the matching `IOAVService`, and remembers each screen's value by EDID UUID, so unplugging and replugging does not reset your brightness.
-- **F1/F2 without interception.** The listener only observes the media-key event; it never swallows it. On a laptop, the built-in display still responds natively. Hold `⌥` while pressing F1/F2 to show the brightness HUD and adjust the external screens.
+- **F1/F2 targets the pointer.** Bare F1/F2 adjusts the DDC screen under the mouse; MoniSwitch consumes the key only for a controllable external display. Anywhere else the event passes through, so the built-in screen keeps its native OSD. Hold `⌥` while pressing F1/F2 to adjust every external screen at once.
 - **The HUD stays out of the way.** A small bubble sits under the menu-bar icon, renews while you hold the key, and fades after 1.2 seconds.
 - **DDC compatibility is explained in Settings.** Displays connected through some docks, adapters or TVs do not expose DDC brightness; they simply do not appear in the brightness list. The app tells you this instead of showing a dead slider.
 
@@ -82,7 +82,7 @@ MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a s
 ### Settings without the clutter
 
 - **General** — interface language, launch at login, theme, auto-refresh (with interval), detailed menu tags, and post-switch notifications.
-- **Brightness & Keys** — enable or disable the F1/F2 listener, see the Input Monitoring state, jump to System Settings, and read the DDC compatibility note.
+- **Brightness & Keys** — enable or disable the F1/F2 listener, see the Accessibility state, jump to System Settings, and read the DDC compatibility note.
 - **Presets** — save the current layout, apply or delete a preset, record a global hotkey, or clear it.
 - **About** — app icon, version and one-line description.
 
@@ -107,7 +107,7 @@ MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a s
     <td width="50%" align="center" valign="top">
       <img src="screenshots/en/settings-general.png" width="400" alt="MoniSwitch Settings, General tab: language, launch at login, themes, auto-refresh and notifications">
       <br><b>Settings · General</b>
-      <br><sub>Language, launch at login, seven themes, refreshing and notifications in native grouped cards.</sub>
+      <br><sub>Language, launch at login, seven themes, refreshing and notifications in the native settings layout.</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="screenshots/en/settings-presets.png" width="400" alt="MoniSwitch Settings, Presets tab: save a layout, apply or delete presets and record a global hotkey">
@@ -123,9 +123,9 @@ MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a s
 <table>
   <tr>
     <td width="50%" align="center" valign="top">
-      <img src="screenshots/en/settings-brightness.png" width="400" alt="MoniSwitch Settings, Brightness & Keys tab: F1/F2 sync switch, Input Monitoring permission and DDC compatibility note">
+      <img src="screenshots/en/settings-brightness.png" width="400" alt="MoniSwitch Settings, Brightness & Keys tab: F1/F2 switch, permission status and DDC compatibility note">
       <br><b>Settings · Brightness &amp; Keys</b>
-      <br><sub>The F1/F2 listener, its Input Monitoring permission and the DDC compatibility note live together. This capture shows the un-granted state; the app links straight to the permission.</sub>
+      <br><sub>The F1/F2 listener, the permission it needs and the DDC compatibility note live together. This capture shows the un-granted state; the app links straight to the permission.</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="screenshots/en/settings-about.png" width="400" alt="MoniSwitch Settings, About tab: app icon, name, description and version 2.0.0">
@@ -191,7 +191,7 @@ The app is built with Swift Package Manager — there is no `.xcodeproj`. The pa
    - **Resolution / Refresh Rate** — click the row to open the option list; HiDPI variants are tagged.
    - **Set as Main** — move the menu bar and Dock to that display.
    - **Mirror / Extend** — use the two icon buttons on a non-main display; hover for a plain-language tooltip.
-4. Use the top brightness sliders, or the F1/F2 keys. Hold `⌥` while pressing F1/F2 for the HUD and external-screen adjustment.
+4. Use the top brightness sliders, or the F1/F2 keys — bare keys adjust the display under the pointer, `⌥` adjusts every external screen.
 5. Click **Presets** to restore a saved layout. Presets matching the current layout carry a **Current** badge.
 6. Click anywhere outside the panel to dismiss it. The gear button opens Settings; the power button quits the app.
 
@@ -200,13 +200,13 @@ The app is built with Swift Package Manager — there is no `.xcodeproj`. The pa
 - **macOS 14 Sonoma or later.**
 - **Apple Silicon.** The current release is an arm64 build; Intel support is on the roadmap.
 - **A DDC/CI-capable external display** for the brightness features. Many USB-C docks, adapters and TVs do not expose DDC brightness; those screens are skipped rather than shown with a dead slider.
-- **Input Monitoring permission** for the F1/F2 listener (optional). Without it, the sliders and presets still work; only the brightness-key listener is inactive.
+- **Accessibility permission** for the F1/F2 listener (optional). Without it, the sliders and presets still work; only the brightness-key listener is inactive.
 
 ## Permissions and privacy
 
 MoniSwitch does not use analytics, telemetry or a network service. Display changes run through the bundled `displayplacer` binary, brightness runs over the local DDC/CI channel, and presets/settings stay in your `UserDefaults`.
 
-The only privacy permission it may ask for is **Input Monitoring**, used by the listen-only F1/F2 `CGEventTap`. Post-switch notifications are off by default; if you turn them on, macOS will also ask for notification permission. The tap never consumes the media-key event. If you prefer not to grant it, turn the F1/F2 listener off in **Settings → Brightness & Keys**; everything else continues to work.
+The only privacy permission it may ask for is **Accessibility**, used by the active F1/F2 `CGEventTap`. Post-switch notifications are off by default; if you turn them on, macOS will also ask for notification permission. The tap consumes the media-key event only when the pointer is over a DDC-controllable external display; anywhere else the event passes through. If you prefer not to grant it, turn the F1/F2 listener off in **Settings → Brightness & Keys**; everything else continues to work.
 
 ## About the notarization warning
 
@@ -218,7 +218,7 @@ MoniSwitch is a SwiftUI + AppKit menu-bar app. The heavy lifting is split into t
 
 - **Arrangement** — a GUI over [displayplacer](https://github.com/jakehilborn/displayplacer) (MIT, © Jake Hilborn). Switching the main display moves the target screen's `origin` to `(0,0)` and shifts the others by the same vector; mirroring uses displayplacer's `id:A+B` syntax; auto-arrange lays screens out side by side while keeping mirror groups merged.
 - **Brightness** — a native DDC/CI engine on Apple Silicon. The app resolves the private `IOAVService` symbols at runtime, discovers the matching service for each external display, and writes `[0x84, 0x03, 0x10, hi, lo, checksum]` packets through a serial `actor` with write coalescing and release guards. The protocol vectors and parser behavior are covered by tests.
-- **Keys** — a listen-only `CGEventTap` for F1/F2. It reads the media-key event, mirrors the step to external screens, and leaves the event untouched for the system. The tap is granted Input Monitoring rather than Accessibility.
+- **Keys** — an active `CGEventTap` for F1/F2. It reads the media-key event, targets the display under the pointer, and writes DDC brightness for a controllable external screen; built-in and non-DDC screens receive the untouched event. The tap requires Accessibility rather than Input Monitoring.
 
 The panel itself is a borderless `NSPanel` with `sizingOptions = []`, a SwiftUI root pinned to the top, and a height bridge that writes the content's measured height back to the window. That combination is what makes the panel grow and shrink without the content drifting vertically.
 
@@ -229,7 +229,7 @@ The panel itself is a borderless `NSPanel` with `sizingOptions = []`, a SwiftUI 
 - **Build:** Swift Package Manager, plain `Package.swift`, no Xcode project
 - **Tests:** Swift Testing (DDC protocol vectors, displayplacer parser fixtures, preset drift remapping, panel theme derivation)
 - **Distribution:** non-sandboxed, local ad-hoc signing, direct DMG
-- **Brightness:** private `IOAVService` via `dlopen`/`dlsym`, Apple Silicon; F1/F2 via a listen-only `CGEventTap`
+- **Brightness:** private `IOAVService` via `dlopen`/`dlsym`, Apple Silicon; F1/F2 via an active `CGEventTap` (Accessibility)
 - **Icons:** SVG source in `design/icon-web/`, exported to `Resources/AppIcon-source.png` and `AppIcon.icns`
 
 ## Project structure
@@ -260,7 +260,7 @@ MoniSwitch/
 │   ├── DDCDiscovery.swift         # External display → IOAVService mapping
 │   ├── DDCWriter.swift            # Serial DDC I/O actor, coalescing and lifecycle guards
 │   ├── BrightnessManager.swift    # Brightness hub (discovery, persistence, sliders, steps)
-│   ├── BrightnessKeyTap.swift     # Listen-only F1/F2 CGEventTap
+│   ├── BrightnessKeyTap.swift     # Active F1/F2 CGEventTap (pointer display)
 │   └── BrightnessHUD.swift        # Mini brightness bubble under the menu-bar icon
 ├── Tests/MoniSwitchTests/         # Swift Testing suites
 ├── Resources/                     # Bundled displayplacer, AppIcon.icns, icon source
@@ -323,7 +323,7 @@ No. The released app bundles `displayplacer`. You only need to provide it when b
 <details>
 <summary><b>Will F1/F2 still change my built-in display?</b></summary>
 
-Yes. The listener is listen-only and never consumes the event, so the built-in display keeps its native response. External screens follow the same step. Hold `⌥` while pressing F1/F2 to show the HUD and target the external screens.
+When the pointer is over a controllable external display, MoniSwitch consumes F1/F2 and drives that screen's DDC brightness. Anywhere else the event passes through, so the built-in display keeps its native response. Hold `⌥` while pressing F1/F2 to adjust every external display at once.
 </details>
 
 <details>
