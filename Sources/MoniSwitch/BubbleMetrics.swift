@@ -104,6 +104,13 @@ enum BubbleMetrics {
 
     /// 停留多久后弹出（对齐系统 tooltip 的 dwell 手感）。
     static let tooltipDwell: TimeInterval = 0.45
+    /// 气泡底边与控件顶边之间的间隙（浮窗定位用）。
+    static let tooltipGap: CGFloat = 10
+    /// 浮窗内容四周的投影留白：迷你气泡的阴影画在窗口内，窗口需比气泡大一圈，
+    /// 否则阴影被窗口边界裁成直线（与面板 shadowBreathingSide 同源问题）。
+    static let tooltipShadowPadding: CGFloat = 16
+    /// 浮窗水平方向的屏幕兜底边距：只在气泡会越出屏幕时夹击（面板边界不夹）。
+    static let tooltipScreenMargin: CGFloat = 6
     /// 入场起始缩放（自按钮上缘向上生长，弹跳缓动）。
     static let tooltipPopScale: CGFloat = 0.85
     /// 入场弹簧：欠阻尼带轻微回弹，近似参考的 bouncy 贝塞尔（0.175, 0.885, 0.32, 1.275）。

@@ -43,10 +43,18 @@ struct SettingsView: View {
     }
 
     @EnvironmentObject private var l10n: L10n
+    @EnvironmentObject private var settings: AppSettings
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedTab: Tab? = .general
     /// 内容区已向上滚出的距离（各 tab 的 ScrollOffsetReader 上报，驱动顶部毛玻璃渐入）。
     @State private var contentScrollOffset: CGFloat = 0
+
+    /// 设置窗口的强调色板（2026-10-17 用户拍板「只同步强调色」）：与面板同源解析
+    /// ——跟随设置里的主题 id 与当前外观，切换主题时整窗控件实时跟随；「跟随系统」
+    /// 回退系统强调色（palette.solid == BrandColor.accent）。
+    private var palette: PanelPalette {
+        PanelTheme.palette(id: settings.panelThemeID, dark: colorScheme == .dark)
+    }
 
     var body: some View {
         // HStack 手拼「边栏 + 竖线 + 内容区」：放弃 NavigationSplitView——它在 macOS 上对
@@ -118,11 +126,14 @@ struct SettingsView: View {
             // windowBackgroundColor 浅灰填充）而非「灰底白卡」。
             .background(colorScheme == .light ? Color.white : Color(nsColor: .windowBackgroundColor))
         }
-        // 不在根视图加 .tint(Color(NSColor.controlAccentColor))：SwiftUI 控件默认就跟随系统
-        // 强调色，这条桥接 AppKit 动态色的 tint 是冗余的；且 macOS 15 实机上它会让下拉框箭头
-        // 胶囊实况渲染成红色（2026-08 实测，系统强调色并非红；离屏渲染不可复现，属实况合成
-        // 路径的桥接动态色解析失败）。删掉后控件依旧跟随系统强调色，显式用 BrandColor.accent
-        // 的地方（边栏选中图标/hover 高亮/菜单栏面板）不受影响。
+        // 主题强调色下发（2026-10-17 用户拍板「只同步强调色」）：面板选了内置主题时
+        // 用色板实心档（静态 hex 色）驱动开关/链接/焦点环等系统控件；「跟随系统」传
+        // nil（不下发 tint），保持原生系统强调色。**必须用静态 theme 色而非
+        // Color(NSColor.controlAccentColor) 桥接动态色**——macOS 15 实机上桥接动态色
+        // 做根 tint 会让下拉框箭头胶囊渲染成红色（2026-08 实测，离屏不可复现）。
+        // 卡底/内容区/边栏材质不参与，布局观感保持原生。
+        .environment(\.panelPalette, palette)
+        .tint(settings.panelThemeID == PanelTheme.systemID ? nil : palette.solid)
         // 注意：不在根视图加 .ignoresSafeArea(.top)——那会让整个边栏(240pt，覆盖红绿灯 x 范围)
         // 和内容区都顶进标题栏、压住红绿灯。仅竖线 Rectangle 单独 ignore（见上），实现
         // 「竖线一通到顶 + 内容避开红绿灯」。HeaderFadeBackdrop 的 ignore 也只作用于内容列
@@ -304,6 +315,10 @@ private struct SidebarRow: View {
     let title: String
     let systemImage: String
     let isSelected: Bool
+
+    /// 设置窗口的主题色板（2026-10-17）：选中页图标跟随面板主题实心档；
+    /// 「跟随系统」时 solid 即系统强调色，观感与改版前一致。
+    @Environment(\.panelPalette) private var palette
     /// 标题后追加「Beta」角标：功能尚未完善的分区（预设）用它向用户示意。
     /// 「Beta」中英文同形，不走 L10n。
     var showsBetaBadge = false
@@ -315,7 +330,7 @@ private struct SidebarRow: View {
             //（.secondary 在 16pt regular 下笔画太细、与材质背景融合看不清）。
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(isSelected ? BrandColor.accent : Color.primary.opacity(0.78))
+                .foregroundStyle(isSelected ? palette.solid : Color.primary.opacity(0.78))
                 .frame(width: 24, height: 24)
             Text(title)
                 .font(.system(size: BubbleMetrics.fontBody, weight: isSelected ? .semibold : .regular))

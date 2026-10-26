@@ -16,10 +16,10 @@
     <string>com.moniswitch.app</string>
 
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
 
     <key>CFBundleShortVersionString</key>
-    <string>2.0.0</string>
+    <string>2.1.0</string>
 
     <key>CFBundleExecutable</key>
     <string>MoniSwitch</string>

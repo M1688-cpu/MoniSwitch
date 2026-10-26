@@ -54,6 +54,13 @@ private struct RevealHeightModifier: ViewModifier, Animatable {
 struct PanelView: View {
 
     @ObservedObject var state: AppState
+    /// 面板窗口的固定高度（0 = 旧弹性行为）。2026-10-18 终版：窗口高度恒定，
+    /// 根部也固定成这个高度，让**内容理想尺寸恒定**——SwiftUI 就没有可改的窗口
+    /// 尺寸（它会按内容尺寸自动改窗口，且底部锚定），面板可见期间零窗口写入。
+    /// 展开/收起因此退化为窗口内部的纯 SwiftUI 布局动画，顶边天然不动。
+    /// 视觉面板高度仍等于内容高度，下方是透明的多余区域（点击判定按内容矩形，
+    /// 见 PanelController.dismissIfClickedOutside）。
+    var windowHeight: CGFloat = 0
     @EnvironmentObject private var l10n: L10n
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var presetManager: PresetManager
@@ -103,7 +110,7 @@ struct PanelView: View {
         VStack(spacing: BubbleMetrics.cardSpacing) {
             if state.displays.isEmpty {
                 // 无显示器：只放一张提示卡。
-                BubbleCard(title: l10n.t(.displaysSection)) {
+                BubbleCard(title: l10n.t(.panelSectionDisplays)) {
                     Text(l10n.t(.noDisplays))
                         .font(.system(size: BubbleMetrics.fontBody))
                         .foregroundStyle(.secondary)
@@ -148,9 +155,8 @@ struct PanelView: View {
         // hover 框线）。顶部**不加**——保持用户定档的卡顶-菜单栏间距不变。
         .padding(.horizontal, BubbleMetrics.shadowBreathingSide)
         .padding(.bottom, BubbleMetrics.shadowBreathingBottom)
-        // 内容理想高度上报（手动尺寸桥的 SwiftUI 侧）：sizingOptions=[] 后
-        // popover 不再自动跟随内容尺寸，由这里实测高度 → PanelController 回写
-        // preferredContentSize。挂 background 不占布局；宽度恒 380，只需上报高度。
+        // 内容实测高度上报（窗口尺寸已钉死，这里只供 PanelController 计算
+        // 外部点击的命中矩形）。挂 background 不占布局；宽度恒 380，只需高度。
         .background {
             GeometryReader { geo in
                 Color.clear.preference(key: PanelContentHeightKey.self, value: geo.size.height)
@@ -169,11 +175,15 @@ struct PanelView: View {
                     .transition(.opacity)
             }
         }
-        // 顶端钉死（配合 PanelController 的 sizingOptions=[] 手动尺寸桥，修「展开
-        // 参数时所有气泡先上跳再下拉」）：根视图按宿主视图边界布局时，此弹性 frame
-        // 让内容恒钉顶部——内容与窗口高度瞬态不一致（窗口跟随滞后 1-2 帧）时，
-        // 误差只落在底缘的微小裁切，整列内容不会垂直居中漂移。
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // 根视图尺寸：传入固定窗口高度时，把内容理想尺寸也钉死成「面板宽 ×
+        // 窗口高」并以顶端对齐排布（这正是阻止 SwiftUI 自动改窗口的关键）；
+        // 未传时保留旧的弹性顶端对齐行为（预览/测试场景）。
+        .frame(width: windowHeight > 0 ? BubbleMetrics.hostContentWidth : nil,
+               height: windowHeight > 0 ? windowHeight : nil,
+               alignment: .top)
+        .frame(maxWidth: windowHeight > 0 ? nil : .infinity,
+               maxHeight: windowHeight > 0 ? nil : .infinity,
+               alignment: .top)
     }
 
     // MARK: - 显示器枢纽卡
@@ -194,8 +204,8 @@ struct PanelView: View {
             // spacing 0：参数二级气泡自带「上缘间隙 + 揭示高度」的完整占位
             // （见 secondaryParamBubble），收起态高度归零时这里不残留空档。
             VStack(spacing: 0) {
-                // 无标题卡（2026-10 拍板）：图即内容，标题字样删除。
-                BubbleCard(title: nil) {
+                // 分区标题（2026-10-17 用户要求）：与预设卡同款小型大写标签。
+                BubbleCard(title: l10n.t(.panelSectionDisplays)) {
                     LayoutDiagram(
                         displays: state.displays,
                         selectedID: expandedDisplayID,
@@ -214,7 +224,7 @@ struct PanelView: View {
         } else if let sole = state.displays.first {
             // 单屏：无位置可排、无镜像对象，参数常展开（内容仅两三行，
             // 折叠反而多一次点击）。
-            BubbleCard(title: nil) {
+            BubbleCard(title: l10n.t(.panelSectionDisplays)) {
                 ArrangementRow(display: sole,
                                state: state,
                                label: sole.localizedTypeName(l10n: l10n),
@@ -243,17 +253,25 @@ struct PanelView: View {
     /// 高度一步跳变（「切屏时面板长度瞬变」，普通展开走 onAppear 天然有动画）。
     private func secondaryParamBubble(_ mounted: DisplayInfo) -> some View {
         let gap = BubbleMetrics.secondaryBubbleGap
-        return ArrangementRow(display: mounted,
-                       state: state,
-                       label: mounted.localizedTypeName(l10n: l10n),
-                       showsPosition: !mounted.isMain,
-                       foldable: true,
-                       isExpanded: expandedDisplayID == mounted.id,
-                       onToggle: { toggleExpansion(for: mounted) },
-                       expandedRowID: $expandedRowID,
-                       onHoverDisplay: { hovering in
-                           hoveredDisplayID = hovering ? mounted.id : nil
-                       })
+        return VStack(alignment: .leading, spacing: 10) {
+            // 分区标题（2026-10-17 用户要求「每张气泡顶部都加像 presets 的标题」）：
+            // 与一级气泡共用 BubbleSectionLabel，字号/字距/主题色完全一致。
+            // leading 4 + 气泡 12 = 16，与 ArrangementRow 的行内容左缘对齐；
+            // 垂直沿用二级气泡自己的 12pt 内边距（比一级气泡的 16 紧凑一档）。
+            BubbleSectionLabel(text: l10n.t(.panelSectionParameters))
+                .padding(.leading, 4)
+            ArrangementRow(display: mounted,
+                           state: state,
+                           label: mounted.localizedTypeName(l10n: l10n),
+                           showsPosition: !mounted.isMain,
+                           foldable: true,
+                           isExpanded: expandedDisplayID == mounted.id,
+                           onToggle: { toggleExpansion(for: mounted) },
+                           expandedRowID: $expandedRowID,
+                           onHoverDisplay: { hovering in
+                               hoveredDisplayID = hovering ? mounted.id : nil
+                           })
+        }
             .padding(BubbleMetrics.secondaryBubblePadding)
             .background {
                 GeometryReader { geo in
@@ -315,7 +333,7 @@ struct PanelView: View {
     /// 名称取注册表 ProductName（如 "DELL U2723QE"，比 displayplacer 的
     /// "27 inch external screen" 更可辨），缺失退本地化「外接显示器」。
     private var brightnessCard: some View {
-        BubbleCard(title: nil) {
+        BubbleCard(title: l10n.t(.panelSectionBrightness)) {
             VStack(spacing: BubbleMetrics.rowSpacing) {
                 ForEach(brightness.entries) { entry in
                     BrightnessRow(
@@ -469,7 +487,8 @@ private struct DeviceIconBadge: View {
 }
 
 /// 底部纯图标按钮：固定触区 34×26（fullWidth 时等宽均分、图标居中）；
-/// 功能名称由 .help 原生 tooltip 呈现。
+/// 功能名称由与镜像/扩展同款的 HoverDwellTooltip 停留气泡呈现
+/// （2026-10-17 由 .help 原生 tooltip 换成面板统一的自绘迷你气泡）。
 ///
 /// 悬浮反馈为按钮级（区别于卡片整泡浮起）：图标 scaleEffect 微放大（仅图标本体，
 /// 2D 仿射不栅格化、触区与布局不动，无边缘振荡问题）；reduceMotion 时无放大。
@@ -505,7 +524,9 @@ private struct ToolbarIconButton: View {
         .buttonStyle(.plain)
         .disabled(disabled)
         .opacity(disabled ? 0.35 : 1)
-        .help(tooltip)
+        // 2026-10-17 用户要求：底部四个按钮也改用与镜像/扩展同款的停留解释气泡
+        // （原 .help 原生 tooltip 文案不变，展示换成统一的自绘迷你气泡）。
+        .modifier(HoverDwellTooltip(text: tooltip, icon: systemImage))
         .onHover { hovering in
             isHovered = hovering
             if !disabled { onHoverChange(hovering) }
@@ -684,83 +705,68 @@ private struct QuitBubble: View {
     }
 }
 
-/// 悬停补充气泡（2026-10-17 通用化：原 MirrorTargetTooltip）：hover 停留
-/// `tooltipDwell` 后在控件上方弹出迷你气泡（缩小→放大的弹跳入场，近似系统
-/// tooltip 的 dwell 手感）；移开立即快退收起。纯展示层：不参与布局、不挡交互。
-/// 镜像/扩展两个纯图标按钮都用它补功能说明（图标-only 后文字只剩这里有）。
-/// mini 气泡外壳（2026-10 曾与布局图悬停名称标签共用，名称改常驻居中后
-/// 布局图不再引用）：与卡片同源的不透明填充 + 细描边 + 浅阴影，
-/// 浅/深模式分别取白 / 深卡色。
-private struct MiniBubble: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-
-    func body(content: Content) -> some View {
-        content
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(BubbleMetrics.surfaceFill(dark: colorScheme == .dark))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.primary.opacity(BubbleMetrics.surfaceStrokeOpacity(dark: colorScheme == .dark)), lineWidth: 1)
-                    .allowsHitTesting(false)
-            )
-            .bubbleShadow(opacity: 0.7)
-    }
-}
-
+/// 控件侧的悬停计时者：停留 `tooltipDwell` 后把气泡交给独立浮窗
+/// （FloatingTooltipPresenter）展示；移开/消失立即收起。
+///
+/// 2026-10-17 改版（用户拍板「气泡居中，即使超出整个菜单栏界面也没问题」）：
+/// 气泡从控件 `overlay` 迁到独立无边框浮窗，构造性绕开两重裁剪——
+/// ① 参数二级气泡整块包在 RevealHeightModifier 的 `.clipped()` 里，居中的
+/// 气泡右半截会被气泡边界裁掉（旧版因此给镜像/扩展传 `.topTrailing`，也就是
+/// 用户截图里「气泡偏左」的根因）；② 面板窗口只有 404pt 宽，贴右缘的控件居中后
+/// 越过窗口的部分会被窗口边界裁掉。浮窗居中于控件正上方、可越过面板边界；
+/// `ignoresMouseEvents` 纯展示，不挡任何交互。
+/// 控件自身只做 dwell 计时与屏幕锚点上报（TooltipAnchorReader 背景探针）。
 private struct HoverDwellTooltip: ViewModifier {
     let text: String
     /// 气泡前缀图标（通常复用按钮自身的 SF Symbol）。
     var icon: String = "info.circle"
-    /// 气泡相对控件的锚点：默认居中于控件上方；贴近面板右缘的控件传 `.topTrailing`
-    /// ——参数二级气泡整块挂在 RevealHeightModifier 的 clipped 里，居中气泡的右半截
-    /// 会被气泡边界裁掉（实测「镜像到 27英寸扩展显示器」少一个「器」字）。
-    var alignment: Alignment = .top
 
-    @State private var isShown = false
-    @State private var dwellTask: DispatchWorkItem?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 计时代际 + 任务（引用盒：由 State 持有，可变但不触发重绘）。
+    @State private var hoverState = TooltipHoverState()
+    /// 屏幕锚点上报盒（背景 NSView 探针写弱引用）。
+    @State private var anchorBox = TooltipAnchorBox()
 
     func body(content: Content) -> some View {
         content
+            .background(TooltipAnchorReader(box: anchorBox))
             .onHover { hovering in
                 guard !text.isEmpty else { return }
                 if hovering {
-                    let task = DispatchWorkItem { isShown = true }
-                    dwellTask = task
+                    // 代际递增：迟到的旧任务即使执行，也会因代际不符而丢弃。
+                    hoverState.generation += 1
+                    let generation = hoverState.generation
+                    let box = anchorBox
+                    let state = hoverState
+                    let task = DispatchWorkItem {
+                        MainActor.assumeIsolated {
+                            guard state.generation == generation,
+                                  let anchor = box.screenRect else { return }
+                            FloatingTooltipPresenter.shared.show(text: text, icon: icon, anchor: anchor)
+                        }
+                    }
+                    hoverState.dwellTask = task
                     DispatchQueue.main.asyncAfter(deadline: .now() + BubbleMetrics.tooltipDwell, execute: task)
                 } else {
-                    dwellTask?.cancel()
-                    dwellTask = nil
-                    isShown = false
+                    hoverState.generation += 1
+                    hoverState.dwellTask?.cancel()
+                    hoverState.dwellTask = nil
+                    FloatingTooltipPresenter.shared.hide()
                 }
             }
-            .overlay(alignment: alignment) {
-                HStack(spacing: 5) {
-                    Image(systemName: icon)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                    Text(text)
-                        .font(.system(size: BubbleMetrics.fontCaption))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .modifier(MiniBubble())
-                .fixedSize()
-                // 纯展示层不参与命中：透明态（opacity 0）的气泡悬在按钮上方 36pt 处
-                // 仍可命中的话，会拦截其覆盖区域内行的 hover（opacity 不摘除命中区）。
-                .allowsHitTesting(false)
-                // 上移到按钮上方（overlay .top 贴按钮顶边，再抬一个按钮高 + 间隙）；
-                // 缩放锚点 .bottom：从按钮上缘向上「生长」。
-                .offset(y: -36)
-                .scaleEffect(isShown || reduceMotion ? 1 : BubbleMetrics.tooltipPopScale, anchor: .bottom)
-                .opacity(isShown ? 1 : 0)
-                .animation(isShown ? BubbleMetrics.tooltipSpring : .easeOut(duration: 0.12), value: isShown)
+            .onDisappear {
+                // 面板收起/视图移除时鼠标可能不再产生 exit 事件，主动收掉浮窗。
+                hoverState.generation += 1
+                hoverState.dwellTask?.cancel()
+                hoverState.dwellTask = nil
+                FloatingTooltipPresenter.shared.hide()
             }
     }
+}
+
+/// `HoverDwellTooltip` 的计时盒：代际号用于丢弃「移开后迟到」的 dwell 任务。
+final class TooltipHoverState {
+    var generation = 0
+    var dwellTask: DispatchWorkItem?
 }
 
 // MARK: - 排列行（常驻左/右移 + 刷新率 + 分辨率）
@@ -977,8 +983,8 @@ private struct ArrangementRow: View {
             .asButton { state.mirror(display) }
             .accessibilityLabel(Text(mirrorHint))
             // 悬停停留补充气泡：镜像到对端屏（图标-only 后这是唯一的文字说明）。
-            .modifier(HoverDwellTooltip(text: mirrorHint, icon: "rectangle.on.rectangle",
-                                        alignment: .topTrailing))
+            // 居中于按钮正上方（浮窗可越过面板边界，见 HoverDwellTooltip）。
+            .modifier(HoverDwellTooltip(text: mirrorHint, icon: "rectangle.on.rectangle"))
 
             ActivePill(active: !isMirroring, verticalPadding: 6, strokeWhenInactive: true) {
                 Image(systemName: "rectangle.dashed")
@@ -987,8 +993,7 @@ private struct ArrangementRow: View {
             }
             .asButton { state.unmirror(display) }
             .accessibilityLabel(Text(extendHint))
-            .modifier(HoverDwellTooltip(text: extendHint, icon: "rectangle.dashed",
-                                        alignment: .topTrailing))
+            .modifier(HoverDwellTooltip(text: extendHint, icon: "rectangle.dashed"))
         }
     }
 }
@@ -1051,7 +1056,6 @@ private struct SelectionRow: View {
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                 }
             }
-
             // 选项列表：浅灰圆角底呈现「菜单浮层」感，选项多时内部滚动限高。
             // 常驻挂载（不条件插入）：贪婪 ScrollView 的条件插入高度跳变不参与
             // 动画，是旧版「展开瞬时拉长」的根源；实测高度后显式 frame 驱动。

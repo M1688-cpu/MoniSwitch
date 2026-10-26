@@ -1,1262 +1,554 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MoniSwitch — 图标设计 / Icon study</title>
-  <meta name="description" content="MoniSwitch 的新图标：深色方寸、极光屏幕，与一个玻璃开关。">
-  <meta name="theme-color" content="#070708">
-  <meta name="color-scheme" content="dark">
-  <link rel="icon" href="moniswitch-icon.svg" type="image/svg+xml">
-  <style>
-    :root {
-      --bg: #070708;
-      --panel: #0d0d11;
-      --text: #f5f2f8;
-      --muted: #b6b0c0;
-      --quiet: #837d8d;
-      --line: rgba(255, 255, 255, .08);
-      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-      --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-      --ease: cubic-bezier(.16, 1, .3, 1);
-    }
-
-    *, *::before, *::after { box-sizing: border-box; }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      font-size: 16px;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: optimizeLegibility;
-      overflow-x: hidden;
-    }
-
-    ::selection { background: rgba(167, 139, 250, .35); }
-
-    a { color: inherit; }
-    img { max-width: 100%; }
-
-    :focus-visible {
-      outline: 2px solid #a78bfa;
-      outline-offset: 3px;
-    }
-
-    .bg {
-      position: fixed;
-      inset: 0;
-      z-index: -1;
-      background:
-        radial-gradient(1100px 820px at 80% -8%, rgba(118, 70, 230, .20), transparent 62%),
-        radial-gradient(900px 720px at 4% 40%, rgba(36, 118, 210, .11), transparent 66%),
-        radial-gradient(760px 680px at 62% 112%, rgba(255, 70, 160, .09), transparent 66%),
-        var(--bg);
-    }
-
-    .grain {
-      position: fixed;
-      inset: 0;
-      z-index: 5;
-      pointer-events: none;
-      opacity: .035;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.65'/%3E%3C/svg%3E");
-      background-size: 160px 160px;
-    }
-
-    .wrap {
-      position: relative;
-      z-index: 2;
-      width: 100%;
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 0 40px;
-    }
-
-    /* ---------- header ---------- */
-
-    .site-header {
-      position: relative;
-      z-index: 3;
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 28px 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 11px;
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: -.015em;
-    }
-
-    .brand img {
-      width: 28px;
-      height: 28px;
-      display: block;
-      border-radius: 7px;
-      filter: drop-shadow(0 3px 9px rgba(0, 0, 0, .55));
-    }
-
-    .brand .slash {
-      color: rgba(255, 255, 255, .18);
-      font-weight: 400;
-    }
-
-    .brand .study {
-      color: #8d8798;
-      font-family: var(--mono);
-      font-size: 9.5px;
-      font-weight: 400;
-      letter-spacing: .15em;
-      text-transform: uppercase;
-    }
-
-    .nav {
-      display: flex;
-      gap: 26px;
-      font-size: 11.5px;
-      color: #8d8798;
-      letter-spacing: .01em;
-    }
-
-    .nav a {
-      text-decoration: none;
-      transition: color .2s ease;
-    }
-
-    .nav a:hover { color: #fff; }
-
-    .header-meta {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      letter-spacing: .14em;
-      color: #6f6978;
-      text-transform: uppercase;
-    }
-
-    /* ---------- hero ---------- */
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
-      gap: clamp(40px, 6vw, 88px);
-      align-items: center;
-      padding: clamp(40px, 6vw, 72px) 0 clamp(72px, 10vw, 116px);
-    }
-
-    .eyebrow {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 0 0 25px;
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: .18em;
-      color: #a79fb5;
-      text-transform: uppercase;
-    }
-
-    .eyebrow::before {
-      content: "";
-      width: 26px;
-      height: 1px;
-      background: linear-gradient(90deg, #7c5cff, transparent);
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(48px, 7vw, 86px);
-      line-height: 1.03;
-      letter-spacing: -.055em;
-      font-weight: 640;
-      color: #f9f6fc;
-    }
-
-    h1 .grad {
-      background: linear-gradient(100deg, #62d9ff 0%, #8f7bff 44%, #ff6fbf 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-
-    .lede {
-      max-width: 31em;
-      margin: 30px 0 0;
-      font-size: 17px;
-      line-height: 1.85;
-      color: #bab4c6;
-    }
-
-    .lede strong {
-      color: #f5f2f8;
-      font-weight: 600;
-    }
-
-    .sub {
-      max-width: 34em;
-      margin: 15px 0 0;
-      font-size: 13.5px;
-      line-height: 1.9;
-      color: #7e7889;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 11px;
-      margin-top: 34px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 9px;
-      min-height: 44px;
-      padding: 0 20px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      font-size: 12.5px;
-      font-weight: 550;
-      letter-spacing: .01em;
-      text-decoration: none;
-      cursor: pointer;
-      transition: transform .25s var(--ease), background .25s ease, border-color .25s ease, box-shadow .25s ease;
-    }
-
-    .btn .arrow {
-      font-size: 14px;
-      line-height: 1;
-      transform: translateY(-.5px);
-    }
-
-    .btn:hover { transform: translateY(-1px); }
-
-    .btn.primary {
-      background: #f5f2f8;
-      color: #0a0a0d;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
-    }
-
-    .btn.primary:hover {
-      background: #fff;
-      box-shadow: 0 14px 40px rgba(255, 255, 255, .10);
-    }
-
-    .btn.ghost {
-      background: rgba(255, 255, 255, .035);
-      border-color: rgba(255, 255, 255, .14);
-      color: #e9e4ef;
-    }
-
-    .btn.ghost:hover {
-      background: rgba(255, 255, 255, .065);
-      border-color: rgba(255, 255, 255, .27);
-    }
-
-    .meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 26px 36px;
-      margin: 42px 0 0;
-      padding: 19px 0 0;
-      border-top: 1px solid var(--line);
-    }
-
-    .meta div { min-width: 96px; }
-
-    .meta dt {
-      margin-bottom: 6px;
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .14em;
-      color: #6f6978;
-      text-transform: uppercase;
-    }
-
-    .meta dd {
-      margin: 0;
-      font-size: 12px;
-      color: #cbc5d4;
-      letter-spacing: .01em;
-    }
-
-    /* stage */
-
-    .stage-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      width: 100%;
-      max-width: 540px;
-      justify-self: end;
-    }
-
-    .stage {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      aspect-ratio: 1;
-      border-radius: 36px;
-      border: 1px solid rgba(255, 255, 255, .075);
-      background:
-        radial-gradient(92% 82% at 72% 16%, rgba(139, 92, 246, .20), transparent 64%),
-        radial-gradient(84% 82% at 22% 88%, rgba(56, 189, 248, .10), transparent 68%),
-        linear-gradient(158deg, #111116, #08080b 72%);
-      box-shadow:
-        0 44px 130px rgba(0, 0, 0, .58),
-        inset 0 1px 0 rgba(255, 255, 255, .08),
-        inset 0 -80px 120px rgba(0, 0, 0, .26);
-      isolation: isolate;
-      overflow: hidden;
-    }
-
-    .stage::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background:
-        radial-gradient(58% 48% at 50% 60%, rgba(167, 139, 250, .16), transparent 70%),
-        radial-gradient(40% 30% at 50% 54%, rgba(255, 111, 181, .07), transparent 72%);
-      filter: blur(8px);
-      z-index: 0;
-    }
-
-    .stage::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      bottom: 10.5%;
-      width: 54%;
-      height: 6%;
-      transform: translateX(-50%);
-      background: radial-gradient(ellipse at center, rgba(0, 0, 0, .68), transparent 70%);
-      filter: blur(17px);
-      z-index: 0;
-    }
-
-    .stage img {
-      position: relative;
-      z-index: 1;
-      display: block;
-      width: 90%;
-      height: auto;
-      filter: drop-shadow(0 38px 55px rgba(0, 0, 0, .52));
-      transition: transform .7s var(--ease), filter .7s var(--ease);
-    }
-
-    .stage:hover img {
-      transform: scale(1.018) translateY(-2px);
-      filter: drop-shadow(0 46px 68px rgba(0, 0, 0, .58));
-    }
-
-    .stage-caption {
-      display: flex;
-      justify-content: space-between;
-      gap: 20px;
-      padding: 0 4px;
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .12em;
-      color: #6b6574;
-      text-transform: uppercase;
-    }
-
-    .stage-caption a {
-      color: #8b8498;
-      text-decoration: none;
-      transition: color .2s ease;
-    }
-
-    .stage-caption a:hover { color: #fff; }
-
-    /* ---------- bands & sections ---------- */
-
-    .band {
-      position: relative;
-      z-index: 2;
-      background: #09090b;
-      border-top: 1px solid rgba(255, 255, 255, .065);
-      border-bottom: 1px solid rgba(255, 255, 255, .065);
-    }
-
-    .band > .wrap {
-      padding-top: clamp(64px, 8vw, 92px);
-      padding-bottom: clamp(64px, 8vw, 92px);
-    }
-
-    .section {
-      padding: clamp(72px, 9vw, 112px) 0 0;
-    }
-
-    .section-head {
-      display: flex;
-      align-items: flex-start;
-      gap: 17px;
-      margin-bottom: 38px;
-    }
-
-    .section-index {
-      flex: 0 0 auto;
-      padding-top: 7px;
-      font-family: var(--mono);
-      font-size: 9.5px;
-      letter-spacing: .12em;
-      color: #6c6675;
-    }
-
-    .section-title { flex: 1; min-width: 0; }
-
-    .section-title h2 {
-      margin: 0;
-      font-size: clamp(24px, 3vw, 31px);
-      line-height: 1.15;
-      letter-spacing: -.035em;
-      font-weight: 600;
-    }
-
-    .section-title p {
-      max-width: 37em;
-      margin: 10px 0 0;
-      font-size: 13.5px;
-      line-height: 1.75;
-      color: #8e8899;
-    }
-
-    /* ---------- dock ---------- */
-
-    .dock-wrap {
-      display: flex;
-      justify-content: center;
-      padding: 28px 0 2px;
-    }
-
-    .dock {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px;
-      padding: 14px 18px 12px;
-      border-radius: 32px;
-      border: 1px solid rgba(255, 255, 255, .13);
-      background: linear-gradient(180deg, rgba(255, 255, 255, .085), rgba(255, 255, 255, .04));
-      backdrop-filter: blur(26px) saturate(140%);
-      -webkit-backdrop-filter: blur(26px) saturate(140%);
-      box-shadow:
-        0 30px 80px rgba(0, 0, 0, .55),
-        inset 0 1px 0 rgba(255, 255, 255, .14);
-    }
-
-    .dock-item {
-      position: relative;
-      width: 72px;
-      height: 72px;
-      border-radius: 17px;
-      transition: transform .25s var(--ease);
-      flex: 0 0 auto;
-    }
-
-    .dock-item:hover { transform: translateY(-4px) scale(1.05); }
-
-    .dock-item.app {
-      z-index: 2;
-      width: 80px;
-      height: 80px;
-      margin-bottom: -2px;
-    }
-
-    .dock-item.app:hover { transform: translateY(-5px) scale(1.03); }
-
-    .dock-item.app > img {
-      display: block;
-      width: 100%;
-      height: 100%;
-      filter: drop-shadow(0 8px 18px rgba(0, 0, 0, .5));
-    }
-
-    .dock-item.ph {
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(255, 255, 255, .075);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, .10),
-        0 8px 20px rgba(0, 0, 0, .28);
-    }
-
-    .dock-item.ph svg {
-      width: 26px;
-      height: 26px;
-      opacity: .62;
-    }
-
-    .ph-a { background: linear-gradient(145deg, #3c5b4f, #18251f); }
-    .ph-b { background: linear-gradient(145deg, #354567, #172033); }
-    .ph-d { background: linear-gradient(145deg, #5a4034, #241713); }
-    .ph-e { background: linear-gradient(145deg, #46395c, #1e1728); }
-    .ph-f { background: linear-gradient(145deg, #33343b, #15161a); }
-
-    .dock-tip {
-      position: absolute;
-      left: 50%;
-      bottom: calc(100% + 15px);
-      transform: translateX(-50%);
-      padding: 5px 9px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, .11);
-      background: rgba(27, 27, 33, .94);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, .38);
-      color: #f2eef6;
-      font-size: 10.5px;
-      line-height: 1.2;
-      letter-spacing: .01em;
-      white-space: nowrap;
-    }
-
-    .dock-tip::after {
-      content: "";
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 5px solid transparent;
-      border-top-color: rgba(27, 27, 33, .94);
-    }
-
-    .running {
-      position: absolute;
-      left: 50%;
-      bottom: -7px;
-      width: 3px;
-      height: 3px;
-      transform: translateX(-50%);
-      border-radius: 50%;
-      background: #fff;
-      box-shadow: 0 0 7px rgba(255, 255, 255, .8);
-      opacity: .85;
-    }
-
-    .dock-note {
-      margin-top: 24px;
-      text-align: center;
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .13em;
-      color: #5f5968;
-      text-transform: uppercase;
-    }
-
-    /* ---------- sizes ---------- */
-
-    .sizes-layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 40px;
-      align-items: end;
-    }
-
-    .size-grid {
-      display: flex;
-      align-items: flex-end;
-      flex-wrap: wrap;
-      gap: clamp(18px, 3vw, 32px);
-      padding-top: 8px;
-    }
-
-    .size-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .size-item img {
-      display: block;
-      filter: drop-shadow(0 12px 26px rgba(0, 0, 0, .32));
-    }
-
-    .size-label {
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .10em;
-      color: #777180;
-      text-transform: uppercase;
-    }
-
-    .size-label b {
-      color: #d3cdd9;
-      font-weight: 500;
-    }
-
-    .light-check {
-      display: flex;
-      align-items: center;
-      gap: 26px;
-      padding: 22px 26px;
-      border-radius: 18px;
-      background: #f3f1f5;
-      color: #17141b;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, .32), inset 0 1px 0 #fff;
-      justify-self: end;
-    }
-
-    .light-copy {
-      font-family: var(--mono);
-      font-size: 8.5px;
-      line-height: 1.75;
-      letter-spacing: .12em;
-      color: #726c7a;
-      text-transform: uppercase;
-    }
-
-    .light-copy strong {
-      display: block;
-      margin-bottom: 4px;
-      font-family: var(--sans);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .02em;
-      color: #211d27;
-    }
-
-    .light-icons {
-      display: flex;
-      align-items: flex-end;
-      gap: 18px;
-    }
-
-    .light-icons div {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 7px;
-    }
-
-    .light-icons img { display: block; }
-
-    .light-icons span {
-      font-family: var(--mono);
-      font-size: 8px;
-      letter-spacing: .08em;
-      color: #79727f;
-    }
-
-    .size-note {
-      max-width: 34em;
-      margin: 26px 0 0;
-      font-size: 12px;
-      line-height: 1.8;
-      color: #777180;
-    }
-
-    /* ---------- notes ---------- */
-
-    .notes {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .note {
-      padding: 25px 26px 27px;
-      border: 1px solid rgba(255, 255, 255, .075);
-      border-radius: 20px;
-      background: linear-gradient(180deg, rgba(255, 255, 255, .032), rgba(255, 255, 255, .010));
-      transition: border-color .3s ease, transform .3s var(--ease), background .3s ease;
-    }
-
-    .note:hover {
-      transform: translateY(-2px);
-      border-color: rgba(255, 255, 255, .15);
-      background: linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .013));
-    }
-
-    .note-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 22px;
-    }
-
-    .note-num {
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .14em;
-      color: #6c6675;
-      text-transform: uppercase;
-    }
-
-    .note-glyph {
-      width: 42px;
-      height: 42px;
-      display: grid;
-      place-items: center;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, .09);
-      background: rgba(255, 255, 255, .03);
-    }
-
-    .note-glyph svg { display: block; }
-
-    .note h3 {
-      margin: 0 0 9px;
-      font-size: 16.5px;
-      font-weight: 600;
-      letter-spacing: -.02em;
-    }
-
-    .note p {
-      margin: 0;
-      font-size: 13px;
-      line-height: 1.78;
-      color: #918b9c;
-    }
-
-    .note p em {
-      color: #d8d2e0;
-      font-style: normal;
-    }
-
-    /* ---------- palette ---------- */
-
-    .palette-card {
-      padding: 26px 26px 25px;
-      border: 1px solid rgba(255, 255, 255, .075);
-      border-radius: 22px;
-      background: #0c0c0f;
-    }
-
-    .palette-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 18px;
-    }
-
-    .palette-head .kicker {
-      font-family: var(--mono);
-      font-size: 9px;
-      letter-spacing: .14em;
-      color: #8b8498;
-      text-transform: uppercase;
-    }
-
-    .palette-head .kicker b {
-      color: #cfc8d8;
-      font-weight: 500;
-    }
-
-    .palette-head .sub {
-      margin: 0;
-      font-size: 10.5px;
-      color: #6f6978;
-    }
-
-    .palette-bar {
-      height: 14px;
-      border-radius: 99px;
-      background: linear-gradient(135deg, #4fd0ff 0%, #5b70ff 24%, #a241ff 55%, #ff47ab 80%, #ff9866 100%);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, .34),
-        0 10px 34px rgba(162, 65, 255, .20);
-    }
-
-    .swatches {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 18px 30px;
-      margin-top: 23px;
-    }
-
-    .swatch {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .chip {
-      width: 26px;
-      height: 26px;
-      flex: 0 0 auto;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, .16);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
-    }
-
-    .swatch > span:last-child {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .swatch .name {
-      font-size: 10.5px;
-      color: #aaa4b4;
-      line-height: 1.25;
-    }
-
-    .swatch .hex {
-      font-family: var(--mono);
-      font-size: 8.5px;
-      letter-spacing: .04em;
-      color: #7e7888;
-    }
-
-    .palette-foot {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 12px 24px;
-      margin-top: 24px;
-      padding-top: 18px;
-      border-top: 1px solid rgba(255, 255, 255, .06);
-      font-family: var(--mono);
-      font-size: 8.5px;
-      letter-spacing: .11em;
-      color: #5f5968;
-      text-transform: uppercase;
-    }
-
-    /* ---------- footer ---------- */
-
-    .site-footer {
-      position: relative;
-      z-index: 2;
-      margin-top: clamp(50px, 7vw, 80px);
-      border-top: 1px solid rgba(255, 255, 255, .07);
-    }
-
-    .footer-inner {
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 28px 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-      flex-wrap: wrap;
-      font-size: 10.5px;
-      color: #6d6776;
-    }
-
-    .footer-brand {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      color: #a9a3b2;
-    }
-
-    .footer-brand img {
-      width: 20px;
-      height: 20px;
-      display: block;
-      border-radius: 5px;
-      opacity: .85;
-    }
-
-    .footer-meta {
-      font-family: var(--mono);
-      font-size: 8.5px;
-      letter-spacing: .11em;
-      color: #5b5563;
-      text-transform: uppercase;
-    }
-
-    /* ---------- motion ---------- */
-
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      *, *::before, *::after {
-        animation: none !important;
-        transition: none !important;
-      }
-    }
-
-    /* ---------- responsive ---------- */
-
-    @media (max-width: 980px) {
-      .hero {
-        grid-template-columns: 1fr;
-        gap: 46px;
-        padding-top: 26px;
-      }
-
-      .hero-copy { max-width: 660px; }
-
-      .stage-wrap {
-        justify-self: start;
-        max-width: 540px;
-      }
-
-      .nav { display: none; }
-
-      .sizes-layout { grid-template-columns: 1fr; }
-      .light-check { justify-self: start; }
-    }
-
-    @media (max-width: 760px) {
-      .wrap { padding: 0 22px; }
-
-      .site-header { padding: 22px; }
-
-      .header-meta { display: none; }
-      .brand .study,
-      .brand .slash { display: none; }
-
-      .hero { padding-bottom: 64px; }
-
-      h1 { font-size: clamp(44px, 12vw, 64px); }
-      .lede { font-size: 15.5px; }
-      .sub { font-size: 13px; }
-
-      .meta { gap: 20px 28px; }
-
-      .stage { border-radius: 28px; }
-
-      .dock-wrap { padding-top: 26px; }
-      .dock {
-        gap: 7px;
-        padding: 10px 11px 8px;
-        border-radius: 22px;
-      }
-
-      .dock-item { width: 48px; height: 48px; border-radius: 12px; }
-      .dock-item.app { width: 58px; height: 58px; }
-
-      .dock-tip {
-        bottom: calc(100% + 12px);
-        padding: 4px 7px;
-        font-size: 9.5px;
-      }
-
-      .size-grid { gap: 18px; }
-      .size-item img { max-width: 100%; height: auto; }
-
-      .notes { grid-template-columns: 1fr; }
-      .note { padding: 22px; }
-
-      .footer-inner { padding: 24px 22px; }
-    }
-
-    @media (max-width: 480px) {
-      .dock { gap: 5px; padding: 9px 9px 7px; }
-      .dock-item { width: 39px; height: 39px; border-radius: 10px; }
-      .dock-item.app { width: 47px; height: 47px; }
-      .dock-item.ph svg { width: 19px; height: 19px; }
-      .running { bottom: -6px; }
-
-      .light-check {
-        gap: 18px;
-        padding: 18px;
-      }
-
-      .size-note { font-size: 11.5px; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoniSwitch — 图标 / Icon</title>
+<meta name="description" content="MoniSwitch 的浅色图标：一块跟着设置主题走的屏幕，和一个玻璃开关。">
+<meta name="theme-color" content="#F5F5F7">
+<link rel="icon" href="moniswitch-icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #F5F5F7;
+    --card: #FFFFFF;
+    --text: #1C1C1E;
+    --muted: #6B7280;
+    --quiet: #8A9099;
+    --line: rgba(15, 23, 42, .08);
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; }
+  img { max-width: 100%; display: block; }
+
+  .wrap {
+    width: 100%;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 26px 0 8px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+
+  .brand img { width: 28px; height: 28px; border-radius: 7px; }
+  .brand .slash { color: rgba(15, 23, 42, .2); font-weight: 400; }
+  .brand .study {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 400;
+    letter-spacing: .14em;
+    color: var(--quiet);
+    text-transform: uppercase;
+  }
+
+  .nav {
+    display: flex;
+    gap: 24px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .nav a { text-decoration: none; }
+  .nav a:hover { color: var(--text); }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, .98fr);
+    gap: clamp(36px, 6vw, 80px);
+    align-items: center;
+    padding: clamp(36px, 6vw, 72px) 0 clamp(48px, 7vw, 88px);
+  }
+
+  .eyebrow {
+    margin: 0 0 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    color: var(--quiet);
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(42px, 6vw, 72px);
+    line-height: 1.05;
+    letter-spacing: -.05em;
+    font-weight: 640;
+  }
+
+  h1 .accent { color: #2160A3; }
+
+  .lede {
+    max-width: 30em;
+    margin: 24px 0 0;
+    font-size: 16.5px;
+    line-height: 1.8;
+    color: #3F3F46;
+  }
+
+  .sub {
+    max-width: 32em;
+    margin: 12px 0 0;
+    font-size: 13.5px;
+    line-height: 1.85;
+    color: var(--muted);
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 34px;
+    margin: 34px 0 0;
+    padding: 18px 0 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .meta dt {
+    margin-bottom: 4px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .13em;
+    color: var(--quiet);
+    text-transform: uppercase;
+  }
+
+  .meta dd { margin: 0; font-size: 12.5px; color: #52525B; }
+
+  .stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    border-radius: 32px;
+    background: linear-gradient(160deg, #FFFFFF, #EDF0F5 78%);
+    box-shadow: 0 30px 70px -40px rgba(15, 23, 42, .45), inset 0 1px 0 #fff;
+    overflow: hidden;
+    justify-self: end;
+    width: 100%;
+    max-width: 460px;
+  }
+
+  .stage img { width: 86%; height: auto; }
+
+  .section { padding: clamp(52px, 7vw, 84px) 0 0; }
+
+  .section-head { max-width: 46em; margin-bottom: 28px; }
+
+  .section-head h2 {
+    margin: 0;
+    font-size: clamp(22px, 2.6vw, 28px);
+    letter-spacing: -.03em;
+    font-weight: 620;
+  }
+
+  .section-head p {
+    margin: 8px 0 0;
+    font-size: 13.5px;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+
+  .themes {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .card {
+    margin: 0;
+    padding: 12px 12px 14px;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 12px 28px -20px rgba(15, 23, 42, .35);
+  }
+
+  .card img { border-radius: 11px; width: 100%; height: auto; }
+
+  .card figcaption { margin-top: 10px; }
+
+  .card b { display: block; font-size: 13px; font-weight: 600; }
+
+  .card span.en { display: block; font-size: 11px; color: var(--muted); }
+
+  .chips { display: flex; gap: 4px; margin-top: 8px; }
+
+  .chip {
+    width: 26px;
+    height: 10px;
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08);
+  }
+
+  .sizes-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 32px;
+    align-items: end;
+  }
+
+  .size-grid { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 30px; }
+
+  .size-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+  .size-item img { filter: drop-shadow(0 10px 22px rgba(15, 23, 42, .18)); }
+
+  .size-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .1em;
+    color: var(--quiet);
+    text-transform: uppercase;
+  }
+
+  .dark-check {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding: 18px 22px;
+    border-radius: 16px;
+    background: #1B1B1F;
+    color: #EDEDF0;
+  }
+
+  .dark-check .copy {
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: .12em;
+    color: #8E8E96;
+    text-transform: uppercase;
+  }
+
+  .dark-check .copy strong {
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: .01em;
+    color: #F2F2F5;
+  }
+
+  .dark-check img { width: 64px; height: 64px; }
+
+  .palette-bar {
+    height: 14px;
+    border-radius: 99px;
+    background: linear-gradient(135deg, #19487A 0%, #2160A3 30%, #5A99DF 60%, #A8CAEE 82%, #E6E9EB 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4);
+  }
+
+  .swatches { display: flex; flex-wrap: wrap; gap: 16px 30px; margin-top: 20px; }
+
+  .swatch { display: flex; align-items: center; gap: 9px; }
+
+  .swatch .chip { width: 24px; height: 24px; border-radius: 7px; }
+
+  .swatch span { display: flex; flex-direction: column; gap: 1px; }
+
+  .swatch .name { font-size: 10.5px; color: #52525B; }
+  .swatch .hex { font-family: var(--mono); font-size: 8.5px; color: var(--quiet); }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 4px;
+  }
+
+  .step {
+    padding: 20px 22px;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+  }
+
+  .step .n {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .14em;
+    color: var(--quiet);
+  }
+
+  .step h3 { margin: 8px 0 6px; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+
+  .step p { margin: 0; font-size: 12.5px; line-height: 1.75; color: var(--muted); }
+
+  .note {
+    margin: 20px 0 0;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--quiet);
+  }
+
+  footer {
+    margin-top: clamp(48px, 6vw, 76px);
+    border-top: 1px solid var(--line);
+  }
+
+  .footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 24px 0 32px;
+    font-size: 10.5px;
+    color: var(--quiet);
+  }
+
+  .footer-brand { display: flex; align-items: center; gap: 8px; color: #52525B; }
+  .footer-brand img { width: 18px; height: 18px; border-radius: 5px; opacity: .9; }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 40px; }
+    .stage { justify-self: start; max-width: 420px; }
+    .themes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sizes-layout { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr; }
+    .nav { display: none; }
+  }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 0 20px; }
+    .brand .study, .brand .slash { display: none; }
+  }
+</style>
 </head>
 <body>
-  <div class="bg" aria-hidden="true"></div>
-  <div class="grain" aria-hidden="true"></div>
-
-  <header class="site-header">
-    <div class="brand">
-      <img src="moniswitch-icon.svg" alt="" width="28" height="28">
-      <span>MoniSwitch</span>
-      <span class="slash">/</span>
-      <span class="study">Icon study</span>
-    </div>
-    <nav class="nav" aria-label="页面导航">
-      <a href="#context">Context</a>
-      <a href="#sizes">Sizes</a>
-      <a href="#details">Details</a>
-    </nav>
-    <div class="header-meta">2026 · SVG / PNG</div>
-  </header>
-
   <div class="wrap">
+    <header class="site-header">
+      <div class="brand">
+        <img src="moniswitch-icon.svg" alt="">
+        <span>MoniSwitch</span>
+        <span class="slash">/</span>
+        <span class="study">Icon</span>
+      </div>
+      <nav class="nav">
+        <a href="#themes">Themes</a>
+        <a href="#sizes">Sizes</a>
+        <a href="#palette">Palette</a>
+        <a href="#follow">How it follows</a>
+      </nav>
+    </header>
+
     <section class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">App icon · A screen, switched</p>
-        <h1>一块屏幕，<br><span class="grad">一个开关。</span></h1>
+      <div>
+        <p class="eyebrow">App icon · Light tile, one hue</p>
+        <h1>一块屏幕，<br><span class="accent">一个开关。</span></h1>
         <p class="lede">
-          MoniSwitch 的新图标。深色方寸里，一块<strong>被点亮的屏幕</strong>，与它<strong>唯一的开关</strong>。
+          浅色底板，深色显示器；屏幕里只有<strong>一个色相</strong>——它来自设置里的主题色。
         </p>
         <p class="sub">
-          黑场、极光屏、玻璃开关——把菜单栏里的显示器控制，收进一个不带文字的符号。
+          7 组内置主题各一张；「跟随系统」按系统 8 档强调色各一张。没有第二个色相，也没有文字。
         </p>
-        <div class="actions">
-          <a class="btn primary" href="moniswitch-icon.svg" download="moniswitch-icon.svg">
-            下载 SVG <span class="arrow" aria-hidden="true">↓</span>
-          </a>
-          <a class="btn ghost" href="moniswitch-icon-1024.png" download="moniswitch-icon-1024.png">
-            1024 PNG <span class="arrow" aria-hidden="true">↓</span>
-          </a>
-        </div>
         <dl class="meta">
-          <div>
-            <dt>Canvas</dt>
-            <dd>1024 × 1024</dd>
-          </div>
-          <div>
-            <dt>Shape</dt>
-            <dd>824 px squircle</dd>
-          </div>
-          <div>
-            <dt>Format</dt>
-            <dd>SVG + PNG</dd>
-          </div>
+          <div><dt>Canvas</dt><dd>1024 × 1024</dd></div>
+          <div><dt>Tile</dt><dd>824 px squircle</dd></div>
+          <div><dt>Source</dt><dd>SVG · theme-driven</dd></div>
         </dl>
       </div>
-
-      <div class="stage-wrap">
-        <div class="stage">
-          <img src="moniswitch-icon.svg" width="1024" height="1024" alt="MoniSwitch 应用图标：一块带有极光渐变屏幕和玻璃开关的深色显示器。">
-        </div>
-        <div class="stage-caption">
-          <span>1024 × 1024 · transparent margin</span>
-          <a href="moniswitch-icon.svg" target="_blank" rel="noopener">Open SVG ↗</a>
-        </div>
+      <div class="stage">
+        <img src="moniswitch-icon.svg" width="1024" height="1024"
+             alt="MoniSwitch 图标：浅色方寸里一台深色显示器，屏幕为蓝色渐变，中央一个玻璃开关。">
       </div>
     </section>
-  </div>
 
-  <section class="band" id="context">
-    <div class="wrap">
+    <section class="section" id="themes">
       <div class="section-head">
-        <span class="section-index">01</span>
-        <div class="section-title">
-          <h2>放进 Dock 里</h2>
-          <p>先不解释。让它在熟悉的深色 Dock 语境里，凭轮廓和一块亮着的屏幕被认出来。</p>
-        </div>
+        <h2>主题画廊</h2>
+        <p>
+          屏幕渐变 = 该主题浅色派生的<strong>实心档</strong>（L*40）→ <strong>高亮档</strong>（L*80），
+          两端各外扩一档；底板 = 同色相的低饱和淡染（顶 L*97 → 底 L*91）。
+        </p>
       </div>
-
-      <div class="dock-wrap">
-        <div class="dock" aria-label="Dock 预览">
-          <div class="dock-item ph ph-a" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.68)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 19c8 0 13-5 13-13-8 0-13 5-13 13Z"/>
-              <path d="M5 19 12 12"/>
-            </svg>
-          </div>
-          <div class="dock-item ph ph-b" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.68)" stroke-width="1.7" stroke-linecap="round">
-              <path d="M5 8h14M5 12h9M5 16h14"/>
-            </svg>
-          </div>
-          <div class="dock-item app">
-            <span class="dock-tip">MoniSwitch</span>
-            <img src="moniswitch-icon.svg" alt="MoniSwitch 图标">
-            <i class="running" aria-hidden="true"></i>
-          </div>
-          <div class="dock-item ph ph-d" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.68)" stroke-width="1.7" stroke-linejoin="round">
-              <path d="M12 5 20 19H4Z"/>
-            </svg>
-          </div>
-          <div class="dock-item ph ph-e" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.68)" stroke-width="1.7">
-              <circle cx="12" cy="12" r="6.2"/>
-              <circle cx="12" cy="12" r="2.2" fill="rgba(255,255,255,.35)" stroke="none"/>
-            </svg>
-          </div>
-          <div class="dock-item ph ph-f" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.68)" stroke-width="1.7" stroke-linecap="round">
-              <path d="M3 14c3-5 6-5 9 0s6 5 9 0"/>
-            </svg>
-          </div>
-        </div>
+      <div class="themes">
+        <figure class="card">
+          <img src="theme-icons/icon-rose.svg" alt="玫瑰红主题图标">
+          <figcaption><b>玫瑰红</b><span class="en">Rose</span>
+            <div class="chips">
+              <span class="chip" style="background:#EAE3E4"></span>
+              <span class="chip" style="background:#9C404C"></span>
+              <span class="chip" style="background:#E4BCC2"></span>
+            </div>
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img src="theme-icons/icon-sage.svg" alt="鼠尾草绿主题图标">
+          <figcaption><b>鼠尾草绿</b><span class="en">Sage</span>
+            <div class="chips">
+              <span class="chip" style="background:#E3E6E2"></span>
+              <span class="chip" style="background:#3F692B"></span>
+              <span class="chip" style="background:#A8D392"></span>
+            </div>
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img src="theme-icons/icon-orange.svg" alt="橙色主题图标">
+          <figcaption><b>橙色</b><span class="en">Orange</span>
+            <div class="chips">
+              <span class="chip" style="background:#ECE4DE"></span>
+              <span class="chip" style="background:#914C1E"></span>
+              <span class="chip" style="background:#ECBD9E"></span>
+            </div>
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img src="theme-icons/icon-tan.svg" alt="棕褐主题图标">
+          <figcaption><b>棕褐</b><span class="en">Tan</span>
+            <div class="chips">
+              <span class="chip" style="background:#E8E5E2"></span>
+              <span class="chip" style="background:#845236"></span>
+              <span class="chip" style="background:#DFC1B0"></span>
+            </div>
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img src="theme-icons/icon-blue.svg" alt="蓝色主题图标">
+          <figcaption><b>蓝色</b><span class="en">Blue</span>
+            <div class="chips">
+              <span class="chip" style="background:#E1E5ED"></span>
+              <span class="chip" style="background:#3C5D9D"></span>
+              <span class="chip" style="background:#B2C8F0"></span>
+            </div>
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img src="theme-icons/icon-blueGray.svg" alt="蓝灰主题图标">
+          <figcaption><b>蓝灰</b><span class="en">Blue Gray</span>
+            <div class="chips">
+              <span class="chip" style="background:#E3E6EB"></span>
+              <span class="chip" style="background:#3F5D9B"></span>
+              <span class="chip" style="background:#B9C6E3"></span>
+            </div>
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img src="theme-icons/icon-tealGray.svg" alt="青灰主题图标">
+          <figcaption><b>青灰</b><span class="en">Teal Gray</span>
+            <div class="chips">
+              <span class="chip" style="background:#E1E7E7"></span>
+              <span class="chip" style="background:#2E666F"></span>
+              <span class="chip" style="background:#9DCED7"></span>
+            </div>
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img src="theme-icons/icon-system-blue.svg" alt="跟随系统（蓝强调色）图标">
+          <figcaption><b>跟随系统</b><span class="en">Follow System</span>
+            <div class="chips">
+              <span class="chip" style="background:#E3E5E9"></span>
+              <span class="chip" style="background:#2160A3"></span>
+              <span class="chip" style="background:#A8CAEE"></span>
+            </div>
+          </figcaption>
+        </figure>
       </div>
-      <p class="dock-note">Placeholder tiles · 占位图标，仅第三枚为真实图标</p>
-    </div>
-  </section>
+    </section>
 
-  <div class="wrap">
     <section class="section" id="sizes">
       <div class="section-head">
-        <span class="section-index">02</span>
-        <div class="section-title">
-          <h2>尺寸阶梯</h2>
-          <p>同一份矢量，从 256 到 16。屏幕负责颜色，开关负责识别；到了 16 px，它自然地退化成一块色域和一个光点。</p>
-        </div>
+        <h2>尺寸阶梯</h2>
+        <p>同一份矢量。屏幕负责颜色，开关负责识别；到 16 px 它退化成一块色域和一个光点。</p>
       </div>
-
       <div class="sizes-layout">
         <div class="size-grid">
-          <div class="size-item">
-            <img src="sizes/icon-256.png" width="256" height="256" alt="MoniSwitch 图标，256 像素">
-            <span class="size-label"><b>256</b> px</span>
-          </div>
-          <div class="size-item">
-            <img src="sizes/icon-128.png" width="128" height="128" alt="MoniSwitch 图标，128 像素">
-            <span class="size-label"><b>128</b> px</span>
-          </div>
-          <div class="size-item">
-            <img src="sizes/icon-64.png" width="64" height="64" alt="MoniSwitch 图标，64 像素">
-            <span class="size-label"><b>64</b> px</span>
-          </div>
-          <div class="size-item">
-            <img src="sizes/icon-32.png" width="32" height="32" alt="MoniSwitch 图标，32 像素">
-            <span class="size-label"><b>32</b> px</span>
-          </div>
-          <div class="size-item">
-            <img src="sizes/icon-16.png" width="16" height="16" alt="MoniSwitch 图标，16 像素">
-            <span class="size-label"><b>16</b> px</span>
-          </div>
+          <div class="size-item"><img src="sizes/icon-256.png" width="256" height="256" alt="256 像素图标"><span class="size-label"><b>256</b> px</span></div>
+          <div class="size-item"><img src="sizes/icon-128.png" width="128" height="128" alt="128 像素图标"><span class="size-label"><b>128</b> px</span></div>
+          <div class="size-item"><img src="sizes/icon-64.png" width="64" height="64" alt="64 像素图标"><span class="size-label"><b>64</b> px</span></div>
+          <div class="size-item"><img src="sizes/icon-32.png" width="32" height="32" alt="32 像素图标"><span class="size-label"><b>32</b> px</span></div>
+          <div class="size-item"><img src="sizes/icon-16.png" width="16" height="16" alt="16 像素图标"><span class="size-label"><b>16</b> px</span></div>
         </div>
-
-        <div class="light-check">
-          <div class="light-copy">
-            <strong>浅色表面检查</strong>
-            Dark tile,<br>still holds.
-          </div>
-          <div class="light-icons">
-            <div>
-              <img src="sizes/icon-64.png" width="64" height="64" alt="浅色背景上的 64 像素图标">
-              <span>64</span>
-            </div>
-            <div>
-              <img src="sizes/icon-32.png" width="32" height="32" alt="浅色背景上的 32 像素图标">
-              <span>32</span>
-            </div>
-          </div>
+        <div class="dark-check">
+          <div class="copy"><strong>深色 Dock 检查</strong>64 / 32 px</div>
+          <img src="sizes/icon-64.png" alt="深色背景上的 64 像素图标">
+          <img src="sizes/icon-32.png" width="32" height="32" alt="深色背景上的 32 像素图标">
         </div>
       </div>
-
-      <p class="size-note">32 px 仍能读出屏幕与开关；16 px 只剩色块与光点——这是它在列表尺寸下应有的样子，不额外加细节去救它。</p>
     </section>
 
-    <section class="section" id="details">
+    <section class="section" id="palette">
       <div class="section-head">
-        <span class="section-index">03</span>
-        <div class="section-title">
-          <h2>设计拆解</h2>
-          <p>四个决定，组成这一个符号。没有第二层装饰，也没有解释性文字。</p>
-        </div>
+        <h2>取色（跟随系统 · 蓝）</h2>
+        <p>色值不是手挑的：与 App 内 <code>PanelTheme.lightDerived()</code> 同一套算法（HSL + L* 二分），由单元测试锁定。</p>
       </div>
-
-      <div class="notes">
-        <article class="note">
-          <div class="note-top">
-            <span class="note-num">01 / Canvas</span>
-            <span class="note-glyph" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                <rect x="2.5" y="2.5" width="17" height="17" rx="5.6" stroke="rgba(255,255,255,.55)" stroke-width="1.4"/>
-                <path d="M7 2.8h8" stroke="rgba(255,255,255,.9)" stroke-width="1.4" stroke-linecap="round"/>
-              </svg>
-            </span>
-          </div>
-          <h3>黑场，先让屏幕发光</h3>
-          <p>像原生深色图标一样，把底压到近黑；只留一道 <em>824 px squircle</em> 的边界和极细的 rim light。屏幕成为画面里唯一的光源。</p>
-        </article>
-
-        <article class="note">
-          <div class="note-top">
-            <span class="note-num">02 / Motif</span>
-            <span class="note-glyph" aria-hidden="true">
-              <svg width="26" height="18" viewBox="0 0 26 18" fill="none">
-                <rect x="1" y="1" width="24" height="16" rx="8" stroke="rgba(255,255,255,.55)" stroke-width="1.4"/>
-                <circle cx="17.6" cy="9" r="5" fill="rgba(255,255,255,.9)"/>
-              </svg>
-            </span>
-          </div>
-          <h3>一个母题：屏幕 + 开关</h3>
-          <p>显示器说 <em>Moni</em>，玻璃开关说 <em>Switch</em>。没有第二个图形，也没有一个小标语——只保留一个能被一眼记住的动作。</p>
-        </article>
-
-        <article class="note">
-          <div class="note-top">
-            <span class="note-num">03 / Light</span>
-            <span class="note-glyph" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                <rect x="2" y="3" width="18" height="16" rx="4.2" fill="url(#miniAurora)" stroke="rgba(255,255,255,.4)" stroke-width="1"/>
-                <defs>
-                  <linearGradient id="miniAurora" x1="3" y1="4" x2="19" y2="18">
-                    <stop stop-color="#4fd0ff"/><stop offset=".55" stop-color="#a241ff"/><stop offset="1" stop-color="#ff9866"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-            </span>
-          </div>
-          <h3>极光玻璃，不是贴纸</h3>
-          <p>五段色标从青蓝走到珊瑚，再叠一层顶部柔光、一道斜向高光和一点底部暗角。它要看起来是<em>亮着的</em>，不是被涂上去的。</p>
-        </article>
-
-        <article class="note">
-          <div class="note-top">
-            <span class="note-num">04 / Warmth</span>
-            <span class="note-glyph" aria-hidden="true">
-              <span style="width:9px;height:9px;border-radius:50%;background:#ffe9d6;box-shadow:0 0 14px 4px rgba(255,185,155,.55);"></span>
-            </span>
-          </div>
-          <h3>一个暖点</h3>
-          <p>下边框上的电源灯是整枚图标唯一的暖色。它不承担识别，只负责让这台机器看起来是<em>醒着的</em>。</p>
-        </article>
-      </div>
-
-      <div class="palette-card">
-        <div class="palette-head">
-          <span class="kicker"><b>Palette</b> / 屏幕色板</span>
-          <span class="sub">Aurora glass · five stops</span>
-        </div>
-        <div class="palette-bar" aria-hidden="true"></div>
-        <div class="swatches">
-          <div class="swatch">
-            <span class="chip" style="background:#4fd0ff"></span>
-            <span><span class="name">Cyan</span><span class="hex">#4FD0FF</span></span>
-          </div>
-          <div class="swatch">
-            <span class="chip" style="background:#5b70ff"></span>
-            <span><span class="name">Indigo</span><span class="hex">#5B70FF</span></span>
-          </div>
-          <div class="swatch">
-            <span class="chip" style="background:#a241ff"></span>
-            <span><span class="name">Violet</span><span class="hex">#A241FF</span></span>
-          </div>
-          <div class="swatch">
-            <span class="chip" style="background:#ff47ab"></span>
-            <span><span class="name">Magenta</span><span class="hex">#FF47AB</span></span>
-          </div>
-          <div class="swatch">
-            <span class="chip" style="background:#ff9866"></span>
-            <span><span class="name">Coral</span><span class="hex">#FF9866</span></span>
-          </div>
-          <div class="swatch">
-            <span class="chip" style="background:linear-gradient(145deg,#1b1b21,#060608)"></span>
-            <span><span class="name">Ink</span><span class="hex">#17171F</span></span>
-          </div>
-          <div class="swatch">
-            <span class="chip" style="background:#fff0e2"></span>
-            <span><span class="name">Warm light</span><span class="hex">#FFF0E2</span></span>
-          </div>
-        </div>
-        <div class="palette-foot">
-          <span>Screen gradient · 135° · five stops</span>
-          <span>SVG master · 1024 × 1024 · transparent margin</span>
-        </div>
+      <div class="palette-bar" aria-hidden="true"></div>
+      <div class="swatches">
+        <div class="swatch"><span class="chip" style="background:#F6F7F7"></span><span><span class="name">底板顶</span><span class="hex">#F6F7F7</span></span></div>
+        <div class="swatch"><span class="chip" style="background:#E3E5E9"></span><span><span class="name">底板底</span><span class="hex">#E3E5E9</span></span></div>
+        <div class="swatch"><span class="chip" style="background:#19487A"></span><span><span class="name">屏幕深端</span><span class="hex">#19487A</span></span></div>
+        <div class="swatch"><span class="chip" style="background:#2160A3"></span><span><span class="name">实心档</span><span class="hex">#2160A3</span></span></div>
+        <div class="swatch"><span class="chip" style="background:#5A99DF"></span><span><span class="name">中间</span><span class="hex">#5A99DF</span></span></div>
+        <div class="swatch"><span class="chip" style="background:#A8CAEE"></span><span><span class="name">高亮档</span><span class="hex">#A8CAEE</span></span></div>
+        <div class="swatch"><span class="chip" style="background:#E6E9EB"></span><span><span class="name">亮端</span><span class="hex">#E6E9EB</span></span></div>
+        <div class="swatch"><span class="chip" style="background:#1C1C24"></span><span><span class="name">Bezel</span><span class="hex">#1C1C24</span></span></div>
+        <div class="swatch"><span class="chip" style="background:#FFF0E2"></span><span><span class="name">电源灯</span><span class="hex">#FFF0E2</span></span></div>
       </div>
     </section>
-  </div>
 
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <img src="moniswitch-icon.svg" alt="" width="20" height="20">
-        <span>MoniSwitch — New icon study</span>
+    <section class="section" id="follow">
+      <div class="section-head">
+        <h2>怎么跟随主题</h2>
+        <p>图标资源在打包时已按主题渲染好（<code>Resources/AppIconThemes/*.png</code>），运行时只做一次映射。</p>
       </div>
-      <div class="footer-meta">2026-10-17 · Web / SVG · This page uses the same master file</div>
-    </div>
-  </footer>
+      <div class="steps">
+        <div class="step">
+          <div class="n">01 / 选主题</div>
+          <h3>设置里的 7 个圆点</h3>
+          <p>选中后立刻写进 <code>AppSettings.panelThemeID</code>，并发出主题变更通知。</p>
+        </div>
+        <div class="step">
+          <div class="n">02 / 选图</div>
+          <h3>主题 → 一张 PNG</h3>
+          <p>内置主题取 <code>theme-&lt;id&gt;.png</code>；「跟随系统」按 <code>AppleAccentColor</code> 取 <code>system-&lt;accent&gt;.png</code>。</p>
+        </div>
+        <div class="step">
+          <div class="n">03 / 应用</div>
+          <h3>Dock 与关于页</h3>
+          <p>设 <code>NSApp.applicationIconImage</code>；关于页读同一张，Finder 与通知横幅仍是 bundle 里的静态 icns。</p>
+        </div>
+      </div>
+      <p class="note">
+        重新生成：<code>python3 design/icon-web/theme-icons/generate.py</code> →
+        <code>bash Support/render-theme-icons.sh</code> → <code>bash Support/build-app.sh</code>。
+      </p>
+    </section>
+
+    <footer>
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <img src="moniswitch-icon.svg" alt="">
+          <span>MoniSwitch — Icon</span>
+        </div>
+        <div>2026-10-23 · SVG / PNG · 跟随设置主题</div>
+      </div>
+    </footer>
+  </div>
 </body>
 </html>

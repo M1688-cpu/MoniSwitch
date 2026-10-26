@@ -5,8 +5,9 @@
 ## 应用图标
 
 - `AppIcon-source.png`：1024×1024 源图（透明留白），设计源在 `design/icon-web/moniswitch-icon.svg`。
-- `AppIcon.icns`：由 `bash Support/make-app-icon.sh` 从 source 生成；`build-app.sh` 会把它拷进 .app。
-- 换图标：导出新的 1024 PNG → 覆盖 `AppIcon-source.png` → 重建 icns → 重新打包。
+- `AppIcon.icns`：由 `bash Support/make-app-icon.sh` 从 source 生成；`build-app.sh` 会把它拷进 .app。这是 bundle 的静态默认图（= 跟随系统/蓝）。
+- `AppIconThemes/`：Dock 图标的主题变体（7 个面板主题 + 8 档系统强调色，512×512），由 `bash Support/render-theme-icons.sh` 从 `design/icon-web/theme-icons/*.svg` 渲染；运行时 `AppIconController` 按设置里的主题选图，`build-app.sh` 整套拷进 `Contents/Resources/AppIconThemes/`。
+- 换图标：改 `design/icon-web/theme-icons/generate.py` → `python3 generate.py` → `bash Support/render-theme-icons.sh`（同时重建 icns）→ `bash Support/build-app.sh`。
 
 ## displayplacer 二进制
 

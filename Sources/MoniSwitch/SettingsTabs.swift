@@ -7,11 +7,10 @@ import AppKit
 
 // MARK: - 主题色卡圆点（设置页专用）
 
-/// 主题选择圆点：三区圆复刻 Chrome 色卡的分区方式——左上象限最深（实心档）/
-/// 右上象限中间（高亮档）/下半圆最浅（背景档）。**现在直接取该主题在当前外观下
-/// 的生效色板**（浅色为 L* 派生、深色为原派生），所见即面板所得，不再画色源原值；
-/// 「跟随系统」画系统强调色上半圆 + 中性色下半圆。
-/// 分区用「矩形 + Circle 裁剪」实现（对齐/frame 驱动，不依赖 addArc 的方向语义）。
+/// 主题选择圆点（2026-10-17 用户二次拍板「色卡只留一档」）：不再画三区圆，
+/// 每个主题只保留最浅一档颜色（原三区圆的右上象限 = 高亮档）做单色圆点；
+/// 「跟随系统」直接画系统强调色（不再拼中性色下半圆）。
+/// 取当前外观下的生效色板（浅色为 L* 派生、深色为原派生），所见即面板所得。
 /// 选中态 = 外圈强调色描边；名称走 .help tooltip 与无障碍标签（与 Chrome 色卡
 /// 同为无文字圆点，7 个名称不占卡面空间）。
 private struct ThemeSwatchButton: View {
@@ -26,6 +25,8 @@ private struct ThemeSwatchButton: View {
     let action: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    /// 设置窗口的主题色板（2026-10-17）：选中环用实心档；「跟随系统」= 系统强调色。
+    @Environment(\.panelPalette) private var palette
     @State private var isHovered = false
 
     private let diameter: CGFloat = 26
@@ -38,7 +39,7 @@ private struct ThemeSwatchButton: View {
                 .overlay(
                     // 选中环在外、留 3pt 呼吸；未选中给一圈极淡边界（浅色下淡彩
                     // 圆点在灰卡上几乎无边缘）。纯装饰环摘除命中区（全站范式）。
-                    Circle().stroke(isSelected ? BrandColor.accent : Color.primary.opacity(isHovered ? 0.28 : 0.12),
+                    Circle().stroke(isSelected ? palette.solid : Color.primary.opacity(isHovered ? 0.28 : 0.12),
                                     lineWidth: isSelected ? 2 : 1)
                         .padding(-3)
                         .allowsHitTesting(false)
@@ -56,25 +57,11 @@ private struct ThemeSwatchButton: View {
     private var swatchCircle: some View {
         switch swatch {
         case .theme(let theme):
-            let p = theme.palette(dark: colorScheme == .dark)
-            let background = p.background
-                ?? (colorScheme == .dark ? BubbleMetrics.bubbleDarkFill : Color.white)
-            ZStack(alignment: .top) {
-                // 底圆 = 生效卡底（浅色近白淡染 / 深色派生深底）。
-                Circle().fill(background)
-                // 上半：左半矩形实心档、右半矩形高亮档，经 Circle 裁剪成两个象限扇区。
-                HStack(spacing: 0) {
-                    Rectangle().fill(p.solid)
-                    Rectangle().fill(p.highlight)
-                }
-                .frame(height: diameter / 2)
-            }
+            // 单色圆点 = 该主题在当前外观下最浅的一档（原三区圆的右上象限）。
+            Circle().fill(theme.palette(dark: colorScheme == .dark).highlight)
         case .followSystem:
-            ZStack(alignment: .top) {
-                Circle().fill(Color(nsColor: .controlBackgroundColor))
-                Rectangle().fill(BrandColor.accent)
-                    .frame(height: diameter / 2)
-            }
+            // 默认项直接用系统强调色（用户截图中第一个圆点的蓝色）。
+            Circle().fill(BrandColor.accent)
         }
     }
 }
@@ -95,15 +82,10 @@ struct GeneralTab: View {
                 SettingsCard(title: l10n.t(.groupGeneral)) {
                     VStack(spacing: 0) {
                         settingRow(l10n.t(.languageLabel)) {
-                            Picker("", selection: $l10n.lang) {
-                                ForEach(Language.allCases) { lang in
-                                    Text(lang.displayName).tag(lang)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .menuPickerNeutralTint()
-                            .labelsHidden()
-                            .frame(width: 150)
+                            SettingsMenuPicker(options: Language.allCases,
+                                               title: { $0.displayName },
+                                               selection: $l10n.lang)
+                                .frame(width: 150)
                         }
                         Divider().padding(.vertical, 6)
                         settingRow(l10n.t(.launchAtLogin),
@@ -157,15 +139,10 @@ struct GeneralTab: View {
                         if settings.autoRefreshEnabled {
                             Divider().padding(.vertical, 6)
                             settingRow(l10n.t(.refreshInterval)) {
-                                Picker("", selection: $settings.autoRefreshInterval) {
-                                    ForEach(AppSettings.refreshIntervalOptions, id: \.self) { sec in
-                                        Text(l10n.t(.intervalSeconds, sec)).tag(sec)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                                .menuPickerNeutralTint()
-                                .labelsHidden()
-                                .frame(width: 150)
+                                SettingsMenuPicker(options: AppSettings.refreshIntervalOptions,
+                                                   title: { l10n.t(.intervalSeconds, $0) },
+                                                   selection: $settings.autoRefreshInterval)
+                                    .frame(width: 150)
                             }
                         }
                         Divider().padding(.vertical, 6)
@@ -220,7 +197,7 @@ struct GeneralTab: View {
     }
 }
 
-// MARK: - 亮度与按键标签（v2：F1/F2 外接屏亮度同步）
+// MARK: - 亮度与按键标签（v2：F1/F2 调鼠标所在屏亮度）
 
 struct BrightnessTab: View {
 
@@ -229,9 +206,11 @@ struct BrightnessTab: View {
     /// 内容滚动偏移，上报给 SettingsView 驱动顶部毛玻璃渐入。
     @Binding var scrollOffset: CGFloat
 
-    /// 权限状态实时读（IOHIDCheckAccess 很轻，body 求值即查；开关切换会触发重算，
-    /// 授权后回到 App 拨一下开关即可看到状态更新并启动监听）。
-    private var permissionGranted: Bool { BrightnessKeyTap.permissionGranted }
+    /// 辅助功能权限状态。**必须是 @State + 主动刷新**：此前用「body 求值即查」的
+    /// 计算属性，SwiftUI 不会因外部 TCC 状态变化重算 body——用户在系统设置里授权
+    /// 后回到 App，橙三角不会自动变绿勾（2026-10-17 用户报障）。现在由 App 激活、
+    /// 窗口回 key 与 1s 轮询兜底三条路径刷新（见 body 尾部 onReceive）。
+    @State private var permissionGranted = BrightnessKeyTap.permissionGranted
 
     var body: some View {
         ScrollView {
@@ -246,7 +225,7 @@ struct BrightnessTab: View {
                     }
                 }
 
-                // —— 输入监控权限（DDC 兼容性说明并入本卡尾部脚注）——
+                // —— 辅助功能权限（DDC 兼容性说明并入本卡尾部脚注）——
                 SettingsCard(title: l10n.t(.groupPermission)) {
                     VStack(spacing: 0) {
                         HStack(spacing: 8) {
@@ -256,18 +235,11 @@ struct BrightnessTab: View {
                                 .font(.system(size: BubbleMetrics.fontBody))
                             Spacer()
                             if !permissionGranted {
+                                // 「打开系统设置」已并入本按钮（2026-10-17 用户拍板）：
+                                // 点「授权」先弹系统辅助功能请求，未获批再深链到授权页。
                                 Button(l10n.t(.grantPermission)) {
-                                    BrightnessKeyTap.requestPermission()
-                                    // 授权弹窗关闭后立即尝试启动（已授权则直接生效）
-                                    if settings.brightnessKeysEnabled {
-                                        BrightnessKeyTap.shared.start()
-                                    }
+                                    requestAccessibility()
                                 }
-                                Button(l10n.t(.openPrivacyPane)) {
-                                    BrightnessKeyTap.openPermissionSettings()
-                                }
-                                .buttonStyle(.link)
-                                .font(.system(size: BubbleMetrics.fontCaption))
                             }
                         }
                         .padding(.vertical, 4)
@@ -285,6 +257,39 @@ struct BrightnessTab: View {
             .padding(20)
             .background(ScrollOffsetReader(offset: $scrollOffset))
         }
+        // 授权状态的三条刷新路径：App 重新激活（从系统设置返回）、窗口重新成为 key、
+        // 1s 轮询兜底（系统弹窗里直接点「允许」时 App 不会失活，也要及时变绿勾）。
+        .onAppear { refreshPermissionState() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshPermissionState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            refreshPermissionState()
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            refreshPermissionState()
+        }
+    }
+
+    /// 重新读取授权状态并让监听与「开关 + 授权」对齐：授权后自动拉起（无需再手动
+    /// 拨开关）、撤销后自动停。状态不变时不写 @State，避免 1s 轮询抖动。
+    private func refreshPermissionState() {
+        let granted = BrightnessKeyTap.permissionGranted
+        if granted != permissionGranted {
+            permissionGranted = granted
+        }
+        BrightnessKeyTap.shared.reconcile()
+    }
+
+    /// 「授权」按钮：先走系统辅助功能授权请求（首次使用会把 App 登记进列表），
+    /// 未获批则直接深链到「隐私与安全性 > 辅助功能」授权页——原独立「打开系统设置」
+    /// 链接已并入本按钮（2026-10-17 用户拍板）。
+    private func requestAccessibility() {
+        let granted = BrightnessKeyTap.requestPermission()
+        if !granted {
+            BrightnessKeyTap.openPermissionSettings()
+        }
+        refreshPermissionState()
     }
 
     /// 与 GeneralTab 同款的设置行（含可选副文本）。
@@ -314,8 +319,16 @@ struct BrightnessTab: View {
 struct AboutTab: View {
 
     @EnvironmentObject private var l10n: L10n
+    @EnvironmentObject private var settings: AppSettings
     /// 内容滚动偏移上报（关于页内容不满屏不可滚，探针仅用于切 tab 时把毛玻璃复位）。
     @Binding var scrollOffset: CGFloat
+
+    /// 关于页图标：优先用当前主题的图标（AppIconController 随设置换好），
+    /// 取不到再回退 bundle 里的静态 icns（dev 模式下没有打包资源）。
+    private var currentIcon: NSImage? {
+        _ = settings.panelThemeID   // 建立依赖：换主题后关于页图标同步刷新
+        return AppIconController.shared.currentImage ?? loadAppIcon()
+    }
 
     private var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
@@ -347,7 +360,7 @@ struct AboutTab: View {
             VStack(spacing: 16) {
                 // 关于页图标：优先用真实 App 图标（打包后从 Bundle 取）；
                 // dev 模式下 Bundle.main 取不到则回退到与边栏同款的渐变方块占位。
-                if let appIcon = loadAppIcon() {
+                if let appIcon = currentIcon {
                     Image(nsImage: appIcon)
                         .resizable()
                         .scaledToFit()

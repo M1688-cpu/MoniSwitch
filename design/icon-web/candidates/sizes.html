@@ -1,0 +1,36 @@
+<!doctype html><html lang="zh"><meta charset="utf-8"><title>size check</title>
+<style>
+  html,body{margin:0;font:12px -apple-system,system-ui,sans-serif}
+  body{padding:22px 24px;background:#F2F3F6;color:#1C1C1E}
+  h2{font-size:12px;font-weight:600;margin:0 0 10px;color:#6B7280;letter-spacing:.04em;text-transform:uppercase}
+  .block{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .dark{background:#1B1B1F;color:#EDEDF0}
+  .dark h2{color:#8E8E96}
+  .lane{display:flex;align-items:flex-end;gap:22px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:6px}
+  img{display:block}
+  .sz{font-size:9.5px;color:#9AA0AA}
+</style>
+<h2>light background · 128 / 64 / 32 / 16</h2>
+<div class="block"><div class="lane" id="l1"></div></div>
+<div class="block dark"><h2>dark background · 128 / 64 / 32 / 16</h2><div class="lane" id="l2"></div></div>
+<script>
+const files=["c1-teal.svg","c2-violet.svg","c3-amber.svg","c4-sage.svg","c5-slate.svg"];
+const sizes=[128,64,32,16];
+for (const id of ["l1","l2"]) {
+  const lane=document.getElementById(id);
+  for (const f of files) {
+    const cell=document.createElement("div"); cell.className="cell";
+    const img=document.createElement("img"); img.src=f; img.width=sizes[0]; img.height=sizes[0];
+    cell.appendChild(img);
+    const tiny=document.createElement("div"); tiny.style.display="flex"; tiny.style.alignItems="flex-end"; tiny.style.gap="10px";
+    for (const s of sizes.slice(1)) {
+      const i2=document.createElement("img"); i2.src=f; i2.width=s; i2.height=s; tiny.appendChild(i2);
+    }
+    cell.appendChild(tiny);
+    const lbl=document.createElement("div"); lbl.className="sz"; lbl.textContent=f.replace(".svg","");
+    cell.appendChild(lbl);
+    lane.appendChild(cell);
+  }
+}
+</script></html>

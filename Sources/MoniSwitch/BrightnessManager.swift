@@ -7,7 +7,9 @@ import AppKit
 ///
 /// 值策略（DDC「写可靠读不可靠」的对策）：
 /// - 面板打开/屏配置变化时发现一次 + 尽力读一次真实值（失败容忍）；
-/// - 读失败 → 上次持久化值 → 兜底 50%；
+/// - 读失败 → 上次持久化百分比 → 兜底 50%；max 单独走「合法读 → 上次成功
+///   读到的 max → 100」，绝不退化成 1（否则单步 = 100%，F1 一按即最暗）；
+/// - 屏睡眠/暗唤醒时不读（I2C 常无响应），只沿用缓存；
 /// - 所有调节（滑条/按键）本地乐观更新 + 异步合并写，按 identityKey 持久化
 ///   （EDID UUID 身份，免疫 CG 屏 ID 跨插拔漂移——与预设漂移重映射同理）。
 @MainActor
@@ -28,7 +30,7 @@ final class BrightnessManager {
 
         /// 当前 DDC 原始值。
         var rawValue: UInt16 {
-            UInt16((min(max(percent, 0), 1) * Double(maxValue)).rounded())
+            BrightnessValue.rawValue(percent: percent, maxValue: maxValue)
         }
     }
 
@@ -39,6 +41,12 @@ final class BrightnessManager {
     private var persisted: [String: Double] {
         didSet { UserDefaults.standard.set(persisted, forKey: persistenceKey) }
     }
+    /// 每块屏上次成功读到的 DDC max（身份键）。读失败时绝不再退化成 1，
+    /// 否则单步 = 100%，F1 会直接写到最暗、F2 写回的 1 仍是同一档。
+    private static let maxPersistenceKey = "moniswitch.brightnessMax.byIdentity"
+    private var persistedMax: [String: Int] {
+        didSet { UserDefaults.standard.set(persistedMax, forKey: Self.maxPersistenceKey) }
+    }
 
     /// 单例与 App 同生命周期（不 deinit、不移除观察者）。
     private var screenObserver: NSObjectProtocol?
@@ -47,6 +55,8 @@ final class BrightnessManager {
 
     private init() {
         persisted = UserDefaults.standard.dictionary(forKey: persistenceKey) as? [String: Double] ?? [:]
+        let storedMax = UserDefaults.standard.dictionary(forKey: Self.maxPersistenceKey) ?? [:]
+        persistedMax = storedMax.compactMapValues { ($0 as? NSNumber)?.intValue }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
@@ -89,16 +99,23 @@ final class BrightnessManager {
 
             var newEntries: [Entry] = []
             for device in devices {
-                // 尽力读一次真实值；读失败用持久化值兜底，再不行 50%
-                let read = await DDCWriter.shared.readBrightness(service: device.service, chipAddress: device.chipAddress)
-                let maxValue = max(read?.max ?? 0, 1)
-                var percent: Double
-                if let read, read.max > 0 {
-                    percent = Double(read.current) / Double(read.max)
-                } else if let saved = persisted[device.identityKey] {
-                    percent = saved
+                // 屏睡眠/暗唤醒时 DDC 总线常无响应：不读，沿用上次成功值与持久化
+                // 百分比（读失败本身无害，害的是把 max 兜底成 1）。
+                let read: (current: UInt16, max: UInt16)?
+                if CGDisplayIsAsleep(device.displayID) != 0 {
+                    read = nil
                 } else {
-                    percent = 0.5
+                    read = await DDCWriter.shared.readBrightness(service: device.service, chipAddress: device.chipAddress)
+                }
+                let cachedMax = persistedMax[device.identityKey].flatMap { UInt16(exactly: $0) }
+                let maxValue = BrightnessValue.resolvedMax(readMax: read?.max, cachedMax: cachedMax)
+                let percent = BrightnessValue.resolvedPercent(
+                    readCurrent: read?.current,
+                    readMax: read?.max,
+                    savedPercent: persisted[device.identityKey]
+                )
+                if let read, read.max >= BrightnessValue.minimumValidMaxValue {
+                    persistedMax[device.identityKey] = Int(read.max)
                 }
                 newEntries.append(Entry(
                     id: device.displayID,
@@ -120,6 +137,9 @@ final class BrightnessManager {
                 PrivateAPI.release(old.service)
             }
             entries = newEntries
+            // 事件 tap 的「要不要吞事件」判定跑在 tap 专属队列，不能读 MainActor
+            // 状态；这里把可控制屏集合同步进线程安全快照（无外接屏 = 空集）。
+            BrightnessControlRegistry.shared.update(Set(newEntries.map(\.id)))
         }
     }
 
@@ -140,15 +160,25 @@ final class BrightnessManager {
         }
     }
 
-    /// F1/F2 同步调节全部外接屏（MonitorControl 手感：各屏按同一步长整体移动）。
+    /// 裸按 F1/F2：只调「鼠标所在屏」（按 displayID 精确瞄准）。
+    /// 返回该屏新百分比供 HUD 显示；该屏已不在可调列表（刷新竞态）返回 nil。
+    @discardableResult
+    func adjustBrightness(up: Bool, for displayID: CGDirectDisplayID) -> Double? {
+        guard let index = entries.firstIndex(where: { $0.id == displayID }) else { return nil }
+        let entry = entries[index]
+        let target = BrightnessValue.adjusted(percent: entry.percent, up: up, maxValue: entry.maxValue)
+        setPercent(target, for: displayID)
+        return target
+    }
+
+    /// ⌥+F1/F2：同步调节全部外接屏（MonitorControl 手感：各屏按同一步长整体移动）。
     /// 返回代表屏（空间最左）的新百分比供 HUD 显示；无可调外接屏返回 nil。
     @discardableResult
-    func adjustBrightness(up: Bool) -> Double? {
+    func adjustAllExternal(up: Bool) -> Double? {
         guard !entries.isEmpty else { return nil }
         var representative: Double?
         for entry in entries {
-            let stepPercent = Double(DDC.brightnessStep(maxValue: entry.maxValue)) / Double(entry.maxValue)
-            let target = min(max(entry.percent + (up ? stepPercent : -stepPercent), 0), 1)
+            let target = BrightnessValue.adjusted(percent: entry.percent, up: up, maxValue: entry.maxValue)
             setPercent(target, for: entry.id)
             if representative == nil {
                 representative = target

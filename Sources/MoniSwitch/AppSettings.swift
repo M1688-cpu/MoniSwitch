@@ -3,6 +3,11 @@ import SwiftUI
 import ServiceManagement
 import UserNotifications
 
+extension Notification.Name {
+    /// 面板主题切换（面板与 HUD 由 SwiftUI 观察设置，App 图标由 AppIconController 跟随）。
+    static let moniswitchPanelThemeChanged = Notification.Name("moniswitch.panelThemeChanged")
+}
+
 /// 操作类型，用于发送切换完成通知时选择正文文案。
 enum OpKind {
     case primary         // 切换主屏
@@ -89,17 +94,14 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// F1/F2 亮度键同步外接屏（listen-only 事件监听，需「输入监控」权限；
-    /// 默认开，未授权时监听静默不生效，设置页有状态与引导）。
+    /// F1/F2 亮度键调「鼠标所在屏」亮度（active 事件监听，会吞事件，需「辅助功能」
+    /// 权限；默认开）。未授权时监听静默不生效，设置页有状态与引导，授权后自动拉起。
     @Published var brightnessKeysEnabled: Bool {
         didSet {
             guard oldValue != brightnessKeysEnabled else { return }
             UserDefaults.standard.set(brightnessKeysEnabled, forKey: Key.brightnessKeysEnabled)
-            if brightnessKeysEnabled {
-                BrightnessKeyTap.shared.start()
-            } else {
-                BrightnessKeyTap.shared.stop()
-            }
+            // reconcile 同时处理「开关关掉 → 停」「打开且已授权 → 起」。
+            BrightnessKeyTap.shared.reconcile()
         }
     }
 
@@ -110,6 +112,9 @@ final class AppSettings: ObservableObject {
         didSet {
             guard oldValue != panelThemeID else { return }
             UserDefaults.standard.set(panelThemeID, forKey: Key.panelThemeID)
+            // 面板/HUD 由 SwiftUI 直接读设置；App 图标（Dock / 关于页）由
+            // AppIconController 监听这条通知跟随（2026-10-23）。
+            NotificationCenter.default.post(name: .moniswitchPanelThemeChanged, object: self)
         }
     }
 

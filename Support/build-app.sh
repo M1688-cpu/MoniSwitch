@@ -68,12 +68,41 @@ if [ -n "$NEWEST_SDK" ]; then
     export SDKROOT="$NEWEST_SDK"
     echo "  SDK: $SDKROOT (自动探测的最新版)"
 else
-    echo "  SDK: $(xcrun --show-sdk-path 2>/dev/null || echo 'xcrun 默认')"
+    # 回退 xcrun 默认 SDK，也显式导出（下面要读它的版本号写进 LC_BUILD_VERSION）
+    export SDKROOT="$(xcrun --show-sdk-path 2>/dev/null || true)"
+    echo "  SDK: ${SDKROOT:-xcrun 默认}"
 fi
 fi
 
+# ---- 设计语言门控：把真实 SDK 版本写进 LC_BUILD_VERSION ----
+# SwiftPM 的链接命令只带 -target arm64-apple-macos14.0 + -sdk <27 SDK>，
+# 驱动会按「部署目标」给链接器记 sdk = 14.0（不是编译用的 27.0）。AppKit 以
+# LC_BUILD_VERSION.sdk 判断设计语言：sdk < 26 时 NSPopUpButton/NSSwitch 等
+# 原生控件走旧外观（白底黑字下拉框、扁平开关），macOS 27 的液态玻璃、按住
+# 开关左右拖动的液态拉伸都不会出现。编译期 SDK 选对也没用——必须让最终
+# 二进制的 sdk 字段等于真实 SDK 版本（2026-10-17 实测：同源码只改这个字段，
+# 控件立刻变原生玻璃）。裸 swift build 不带这些参数，属预期。
+MIN_MACOS="14.0"   # 与 Package.swift 的 .macOS(.v14) 保持一致
+SDK_VERSION="$(basename "${SDKROOT:-}" | sed -E 's/^MacOSX([0-9]+(\.[0-9]+)*)\.sdk$/\1/')"
+case "$SDK_VERSION" in
+    ""|*[!0-9.]*)
+        # 自定义路径可能是指向真实 SDK 的符号链接：回退读 SDKSettings.plist
+        SDK_VERSION="$(plutil -extract Version raw -o - "${SDKROOT:-}/SDKSettings.plist" 2>/dev/null || true)"
+        ;;
+esac
+if [ -z "$SDK_VERSION" ]; then
+    SDK_VERSION="$(xcrun --show-sdk-version 2>/dev/null || true)"
+fi
+if [ -z "$SDK_VERSION" ]; then
+    echo "✗ 无法确定 SDK 版本，拒绝打包（会导致控件退回旧设计语言）"
+    exit 1
+fi
+echo "  SDK 版本: ${SDK_VERSION}（写入 LC_BUILD_VERSION 用于设计语言门控）"
+
 cd "$PROJECT_DIR"
-swift build -c release 2>&1 | tail -5
+swift build -c release \
+    -Xlinker -platform_version -Xlinker macos -Xlinker "$MIN_MACOS" -Xlinker "$SDK_VERSION" \
+    2>&1 | tail -5
 
 # 找到编译产物路径
 BIN_PATH="$BUILD_DIR/release/$APP_NAME"
@@ -81,6 +110,18 @@ if [ ! -f "$BIN_PATH" ]; then
     echo "✗ 找不到编译产物: $BIN_PATH"
     exit 1
 fi
+# 校验门控字段真的落进二进制（增量构建/参数被吞时这里会失败，避免又打出
+# 一个「编译用 27 SDK、运行时按 14 SDK 画旧控件」的假新版）
+RECORDED_SDK="$(otool -l "$BIN_PATH" | awk '/LC_BUILD_VERSION/{found=1} found && $1=="sdk"{print $2; exit}')"
+if [ "$RECORDED_SDK" != "$SDK_VERSION" ]; then
+    echo "✗ LC_BUILD_VERSION sdk=$RECORDED_SDK，与所选 SDK $SDK_VERSION 不一致"
+    echo "  设置页控件会退回旧外观（无液态玻璃）。请检查 -Xlinker 参数。"
+    exit 1
+fi
+if [ "$(printf '%s\n26.0\n' "$RECORDED_SDK" | sort -V | head -1)" != "26.0" ]; then
+    echo "  ⚠ 记录的 SDK $RECORDED_SDK < 26：当前系统上仍是传统控件外观"
+fi
+echo "  ✓ 设计语言门控: LC_BUILD_VERSION sdk=$RECORDED_SDK"
 echo "  ✓ 编译完成: $BIN_PATH"
 echo ""
 
@@ -110,6 +151,16 @@ else
     echo "  ⚠ 警告: 未找到 Resources/AppIcon.icns，App 将使用默认图标。"
 fi
 
+# 主题图标（Dock 图标跟随面板主题；bundle 默认图仍是上面的静态 icns）
+if [ -d "$PROJECT_DIR/Resources/AppIconThemes" ]; then
+    mkdir -p "$APP_BUNDLE/Contents/Resources/AppIconThemes"
+    cp "$PROJECT_DIR/Resources/AppIconThemes/"*.png "$APP_BUNDLE/Contents/Resources/AppIconThemes/"
+    echo "  ✓ 已打包主题图标 $(find "$PROJECT_DIR/Resources/AppIconThemes" -name '*.png' | wc -l | tr -d ' ') 张"
+else
+    echo "  ⚠ 警告: 未找到 Resources/AppIconThemes，App 图标不会随主题切换。"
+    echo "    先运行: bash Support/render-theme-icons.sh"
+fi
+
 # 打包 displayplacer 进 Resources
 if [ -f "$PROJECT_DIR/Resources/displayplacer" ]; then
     cp "$PROJECT_DIR/Resources/displayplacer" "$APP_BUNDLE/Contents/Resources/displayplacer"
@@ -125,23 +176,49 @@ echo ""
 
 # ---------- 4. 签名 ----------
 # 重要：未签名的 displayplacer 会被 macOS Gatekeeper 杀掉（exit 137）。
-# 这里用 ad-hoc 签名（-s -），适合本地/小范围分发。
-# 若以后要正式分发，可改成用 Apple Developer ID 签名 + 公证。
+#
+# 签名身份（2026-10-17）：优先用本地自签名证书 "MoniSwitch Dev"（由
+# Support/setup-dev-signing.sh 一次性创建）。ad-hoc 签名（-）的 code requirement
+# 只含 cdhash，每次重新打包必变，TCC（输入监控/辅助功能）授权随之失效——这正是
+# 「系统设置里开关亮着、App 里却显示未授权」的根因。自签名证书的 requirement 是
+# identifier + 证书指纹，重新打包授权不丢。
+# 可用环境变量 CODESIGN_IDENTITY 强制指定其它身份（如 Apple Development）；
+# 找不到自签名身份时回退 ad-hoc（并明确警告）。
 echo "▶ [4/6] 清除隔离标记并签名..."
 
 # 先清掉所有扩展属性（quarantine 等）
 xattr -cr "$APP_BUNDLE"
 
-# 给 displayplacer 单独签名（它是可执行二进制）
-codesign --force --options runtime --sign - \
+SIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
+if [ -z "$SIGN_IDENTITY" ]; then
+    if security find-identity -v -p codesigning 2>/dev/null | grep -q '"MoniSwitch Dev"'; then
+        SIGN_IDENTITY="MoniSwitch Dev"
+    else
+        SIGN_IDENTITY="-"
+        echo "  ⚠ 未找到「MoniSwitch Dev」自签名身份，回退 ad-hoc；"
+        echo "    重新打包后 TCC 授权会失效。先运行: bash Support/setup-dev-signing.sh"
+    fi
+fi
+echo "  签名身份: $SIGN_IDENTITY"
+
+# 给 displayplacer 单独签名（它是可执行二进制；主 App 不再 --deep，嵌套项须先签）
+codesign --force --options runtime --sign "$SIGN_IDENTITY" \
     "$APP_BUNDLE/Contents/Resources/displayplacer" 2>&1 | tail -2 || true
 
-# 给整个 App 签名（深度）
-codesign --force --deep --options runtime --sign - "$APP_BUNDLE" 2>&1 | tail -2 || true
+# 给整个 App 签名（displayplacer 已单独签过，这里不 --deep，避免重复签嵌套项）
+codesign --force --options runtime --sign "$SIGN_IDENTITY" "$APP_BUNDLE" 2>&1 | tail -2 || true
 
 # 验证签名
 echo "  签名校验:"
 codesign --verify --verbose=1 "$APP_BUNDLE" 2>&1 | sed 's/^/    /' || true
+# 打印 code requirement：含 cdhash = ad-hoc，重新打包后必须重新授权
+SIGN_REQUIREMENT="$(codesign -d -r- "$APP_BUNDLE" 2>&1 | tail -1)"
+echo "  code requirement: $SIGN_REQUIREMENT"
+case "$SIGN_REQUIREMENT" in
+    *cdhash*)
+        echo "  ⚠ requirement 含 cdhash（ad-hoc）：重新打包后 TCC 授权会失效"
+        ;;
+esac
 echo "  ✓ 签名完成"
 echo ""
 

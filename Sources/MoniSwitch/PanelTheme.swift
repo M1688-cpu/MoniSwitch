@@ -2,7 +2,9 @@ import SwiftUI
 
 // 面板内置主题（2026-10-17）：色源 = 用户提供的 Chrome 主题色卡截图，三档色值经
 // 像素扫描逐圆提取并锁定（Tests/PanelThemeTests）；派生规则与「跟随系统」行为
-// 见各类型注释。作用范围 = 菜单栏面板 + 亮度 HUD；设置窗口保持原生观感不注入。
+// 见各类型注释。作用范围 = 菜单栏面板 + 亮度 HUD（全量色板）；设置窗口只取
+// 实心档做强调色同步（2026-10-17 用户拍板：控件/边栏选中/主题选中环，卡底与
+// 材质保持原生）。
 
 // MARK: - 三档色板
 
@@ -81,9 +83,10 @@ private struct PanelPaletteKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    /// 面板主题色板。PanelView 根部与亮度 HUD 各自按当前设置解析后注入；
-    /// 设置窗口不注入（defaultValue = .system，保持系统强调色与原生卡片观感）。
-    /// BubbleBackground / ActivePill / 行 hover 高亮及面板私有视图从环境读取。
+    /// 面板主题色板。PanelView / 亮度 HUD / SettingsView 各自按当前设置解析后注入：
+    /// 面板与 HUD 用全量三档，设置窗口只用实心档做强调色（卡底仍走系统语义色，
+    /// 「跟随系统」时不下发 tint）。BubbleBackground / ActivePill / 行 hover 高亮
+    /// 及面板私有视图从环境读取。
     var panelPalette: PanelPalette {
         get { self[PanelPaletteKey.self] }
         set { self[PanelPaletteKey.self] = newValue }

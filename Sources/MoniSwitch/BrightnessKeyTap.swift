@@ -1,19 +1,21 @@
 import Foundation
 import AppKit
 import CoreGraphics
-import IOKit
-import IOKit.hid
+import ApplicationServices
 
-/// F1/F2 亮度键监听：listen-only CGEventTap，只旁听不吞事件。
+/// F1/F2 亮度键 = 主动 CGEventTap（会吞事件），需「辅助功能」权限。
 ///
-/// 设计契约（v2 拍板）：
-/// - 裸按 F1/F2：内置屏照常走系统原生调节（原生 OSD 照常显示），我们把同样的
-///   步进量同步写到全部外接 DDC 屏（MonitorControl 的「全部屏同步」效果）；
-/// - ⌥+F1/F2：仅调外接屏，并弹出 App 自己的 HUD 气泡（修饰键语义 = 显式反馈）；
-/// - 无内置屏（Mac mini）时裸按也弹 HUD（否则没有任何视觉反馈）；
-/// - listen-only 最坏情况是「无效果」，永远不可能弄坏系统亮度键；
-/// - 权限走「输入监控」（IOHIDRequestTypeListenEvent），比辅助功能轻；
-///   未授权时静默不生效，设置页负责状态展示与引导。
+/// 语义（2026-10-17 用户拍板，对齐 MonitorControl）：
+/// - 裸按 F1/F2：调「鼠标所在屏」的亮度。可 DDC 控制的外接屏由 App 接管
+///   （吞事件 + DDC 写 + HUD）；内置屏 / 不可控屏放行原生事件，内置屏继续走
+///   系统原生亮度 + 系统 OSD（笔记本手感不变）。
+/// - ⌥+F1/F2：同步调全部可 DDC 控制的外接屏（保留旧能力），并弹 HUD。
+/// - 未授权辅助功能：不建 tap，快捷键回到系统原生行为；设置页负责状态与引导。
+///
+/// 权限模型（2026-10-17 从「输入监控」升级）：listen-only 只能旁听、拦不住内置屏
+/// 跟随 F1/F2，无法实现「只调鼠标所在屏」；吞事件必须 active tap，其 TCC 服务是
+/// 「辅助功能」（MonitorControl 官方同样要求）。设置页的状态检查/请求/深链全部
+/// 走 AX API。
 ///
 /// 事件解析抄 MediaKeyTap（MonitorControl fork，MIT）：NX_SYSDEFINED 事件里
 /// subtype==8 为按键类，键码在 data1 高 16 位，按下态在 (data1 & 0xFF00)>>8==0xA。
@@ -39,22 +41,23 @@ final class BrightnessKeyTap {
 
     var isRunning: Bool { tapPort != nil }
 
-    /// 「输入监控」权限是否已授予。
+    /// 「辅助功能」权限是否已授予。
     static var permissionGranted: Bool {
-        IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+        AXIsProcessTrusted()
     }
 
-    /// 请求「输入监控」权限（弹系统 TCC 提示）；返回是否已授予。
+    /// 请求「辅助功能」权限（系统弹窗）；返回调用时的授权状态。
+    /// 已授权时直接返回 true，不会弹窗。
     @discardableResult
     static func requestPermission() -> Bool {
         guard !permissionGranted else { return true }
-        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
-        return permissionGranted
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        return AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
     }
 
-    /// 系统设置「隐私与安全性 > 输入监控」深链。
+    /// 系统设置「隐私与安全性 > 辅助功能」深链。
     static func openPermissionSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
     }
 
@@ -68,7 +71,7 @@ final class BrightnessKeyTap {
         let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .listenOnly,
+            options: .defaultTap,
             eventsOfInterest: CGEventMask(1) << Self.nxSysDefined.rawValue,
             callback: brightnessTapCallback,
             userInfo: Unmanaged.passUnretained(self).toOpaque()
@@ -93,6 +96,28 @@ final class BrightnessKeyTap {
         }
     }
 
+    /// 让 tap 实际状态与「开关 + 授权」一致：授权后自动拉起、撤销/关闭后自动停。
+    /// 由 App 的 2s 权限看门狗与设置页刷新共同调用（幂等，可高频调用）。
+    /// 同时兜底系统把 tap 置为 disabled（超时/用户输入打断后未自愈）或端口失效。
+    func reconcile() {
+        assert(Thread.isMainThread)
+        let enabled = AppSettings.shared.brightnessKeysEnabled
+        let trusted = Self.permissionGranted
+        if enabled && trusted {
+            start()
+            if let tapPort {
+                if !CFMachPortIsValid(tapPort) {
+                    stop()
+                    start()
+                } else if !CGEvent.tapIsEnabled(tap: tapPort) {
+                    CGEvent.tapEnable(tap: tapPort, enable: true)
+                }
+            }
+        } else {
+            stop()
+        }
+    }
+
     /// 停止监听并拆除 tap（主线程调用）：先摘 runloop source 并停掉 runloop
     /// （否则 CFRunLoopRun 永不返回，队列线程常驻泄漏）。
     func stop() {
@@ -112,31 +137,64 @@ final class BrightnessKeyTap {
         runLoopQueue = nil
     }
 
-    /// 事件解析（跑在 tap 专属队列）：命中亮度键则回主线程调亮度 + 决定 HUD。
-    fileprivate func handle(_ event: CGEvent) {
+    /// 事件解析（跑在 tap 专属队列）：命中亮度键则判定目标屏并决定是否吞掉。
+    /// 返回 true = 吞掉事件（App 接管）；false = 放行给系统原生处理。
+    fileprivate func handle(_ event: CGEvent) -> Bool {
         guard let nsEvent = NSEvent(cgEvent: event),
-              nsEvent.subtype.rawValue == Self.keyEventSubtype else { return }
+              nsEvent.subtype.rawValue == Self.keyEventSubtype else { return false }
         let keycode = Int32((nsEvent.data1 & 0xFFFF_0000) >> 16)
         let keyFlags = nsEvent.data1 & 0x0000_FFFF
-        // 0xA = NX_KEYDOWN；按住不放的重复事件也是 down 态，天然支持连续调节
+        // 0xA = NX_KEYDOWN；按住不放的重复事件也是 down 态。key up 放行（系统
+        // 只用 key down 触发媒体键动作，孤立 key up 无副作用）。
         let keyPressed = ((keyFlags & 0xFF00) >> 8) == 0xA
-        guard keyPressed else { return }
+        guard keyPressed else { return false }
 
         let isUp: Bool
         switch keycode {
         case Self.brightnessUpKeycode: isUp = true
         case Self.brightnessDownKeycode: isUp = false
-        default: return
+        default: return false
         }
-        let optionHeld = nsEvent.modifierFlags.contains(.option)
 
-        DispatchQueue.main.async {
-            // 无外接 DDC 屏时完全静默（原生行为不受任何影响）
-            guard let percent = BrightnessManager.shared.adjustBrightness(up: isUp) else { return }
-            // HUD「智能显示」：⌥ 修饰键（显式只调外接）或无内置屏（无系统 OSD 可依赖）时弹
-            if optionHeld || !DDCDiscovery.hasBuiltInDisplay() {
+        // ⌥：全部外接屏同步（旧能力）。无可控外接屏时放行原生事件。
+        if nsEvent.modifierFlags.contains(.option) {
+            guard !BrightnessControlRegistry.shared.snapshot().isEmpty else { return false }
+            DispatchQueue.main.async {
+                guard let percent = BrightnessManager.shared.adjustAllExternal(up: isUp) else { return }
                 BrightnessHUD.shared.show(percent: percent)
             }
+            return true
+        }
+
+        // 裸按：调鼠标所在屏。内置屏 / 不可控屏 / 屏外一律放行原生事件。
+        let point = CGEvent(source: nil)?.location ?? .zero
+        let screens = Self.onlineScreens()
+        let target = BrightnessKeyRouting.target(for: point, screens: screens)
+        guard case .control(let displayID) = target else {
+            return false
+        }
+        DispatchQueue.main.async {
+            guard let percent = BrightnessManager.shared.adjustBrightness(up: isUp, for: displayID) else { return }
+            BrightnessHUD.shared.show(percent: percent)
+        }
+        return true
+    }
+
+    /// 在线屏快照（CG 全局坐标）。CGDisplay* 系列可从任意线程调用；可控集合
+    /// 走 BrightnessControlRegistry 的锁快照，不碰 MainActor 状态。
+    private static func onlineScreens() -> [BrightnessScreenSnapshot] {
+        var count: UInt32 = 0
+        guard CGGetOnlineDisplayList(0, nil, &count) == .success, count > 0 else { return [] }
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetOnlineDisplayList(count, &ids, &count) == .success else { return [] }
+        let controllable = BrightnessControlRegistry.shared.snapshot()
+        return ids.prefix(Int(count)).map { id in
+            BrightnessScreenSnapshot(
+                displayID: id,
+                bounds: CGDisplayBounds(id),
+                isBuiltIn: CGDisplayIsBuiltin(id) != 0,
+                isControllable: controllable.contains(id)
+            )
         }
     }
 }
@@ -148,14 +206,14 @@ private func brightnessTapCallback(
 ) -> Unmanaged<CGEvent>? {
     guard let refcon else { return Unmanaged.passUnretained(event) }
     let tap = Unmanaged<BrightnessKeyTap>.fromOpaque(refcon).takeUnretainedValue()
-    if type == .tapDisabledByTimeout {
-        // 惯例自愈：超时被系统禁用时重新启用（MediaKeyTap 同款）
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        // 惯例自愈：超时/用户输入打断被系统禁用时重新启用（MediaKeyTap 同款）
         if let port = tap.tapPort {
             CGEvent.tapEnable(tap: port, enable: true)
         }
         return Unmanaged.passUnretained(event)
     }
     guard type == BrightnessKeyTap.nxSysDefined else { return Unmanaged.passUnretained(event) }
-    tap.handle(event)
-    return Unmanaged.passUnretained(event)
+    // 吞掉（返回 nil）只发生在「App 接管的亮度键」上；其余事件原样放行。
+    return tap.handle(event) ? nil : Unmanaged.passUnretained(event)
 }

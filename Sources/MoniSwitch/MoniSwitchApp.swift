@@ -33,10 +33,23 @@ struct MoniSwitchApp: App {
 
 /// AppKit 委托：启动完成后创建菜单栏图标与面板（此前由 MenuBarExtra Scene 承担）。
 private final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// 辅助功能授权看门狗（见 applicationDidFinishLaunching）。
+    private var permissionWatchdog: Timer?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         PanelController.shared.setup()
-        // F1/F2 亮度键监听（listen-only；设置关/无输入监控权限时内部静默跳过）
-        BrightnessKeyTap.shared.start()
+        // App 图标跟随设置里的面板主题（Dock / 关于页；bundle 里的 .icns 仍是静态默认图）
+        AppIconController.shared.start()
+        // F1/F2 亮度键（active tap；设置关/无辅助功能权限时内部静默跳过）
+        BrightnessKeyTap.shared.reconcile()
+        // 授权看门狗：菜单栏 App 没有稳定的「App 激活」信号，用户从系统设置勾选
+        // 「辅助功能」后不会触发任何回调；2s 轮询 AX 状态自动拉起事件 tap
+        //（撤销授权也会自动停）。AXIsProcessTrusted 只查 TCC 缓存，开销可忽略。
+        let watchdog = Timer(timeInterval: 2, target: self,
+                             selector: #selector(permissionWatchdogTick),
+                             userInfo: nil, repeats: true)
+        RunLoop.main.add(watchdog, forMode: .common)
+        permissionWatchdog = watchdog
         hidePlaceholderSettingsWindow()
         // 占位 Settings scene 的窗口可能在启动后异步实体化（macOS 27 实测会以
         // 900x450 空白窗「MoniSwitch Settings」显示在桌面），用窗口遮挡状态变化
@@ -55,6 +68,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
             window.orderOut(nil)
         }
+    }
+
+    /// 看门狗心跳：让 F1/F2 事件 tap 与「开关 + 辅助功能授权」始终一致。
+    @objc private func permissionWatchdogTick() {
+        BrightnessKeyTap.shared.reconcile()
     }
 
     @objc private func windowOcclusionStateChanged(_ note: Notification) {

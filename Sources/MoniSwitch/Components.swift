@@ -55,20 +55,15 @@ struct BubbleBackground: ViewModifier {
 /// 无边框：不加 stroke 描边，仅靠不透明填充（BubbleBackground）与圆角呈现气泡形态，
 /// 四周悬浮阴影与背景拉开层次。
 struct BubbleCard<Content: View>: View {
-    /// 分区标题；nil = 无标题卡（2026-10 布局图枢纽卡：图即内容，标题字样删除）。
+    /// 分区标题；nil = 无标题卡（2026-10-17 起面板内容卡均已带标题，
+    /// 保留可选是为将来有意无标题的气泡留口子）。
     let title: String?
     @ViewBuilder let content: Content
-    @Environment(\.panelPalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let title {
-                Text(title)
-                    .font(.system(size: BubbleMetrics.fontCaption, weight: .semibold))
-                    .tracking(BubbleMetrics.sectionLabelTracking)
-                    .textCase(.uppercase)
-                    .foregroundStyle(palette.sectionLabel ?? BubbleMetrics.sectionLabelColor)
-                    .lineLimit(1)
+                BubbleSectionLabel(text: title)
             }
             content
         }
@@ -84,6 +79,45 @@ struct BubbleCard<Content: View>: View {
         .bubbleFloatingShadow()
         // hover 整卡微放大 + 上浮 + 阴影增强（最外层，全仿射保原生锐度）。仅菜单栏面板使用。
         .bubbleHoverLift()
+    }
+}
+
+/// 面板气泡顶部的分区标题（小型大写标签风格）：`BubbleCard` 头部与
+/// 参数二级气泡共用同一字体/字号/字距/主题色——用户要求「每张气泡顶部都有
+/// 像 presets 那样的标题字样」后抽出，避免两处样式漂移。
+struct BubbleSectionLabel: View {
+    let text: String
+    @Environment(\.panelPalette) private var palette
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: BubbleMetrics.fontCaption, weight: .semibold))
+            .tracking(BubbleMetrics.sectionLabelTracking)
+            .textCase(.uppercase)
+            .foregroundStyle(palette.sectionLabel ?? BubbleMetrics.sectionLabelColor)
+            .lineLimit(1)
+    }
+}
+
+/// 悬停补充气泡的迷你外壳：与卡片同源的浮面填充 + 细描边 + 浅阴影
+/// （2026-10 与布局图悬停名称标签共用，名称改常驻后由 HoverDwellTooltip 独用）。
+/// 气泡本体与宿主窗口解耦：现在渲染在独立浮窗里（FloatingTooltipPresenter），
+/// 外壳尺寸即窗口内容尺寸（外加浮窗的投影留白，见 BubbleMetrics.tooltipShadowPadding）。
+struct MiniBubble: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(BubbleMetrics.surfaceFill(dark: colorScheme == .dark))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.primary.opacity(BubbleMetrics.surfaceStrokeOpacity(dark: colorScheme == .dark)), lineWidth: 1)
+                    .allowsHitTesting(false)
+            )
+            .bubbleShadow(opacity: 0.7)
     }
 }
 
@@ -465,18 +499,119 @@ struct IndeterminateBar: View {
     }
 }
 
-// MARK: - 控件配色
+// MARK: - 设置页下拉选择胶囊
 
-extension View {
-    /// 菜单样式下拉框的中性灰 tint：箭头指示胶囊渲染为灰底白箭头。
-    ///
-    /// macOS 15 实机上，设置窗口曾在根级传过桥接 AppKit 动态色的 tint
-    ///（`Color(NSColor.controlAccentColor)`），下拉框箭头胶囊被实况渲染成红色
-    ///（2026-08 实测，15.5 SDK 编译亦出现；离屏渲染不可复现，属实况合成路径的
-    /// 桥接动态色解析失败）。此处刻意用 SwiftUI 静态灰 `Color.gray`
-    ///（非桥接动态色，深浅外观恒定），避开同类桥接色风险；
-    /// 若胶囊不跟随 tint 也无副作用（回落系统默认样式）。
-    func menuPickerNeutralTint() -> some View {
-        tint(Color.gray)
+/// 设置页的下拉选择胶囊（自绘外壳 + 原生菜单弹出）。
+///
+/// 为什么不用原生 `Picker(.menu)`：macOS 27 实机（2026-10-17 用户前后台对比截图）
+/// 上，原生菜单下拉框在**活动窗口**里反而渲染成近透明的浅底 + 灰字，非活动窗口
+/// 才是灰底黑字——与原生控件惯例相反，视觉上「前台比后台更暗」。这里自绘外壳，
+/// 按窗口 key 状态显式走惯例方向：活动窗口 = 更实的灰底 + 主文字色；非活动窗口 =
+/// 更浅的底 + 5 成文字色（数值对应用户截图：活动 ≈#EEE / 非活动 ≈#F9F9F9）。
+/// 弹出菜单仍用原生 `Menu`（选中项由 `Toggle` 呈现系统勾选标记）。
+struct SettingsMenuPicker<Value: Hashable>: View {
+    let options: [Value]
+    let title: (Value) -> String
+    @Binding var selection: Value
+
+    /// 所在窗口是否为 key 窗口（由零尺寸 AppKit 探针回写）。
+    @State private var windowIsKey = true
+
+    var body: some View {
+        Menu {
+            ForEach(options, id: \.self) { option in
+                Toggle(isOn: Binding(
+                    get: { selection == option },
+                    set: { isOn in
+                        // 点击已选中项时系统会尝试取消勾选，这里忽略，保持单选语义。
+                        guard isOn else { return }
+                        selection = option
+                    }
+                )) {
+                    Text(title(option))
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Text(title(selection))
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(chevronColor)
+            }
+            .font(.system(size: BubbleMetrics.fontBody))
+            .foregroundStyle(textColor)
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(fillColor)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .background(WindowKeyStateReader(isKey: $windowIsKey))
+    }
+
+    /// 活动窗口 #EEEEEE / 非活动 #F9F9F9（用户截图实测），深色模式随 primary 自动反转。
+    private var fillColor: Color {
+        Color.primary.opacity(windowIsKey ? 0.08 : 0.028)
+    }
+    private var textColor: Color {
+        windowIsKey ? Color.primary : Color.primary.opacity(0.55)
+    }
+    private var chevronColor: Color {
+        Color.primary.opacity(windowIsKey ? 0.7 : 0.4)
+    }
+}
+
+/// 把所在窗口的 key 状态回写成 Binding（下拉胶囊在活动/非活动窗口用不同配色）。
+///
+/// 零尺寸探针挂在 background：`viewDidMoveToWindow` 时订阅该窗口的
+/// didBecomeKey/didResignKey 通知并立即上报当前值。不用 SwiftUI 的
+/// `controlActiveState`（无公开环境键）；也不读 `NSApp.isActive`——那是 App 级
+/// 概念，同 App 多窗口时窗口 key 状态才是原生控件的判据。
+private struct WindowKeyStateReader: NSViewRepresentable {
+    @Binding var isKey: Bool
+
+    func makeNSView(context: Context) -> WindowKeyProbe {
+        let view = WindowKeyProbe()
+        view.onChange = { isKey = $0 }
+        return view
+    }
+
+    func updateNSView(_ nsView: WindowKeyProbe, context: Context) {
+        nsView.onChange = { isKey = $0 }
+    }
+}
+
+private final class WindowKeyProbe: NSView {
+    var onChange: ((Bool) -> Void)?
+    private var observers: [NSObjectProtocol] = []
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
+        guard let window else { return }
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
+            self?.onChange?(true)
+        })
+        observers.append(center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
+            self?.onChange?(false)
+        })
+        // 首次上报延后一拍：viewDidMoveToWindow 落在 SwiftUI 更新事务里，同步写
+        // @State 会触发「Modifying state during view update」告警。
+        let current = window.isKeyWindow
+        DispatchQueue.main.async { [weak self] in
+            self?.onChange?(current)
+        }
+    }
+
+    deinit {
+        observers.forEach(NotificationCenter.default.removeObserver)
     }
 }

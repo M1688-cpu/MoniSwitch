@@ -18,7 +18,6 @@ enum Language: String, CaseIterable, Identifiable {
 /// 所有需要翻译的文案 key。
 enum TextKey: String {
     // 菜单
-    case displaysSection        = "displaysSection"        // 主显示器
     case noDisplays             = "noDisplays"             // 未检测到显示器
     case externalSection        = "externalSection"        // 扩展显示器
     case positionLabel          = "positionLabel"          // 位置（排列表单行标题）
@@ -112,22 +111,24 @@ enum TextKey: String {
     case lowResolutionTag       = "lowResolutionTag"       // 非 HiDPI 变体标注
 
     // 面板气泡卡片（.window 样式专用）
+    case panelSectionBrightness = "panelSectionBrightness" // 面板分区标题：亮度
+    case panelSectionDisplays   = "panelSectionDisplays"   // 面板分区标题：显示器
+    case panelSectionParameters = "panelSectionParameters" // 面板分区标题：参数（展开后的参数二级气泡）
     case setAsPrimary           = "setAsPrimary"           // 设为主屏（非主屏参数块操作行）
     case currentLayoutBadge     = "currentLayoutBadge"     // 当前（预设与当前布局一致的角标）
     case mirrorActionHint       = "mirrorActionHint"       // 镜像按钮悬停提示：镜像到 @（纯图标按钮的功能说明）
     case extendActionHint       = "extendActionHint"       // 扩展按钮悬停提示：扩展显示：各屏独立排列
     case autoArrange            = "autoArrange"            // 自动排列按钮
 
-    // 亮度与按键（v2：F1/F2 外接屏亮度同步，设置页新 tab）
+    // 亮度与按键（v2：F1/F2 调鼠标所在屏亮度，设置页新 tab）
     case tabBrightness          = "tabBrightness"          // 设置边栏：亮度与按键
     case groupBrightnessKeys    = "groupBrightnessKeys"    // 卡片标题：F1/F2 亮度键
-    case brightnessKeysRow      = "brightnessKeysRow"      // 开关行：F1/F2 同步外接屏亮度
-    case brightnessKeysHint     = "brightnessKeysHint"     // 用法说明（裸按/⌥ 修饰键）
-    case groupPermission        = "groupPermission"        // 卡片标题：输入监控权限
+    case brightnessKeysRow      = "brightnessKeysRow"      // 开关行：F1/F2 调节鼠标所在屏亮度
+    case brightnessKeysHint     = "brightnessKeysHint"     // 用法说明（鼠标所在屏 / ⌥ 全部外接屏）
+    case groupPermission        = "groupPermission"        // 卡片标题：辅助功能权限
     case permissionGranted      = "permissionGranted"      // 状态：已授权
     case permissionMissing      = "permissionMissing"      // 状态：未授权未生效
-    case grantPermission        = "grantPermission"        // 按钮：授权…
-    case openPrivacyPane        = "openPrivacyPane"        // 按钮：打开系统设置
+    case grantPermission        = "grantPermission"        // 按钮：授权（点击即打开系统设置授权页）
     case ddcUnsupportedHint     = "ddcUnsupportedHint"     // 说明：坞/电视等无 DDC 的屏不出现在亮度列表
 }
 
@@ -166,7 +167,6 @@ final class L10n: ObservableObject {
 
     /// 翻译表。
     private let table: [TextKey: [Language: String]] = [
-        .displaysSection:  [.zh: "主显示器",                      .en: "Primary display"],
         .noDisplays:       [.zh: "未检测到显示器",                .en: "No displays detected"],
         .externalSection:  [.zh: "扩展显示器",                    .en: "Extended displays"],
         .positionLabel:    [.zh: "位置",                        .en: "Position"],
@@ -227,6 +227,9 @@ final class L10n: ObservableObject {
 
         .tabPresets:       [.zh: "预设",                          .en: "Presets"],
         .groupPresets:     [.zh: "预设",                          .en: "Presets"],
+        .panelSectionBrightness: [.zh: "亮度",                    .en: "Brightness"],
+        .panelSectionDisplays:   [.zh: "显示器",                  .en: "Displays"],
+        .panelSectionParameters: [.zh: "参数",                    .en: "Parameters"],
         .presetCaptureHint:[.zh: "保存当前显示器布局为预设",      .en: "Save current display layout as a preset"],
         .presetNamePlaceholder:[.zh: "预设名称",                  .en: "Preset name"],
         .presetCaptureButton:[.zh: "保存预设",                    .en: "Save Preset"],
@@ -250,13 +253,12 @@ final class L10n: ObservableObject {
         .setAsPrimary:     [.zh: "设为主屏",                      .en: "Set as Main"],
         .tabBrightness:    [.zh: "亮度与按键",                    .en: "Brightness & Keys"],
         .groupBrightnessKeys: [.zh: "F1/F2 亮度键",               .en: "F1/F2 Brightness Keys"],
-        .brightnessKeysRow:   [.zh: "F1/F2 同步外接屏亮度",        .en: "Sync external displays on F1/F2"],
-        .brightnessKeysHint:  [.zh: "裸按 F1/F2：内置屏照常由系统调节，外接屏同步跟随同样的步进。按住 ⌥ 再按：外接屏调节并显示指示气泡（笔记本内置屏不受 ⌥ 影响，仍由系统调节）。", .en: "Plain F1/F2: the built-in display adjusts natively and external displays follow. Hold ⌥: external displays adjust with an indicator bubble (on laptops the built-in display still adjusts natively — listen-only cannot suppress it)."],
-        .groupPermission:  [.zh: "输入监控权限",                  .en: "Input Monitoring Permission"],
+        .brightnessKeysRow:   [.zh: "F1/F2 调节鼠标所在屏亮度",    .en: "Adjust display under pointer with F1/F2"],
+        .brightnessKeysHint:  [.zh: "F1/F2 调节鼠标所在屏幕的亮度：外接屏经 DDC，内置屏由系统原生调节。按住 ⌥ 再按可同步调节全部外接屏。", .en: "F1/F2 adjust the brightness of the display under the pointer: DDC for external displays, native control for the built-in display. Hold ⌥ to sync all external displays."],
+        .groupPermission:  [.zh: "辅助功能权限",                  .en: "Accessibility Permission"],
         .permissionGranted: [.zh: "已授权",                        .en: "Granted"],
-        .permissionMissing: [.zh: "未授权，F1/F2 监听未生效",       .en: "Not granted — F1/F2 listening inactive"],
-        .grantPermission:  [.zh: "授权…",                         .en: "Grant…"],
-        .openPrivacyPane:  [.zh: "打开系统设置",                   .en: "Open System Settings"],
+        .permissionMissing: [.zh: "未授权辅助功能，F1/F2 调节未生效", .en: "Not granted — F1/F2 control inactive"],
+        .grantPermission:  [.zh: "授权",                          .en: "Grant"],
         .ddcUnsupportedHint: [.zh: "经坞站/转换器连接或部分电视不支持 DDC 亮度控制，此类屏幕不会出现在亮度列表中。", .en: "Displays connected through docks/adapters and some TVs don't support DDC brightness control; they won't appear in the brightness list."],
         .currentLayoutBadge:[.zh: "当前",                        .en: "Current"],
         .mirrorActionHint: [.zh: "镜像到 %@",                     .en: "Mirror to %@"],

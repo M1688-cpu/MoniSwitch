@@ -1,79 +1,62 @@
-# MoniSwitch — 新图标 / Icon study
+# MoniSwitch — 图标 / Icon
 
-MoniSwitch 的深色图标概念，以 Web 可用的 **SVG** 为主文件，附 1024 PNG 和多尺寸栅格图。
-
-> 已接入：`Resources/AppIcon-source.png` 和 `Resources/AppIcon.icns` 已更新，`Support/make-app-icon.sh` 默认直接使用现成源图生成 icns。
+浅色底、单色相屏幕的图标，**跟随设置里的面板主题**。SVG 是主文件，PNG 由脚本渲染。
 
 ## 文件
 
 | 文件 | 用途 |
 | --- | --- |
-| `moniswitch-icon.svg` | 主文件，1024×1024，可无损缩放 |
-| `moniswitch-icon-1024.png` | 透明底 1024 PNG（由 SVG 导出） |
+| `moniswitch-icon.svg` | 主文件（1024×1024）。= 跟随系统（蓝强调色），也是 bundle 里 `.icns` 的来源 |
+| `moniswitch-icon-1024.png` | 主图标 1024 PNG（透明底） |
 | `sizes/icon-{512,256,128,64,32,16}.png` | 尺寸检查用栅格图 |
-| `index.html` | 预览页：Dock 语境、尺寸阶梯、设计拆解、色板 |
-| `README.md` | 本文件 |
+| `theme-icons/` | 7 个内置主题 + 8 档系统强调色的 SVG 源；`generate.py` 是唯一色值入口 |
+| `theme-icons/preview.html` | 8 套主题预览（档 1 底板） |
+| `theme-icons/tiers.html` | 底板深浅三档对比（历史选型；定档 = 档 1） |
+| `candidates/` | 早期「彩虹渐变换色」研究（历史存档，未采用） |
+| `index.html` | 预览页：主题画廊、尺寸阶梯、取色规则 |
 
-## 概念
+## 设计
 
 > 一块屏幕，一个开关。
 
-- **屏幕 = Moni**：一块宽屏显示器，支架、摄像头、下边框电源灯都在，但只保留最必要的硬件线索。
-- **开关 = Switch**：屏幕正中的磨砂玻璃 toggle。它是整枚图标唯一的“操作”，也是 App 名字的字面翻译。
-- **黑场**：824 px squircle，近黑底 + 一圈极细 rim light。原生深色图标的做法，让屏幕成为唯一光源。
-- **极光屏**：青蓝 → 靛蓝 → 紫 → 洋红 → 珊瑚的五段渐变，叠顶部柔光、斜向高光和底部暗角。屏幕是“亮着的”，不是贴上去的。
-- **一个暖点**：下边框上的电源灯是唯一的暖色。它不负责识别，只负责让机器看起来醒着。
+- **浅色底**：824 px squircle，顶 `#F8F6F7` 左近白 → 底略深的同色相淡染，一圈 5–13% 的细边；显示器下方叠同色相的极淡反光。
+- **单色相屏幕**：渐变只用主题色一个色相——主题浅色派生的**实心档（L\*40）→ 高亮档（L\*80）**，两端再各外扩一档（深端 L\*30、亮端 L\*92）。没有第二个色相，因此没有彩虹。
+- **深色 bezel 保留**：浅底上仍是一台深色显示器，屏幕是唯一光源；16 px 下仍读得出「亮着的屏 + 一个开关」。
+- **跟随主题**：7 个内置主题（玫瑰红/鼠尾草绿/橙/棕褐/蓝/蓝灰/青灰）各一张；「跟随系统」按系统 8 档强调色各一张（多彩/未知按蓝）。
 
-参考图里借的是**方法**，不是图形：
-
-- 苹果原生深色图标 → 黑场、单一母题、无文字、居中的强轮廓。
-- BongoCat → 大量负空间，以及一个很小的、有人味的暖色细节。
-- Compositor → 高饱和极光渐变 + 玻璃高光。
-- Alcove → 深色边框包住发光屏幕，屏幕边缘有内发光。
+取色不是手挑的：`generate.py` 调的是与 App 内 `PanelTheme.lightDerived()` 相同的算法（HSL + L\* 二分），色值由 `Tests/MoniSwitchTests/PanelThemeTests.swift` 锁定。
 
 ## 规格
 
-- 画布：1024 × 1024，透明留白 100 px
-- 实体：824 × 824 squircle，圆角 185 px
-- 屏幕渐变：`#4FD0FF → #5B70FF 24% → #A241FF 55% → #FF47AB 80% → #FF9866`，135°
-- 深色底：`#17171F → #0B0B11 → #050507`
-- 电源灯：`#FFF0E2`
-- 开关：白色玻璃轨 + 白色旋钮，未使用额外的品牌色
+- 画布 1024 × 1024，透明留白 100 px；实体 824 × 824 squircle（圆角 185 px）
+- 屏幕区域 532 × 312（圆角 20），bezel 560 × 340（圆角 34）
+- 底板（档 1）：顶 L\*97 → 底 L\*91，S = 主题 bg 的 S
+- 屏幕渐变：135°，5 个停靠点，见上
+- 开关：白色玻璃轨 + 白色旋钮；下边框一颗暖色电源灯（`#FFF0E2`）
 
-## 重新导出 PNG
+## 重新生成
 
-macOS 上已装 Chrome 时：
+改色/改几何 → 跑生成器（`design/icon-web/theme-icons/generate.py`）→ 渲染资源：
 
 ```bash
-cd design/icon-web
+cd design/icon-web/theme-icons
+python3 generate.py                 # 重写 SVG（含 ../moniswitch-icon.svg）
 
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --headless=new --disable-gpu --hide-scrollbars \
-  --force-device-scale-factor=1 \
-  --default-background-color=00000000 \
-  --screenshot=moniswitch-icon-1024.png \
-  --window-size=1024,1024 \
-  "file://$PWD/moniswitch-icon.svg"
-
-mkdir -p sizes
-for s in 512 256 128 64 32 16; do
-  sips -z "$s" "$s" moniswitch-icon-1024.png --out "sizes/icon-$s.png" >/dev/null
-done
+cd ../../..
+bash Support/render-theme-icons.sh  # Chrome 渲染 → Resources/AppIconThemes/*.png
+                                    # + 主图标 PNG/尺寸阶梯/AppIcon-source.png
+                                    # + 重建 Resources/AppIcon.icns
+bash Support/build-app.sh           # 打包
 ```
 
-预览页的主视觉直接使用 SVG；`sizes/` 只服务于尺寸阶梯的栅格检查。
+`render-theme-icons.sh` 需要 Google Chrome（headless 截图），可用 `CHROME=/path/to/chrome` 覆盖。
 
-## 已接入 App
+## 运行时怎么跟随主题
 
-`Resources/AppIcon-source.png` 已替换为本图的 1024 PNG，`Resources/AppIcon.icns` 已重建；`Support/make-app-icon.sh` 默认直接使用现成源图，不再调用旧版 Swift 自绘。
+打包只带一张静态 `AppIcon.icns`（= 跟随系统蓝）。运行中：
 
-以后改图：
+- `AppIconController` 监听主题切换 / App 激活 / 系统强调色变化，
+- 按「主题 id + `AppleAccentColor`」选 `Resources/AppIconThemes/theme-<id>.png` 或 `system-<accent>.png`，
+- 设 `NSApp.applicationIconImage` —— 设置窗口打开时 Dock 里的图标即时跟着换，关于页也显示同一张。
 
-1. 改 `moniswitch-icon.svg`，重新导出 `moniswitch-icon-1024.png`（命令见上）。
-2. 覆盖 `Resources/AppIcon-source.png`。
-3. `bash Support/make-app-icon.sh` → 重建 `Resources/AppIcon.icns`。
-4. `bash Support/build-app.sh` → 重新生成 `Support/MoniSwitch.app` / `.dmg`。
-
-旧版蓝色显示器自绘仍保留在 `Support/make-app-icon-design.swift`，只能通过 `bash Support/make-app-icon.sh --redraw` 走实验路径；默认流程不会再用它。
-
-如果 Finder / Dock 仍显示旧图标，重启应用或重新打包；系统图标缓存偶尔需要重新登录（或 `killall Dock`）才会刷新。
+Finder 里 `.app` 文件的图标、通知横幅用的都是 bundle 里的静态 icns（macOS 限制，运行时不改）。
