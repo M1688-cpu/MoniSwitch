@@ -1,11 +1,12 @@
 import AppKit
 
-/// 图标主题：设置里选中的面板主题决定 App 图标（2026-10-23）。
+/// 图标跟随系统强调色（2026-10-23；2026-11-14 面板主题移除后只剩强调色一条路）。
 ///
 /// 资源由 `Support/render-theme-icons.sh` 从 `design/icon-web/theme-icons/*.svg`
 /// 渲染到 `Resources/AppIconThemes/`（512×512，透明底），打包时整套拷进
-/// `Contents/Resources/AppIconThemes`。7 个内置主题各自一张；「跟随系统」按系统的
-/// 8 档强调色各备一张（AppleAccentColor 映射），未设置（多彩）用蓝。
+/// `Contents/Resources/AppIconThemes`。8 档强调色各备一张 `system-<accent>.png`
+/// （AppleAccentColor 映射），未设置（多彩）用蓝。脚本仍会顺带产出旧主题的
+/// `theme-*.png`，运行时不再读取，可删。
 ///
 /// 为什么预渲染而不是运行时画：图标由线性/径向渐变 + 多层阴影组成，用 SVG 渲染
 /// 保证与设计稿逐像素一致；运行时只做「主题 → 文件名」的映射，不重画。
@@ -17,14 +18,9 @@ enum AppIconTheme {
     static let accentSlugs = ["blue", "purple", "pink", "red",
                               "orange", "yellow", "green", "graphite"]
 
-    /// 主题 id + 强调色序号 → 资源名（不含扩展名）。
-    /// 主题未知或为「跟随系统」时走 `system-<accent>`。
-    static func resourceName(themeID: String, accentIndex: Int?) -> String {
-        if themeID != PanelTheme.systemID,
-           PanelTheme.all.contains(where: { $0.id == themeID }) {
-            return "theme-\(themeID)"
-        }
-        return "system-\(accentSlug(accentIndex))"
+    /// 强调色序号 → 资源名（不含扩展名）。
+    static func resourceName(accentIndex: Int?) -> String {
+        "system-\(accentSlug(accentIndex))"
     }
 
     /// AppleAccentColor 序号 → 强调色 slug。
@@ -50,10 +46,9 @@ enum AppIconTheme {
     }
 }
 
-/// 把「当前主题」应用成 Dock / 关于页看到的图标。
+/// 把当前强调色对应的图标应用成 Dock / 关于页看到的图标。
 ///
-/// 触发点：启动、设置里换主题（AppSettings 发 `.moniswitchPanelThemeChanged`）、
-/// App 激活（用户可能在系统设置里换了强调色）、系统强调色变化的分布式通知。
+/// 触发点：启动、App 激活（用户可能在系统设置里换了强调色）、系统强调色变化的分布式通知。
 /// 同一张图重复应用会被 `appliedKey` 去重。
 ///
 /// 注意：通知横幅等系统 UI 取的是 bundle 里的 AppIcon.icns（静态 = 跟随系统蓝），
@@ -62,10 +57,10 @@ enum AppIconTheme {
 final class AppIconController: NSObject {
     static let shared = AppIconController()
 
-    /// 当前生效的主题图标（关于页直接取它，避免再读静态 icns）。
+    /// 当前生效的图标（关于页直接取它，避免再读静态 icns）。
     private(set) var currentImage: NSImage?
 
-    /// 上一次成功应用的资源名：只换主题/强调色时才重设 applicationIconImage。
+    /// 上一次成功应用的资源名：强调色变了才重设 applicationIconImage。
     private var appliedKey: String?
 
     private override init() { super.init() }
@@ -73,11 +68,9 @@ final class AppIconController: NSObject {
     /// AppDelegate 启动时调用一次。
     func start() {
         let center = NotificationCenter.default
-        center.addObserver(self, selector: #selector(themeChanged),
-                           name: .moniswitchPanelThemeChanged, object: nil)
         center.addObserver(self, selector: #selector(refresh),
                            name: NSApplication.didBecomeActiveNotification, object: nil)
-        // 强调色是全局域设置，「跟随系统」时要跟着换图。分布式通知在注册线程
+        // 强调色是全局域设置，要跟着换图。分布式通知在注册线程
         // （主线程）的 runloop 上派发，与 selector 观察者配合无需额外切换队列。
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(refresh),
@@ -86,24 +79,20 @@ final class AppIconController: NSObject {
         apply(force: true)
     }
 
-    @objc private func themeChanged() { apply(force: true) }
-
     @objc private func refresh() { apply() }
 
     /// 按当前设置解析并应用图标；资源缺失时保持现状（打包漏拷时降级，不崩）。
     func apply(force: Bool = false) {
-        let key = AppIconTheme.resourceName(themeID: AppSettings.shared.panelThemeID,
-                                            accentIndex: AppIconTheme.systemAccentIndex())
-        guard force || key != appliedKey else { return }
-        apply(themeID: AppSettings.shared.panelThemeID,
-              accentIndex: AppIconTheme.systemAccentIndex())
+        let accentIndex = AppIconTheme.systemAccentIndex()
+        guard force || AppIconTheme.resourceName(accentIndex: accentIndex) != appliedKey else { return }
+        apply(accentIndex: accentIndex)
     }
 
-    /// 显式指定主题/强调色应用图标（测试友好，不读 AppSettings）。
+    /// 显式指定强调色应用图标（测试友好，不读全局域）。
     /// 返回是否成功加载并应用；资源缺失返回 false。
     @discardableResult
-    func apply(themeID: String, accentIndex: Int?) -> Bool {
-        let key = AppIconTheme.resourceName(themeID: themeID, accentIndex: accentIndex)
+    func apply(accentIndex: Int?) -> Bool {
+        let key = AppIconTheme.resourceName(accentIndex: accentIndex)
         guard let image = loadImage(named: key) else { return false }
         NSApplication.shared.applicationIconImage = image
         currentImage = image

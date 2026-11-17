@@ -21,7 +21,8 @@ final class DockPolicyManager: NSObject, NSWindowDelegate {
 
     /// 打开设置：切到普通模式 → 激活 App → 创建/显示设置窗口。
     @MainActor
-    func openSettings() {
+    func openSettings(tab: SettingsView.Tab? = nil) {
+        if let tab { SettingsNavigation.shared.selectedTab = tab }
         let l10n = L10n.shared
         let settings = AppSettings.shared
 

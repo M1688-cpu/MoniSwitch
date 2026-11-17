@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="docs/poster.svg?v=3">
-    <img src="docs/poster.svg?v=3" width="100%" alt="MoniSwitch — 每块屏，一个开关。深色极光海报，含显示器、亮度滑条和布局卡片。">
+  <a href="docs/poster.jpg?v=4">
+    <img src="docs/poster.jpg?v=4" width="100%" alt="MoniSwitch：每块屏，一个开关。玻璃瓷砖菜单栏面板浮在夜空沙漠壁纸上。">
   </a>
 </p>
 
@@ -31,7 +31,7 @@
 
 MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不是系统菜单。每块屏按真实比例画在布局图里，常用操作一到两次点击就能完成；面板高度随内容自适应，没有内部滚动条，也不用反复打开「系统设置 → 显示器」。
 
-**v2.0 是一次面板层面的重写**，同时补上了显示器使用中另一半高频需求：外接屏亮度。每块支持 DDC/CI 的外接屏在面板顶部都有一条滑条，F1/F2 亮度键会调节鼠标所在屏的 DDC 亮度，七组低饱和主题让整块面板在浅色与深色下都能换色。
+**v2.0 是一次面板层面的重写**，同时补上了显示器使用中另一半高频需求：外接屏亮度。每块支持 DDC/CI 的外接屏在面板顶部都有一条滑条，F1/F2 亮度键会调节鼠标所在屏的 DDC 亮度。
 
 ## v2.0 新增
 
@@ -39,7 +39,7 @@ MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不
 - **F1/F2 跟着鼠标走。** active `CGEventTap` 监听亮度键，调节鼠标所在屏的 DDC 亮度；内置屏与不支持 DDC 的屏保持系统原生响应。按住 `⌥` 一次调节全部外接屏，并显示小气泡 HUD。
 - **全新的面板壳，不是换皮。** 弃用 `NSPopover`，改为 MoniSwitch 自有的无边框 `NSPanel`：顶边锚在菜单栏图标下方，淡入并从顶部缩放展开，点面板外任意位置收起。
 - **控制中心式布局。** 亮度卡常驻顶部，按真实比例绘制的布局图是枢纽；点击屏块，在第二张气泡卡里展开该屏参数。预设卡与底部工具栏顺次排在下面。
-- **七组主题 + 跟随系统。** 鼠尾草绿、玫瑰红、橙、棕褐、蓝、蓝灰、青灰；每组派生卡底、高亮和实心强调三档色，并分别计算浅色与深色版本。
+- **v2.2 起改为玻璃瓷砖。** 面板是一列浮在桌面上的 Liquid Glass 瓷砖（macOS 14 和 15 使用系统材质），颜色跟随系统强调色；内置主题已在 v2.2 移除。
 - **重做的设置窗口。** 原生边栏材质、分组卡片，并新增「亮度与按键」页：F1/F2 监听开关、辅助功能权限状态、DDC 兼容性说明都在这里。
 
 ## 功能
@@ -50,7 +50,7 @@ MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不
 | **亮度** | 外接屏原生 DDC/CI 滑条、F1/F2 调鼠标所在屏、迷你 HUD，并按 EDID 身份记住每块屏的值。 |
 | **预设** | 把整套布局（主屏、位置、镜像）存成预设，一键或一个全局快捷键恢复。 |
 | **面板** | 无边框悬浮面板、按真实比例布局图、可折叠参数组、弹簧动画与悬停浮起。 |
-| **设置** | 中英双语、登录时启动、自动刷新、通知、主题、预设与权限，集中在一个窗口。 |
+| **设置** | 中英双语、登录时启动、自动刷新、通知、预设与权限，集中在一个窗口。 |
 
 ### 每块屏，都只要一两次点击
 
@@ -77,11 +77,11 @@ MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不
 - **悬停有重量。** 卡片悬停时以底边为锚做 2D 仿射放大并轻微上浮，指针不会落入「进入→底边越过指针→退出→再进入」的振荡死区。底部工具栏按钮悬停时轮廓局部隆起。
 - **长操作可见。** 切换进行中顶部浮现流动进度条，并禁用重复点击；失败会发系统通知。
 - **布局图是活的。** 按真实比例绘制；悬停显示器行时对应屏块高亮，选中的屏块带勾选标记。
-- **双语是设计的一部分。** English / 简体中文一键切换并持久保存；默认跟随系统强调色，也可以换成七组内置主题。
+- **双语是设计的一部分。** English / 简体中文一键切换并持久保存；面板跟随系统强调色。
 
 ### 设置窗口，去繁就简
 
-- **通用** —— 界面语言、登录时启动、主题色、自动刷新（含间隔）、菜单中的刷新率/HiDPI 标注、切换后通知。
+- **通用** —— 界面语言、登录时启动、自动刷新（含间隔）、菜单中的刷新率/HiDPI 标注、切换后通知。
 - **亮度与按键** —— F1/F2 监听开关、辅助功能权限状态与跳转、DDC 兼容性说明。
 - **预设（Beta）** —— 保存当前布局、应用/删除预设、录制或清除全局快捷键。
 - **关于** —— 图标、版本和一句话简介。
@@ -105,9 +105,9 @@ MoniSwitch 常驻菜单栏，点开是一块悬浮的气泡卡片面板，而不
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
-      <img src="screenshots/zh/settings-general.png" width="400" alt="MoniSwitch 设置-通用：语言、登录时启动、主题色、自动刷新与通知">
+      <img src="screenshots/zh/settings-general.png" width="400" alt="MoniSwitch 设置-通用：语言、登录时启动、自动刷新与通知">
       <br><b>设置 · 通用</b>
-      <br><sub>语言、登录时启动、七组主题、刷新与通知，收在原生设置布局里。</sub>
+      <br><sub>语言、登录时启动、刷新与通知，收在原生设置布局里。</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="screenshots/zh/settings-presets.png" width="400" alt="MoniSwitch 设置-预设：保存布局、应用/删除预设、录制全局快捷键">
@@ -227,7 +227,7 @@ MoniSwitch 是一个 SwiftUI + AppKit 的菜单栏 App，核心能力分成三�
 - **语言：** Swift 6（语言模式 v5），SwiftUI + AppKit
 - **最低系统：** macOS 14
 - **构建：** Swift Package Manager，纯文本 `Package.swift`，无 Xcode 工程
-- **测试：** Swift Testing（DDC 协议向量、displayplacer 解析 fixture、预设漂移重映射、面板主题派生）
+- **测试：** Swift Testing（DDC 协议向量、displayplacer 解析 fixture、预设漂移重映射、面板显示器上下文）
 - **分发：** 非沙盒，本地 ad-hoc 签名，DMG 直链
 - **亮度：** 私有 `IOAVService`，经 `dlopen`/`dlsym` 运行时解析，Apple Silicon；F1/F2 走 active `CGEventTap`（辅助功能权限）
 - **图标：** SVG 源在 `design/icon-web/`，导出到 `Resources/AppIcon-source.png` 与 `AppIcon.icns`
@@ -242,13 +242,13 @@ MoniSwitch/
 │   ├── PanelController.swift      # NSStatusItem + 无边框 NSPanel 面板壳
 │   ├── AppState.swift             # 显示器列表 + 切换操作
 │   ├── PanelView.swift            # 气泡卡片面板（亮度、布局枢纽、预设、工具栏）
-│   ├── PanelTheme.swift           # 七组三档主题 + 浅深派生
+│   ├── PanelGlass.swift           # 玻璃瓷砖材质与底栏按钮
 │   ├── Components.swift           # 共享卡片/按钮/胶囊/悬停与布光修饰器
 │   ├── BubbleMetrics.swift        # 设计令牌（圆角、字号、间距、阴影）
 │   ├── Models.swift               # 显示器、分辨率、快捷键与预设模型
 │   ├── ShellRunner.swift          # displayplacer 调用封装
 │   ├── DisplayManager.swift       # 解析、切换、镜像组、自动排列、漂移重映射
-│   ├── AppSettings.swift          # 偏好（登录启动、刷新、通知、主题）
+│   ├── AppSettings.swift          # 偏好（登录启动、刷新、通知）
 │   ├── PresetManager.swift        # 布局预设（保存/应用/删除/快捷键）
 │   ├── HotkeyManager.swift        # Carbon RegisterEventHotKey
 │   ├── DockPolicyManager.swift    # 设置窗口宿主
@@ -266,7 +266,7 @@ MoniSwitch/
 ├── Resources/                     # 随包 displayplacer、AppIcon.icns、图标源
 ├── Support/                       # Info.plist、build-app.sh、run-tests.sh
 ├── design/icon-web/               # 图标 SVG、预览页与 PNG 导出
-├── docs/poster.svg                # README 顶部海报（SVG 源）
+├── docs/poster.jpg                # README 顶部海报（由 design/poster-v4 生成）
 ├── screenshots/                   # README 截图（en/zh 两套，文件名一一对应）
 ├── README.md                      # 英文 README
 ├── README.zh-CN.md                # 简体中文 README（本文件）
@@ -288,7 +288,7 @@ MoniSwitch/
 - [x] 预设 ID 漂移重映射与「当前」角标
 - [x] 无边框悬浮面板、弹簧揭示与点外部收起
 - [x] **v2：** 原生 DDC/CI 外接屏亮度、F1/F2 监听与 HUD
-- [x] **v2：** 七组主题与浅深派生
+- [x] **v2.2：** 玻璃瓷砖面板，跟随系统强调色
 - [x] **v2：** 重做设置窗口，新增「亮度与按键」页
 - [ ] 适配 Intel
 - [ ] 三块以上显示器场景的打磨与测试
@@ -356,4 +356,4 @@ MIT License。MoniSwitch 代码 © MoniSwitch contributors。
 
 - [displayplacer](https://github.com/jakehilborn/displayplacer) —— 显示器排列功能背后的配置引擎。
 - [MonitorControl](https://github.com/MonitorControl/MonitorControl) 与 [m1ddc](https://github.com/waydabber/m1ddc) —— 均为 MIT；它们的 DDC/CI 常量、校验和与屏→服务映射为亮度引擎提供了重要参考。MoniSwitch 是独立实现，不是 fork。
-- 图标极光配色与面板三档主题均为自研；SVG 源在 [`design/icon-web/`](design/icon-web/) 和 [`docs/poster.svg`](docs/poster.svg)。
+- App 图标与 README 海报均为自研；图标 SVG 源在 [`design/icon-web/`](design/icon-web/)。

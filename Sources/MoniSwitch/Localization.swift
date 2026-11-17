@@ -60,16 +60,6 @@ enum TextKey: String {
     case notifyFootnote         = "notifyFootnote"         // 通知行副文本
 
     // 设置 - 面板主题（2026-10-17 内置主题：Chrome 色卡式 7 组三档 + 跟随系统）
-    case groupTheme             = "groupTheme"             // 主题色（选择卡标题）
-    case themeFollowSystem      = "themeFollowSystem"      // 跟随系统（默认项）
-    case themeFootnote          = "themeFootnote"          // 主题行副文本（三档用途说明）
-    case themeRose              = "themeRose"              // 玫瑰红
-    case themeSage              = "themeSage"              // 鼠尾草绿
-    case themeOrange            = "themeOrange"            // 橙色
-    case themeTan               = "themeTan"               // 棕褐
-    case themeBlue              = "themeBlue"              // 蓝色
-    case themeBlueGray          = "themeBlueGray"          // 蓝灰
-    case themeTealGray          = "themeTealGray"          // 青灰
 
     // 通知正文（按操作类型）
     case notifPrimary           = "notifPrimary"           // 已切换主屏
@@ -119,6 +109,17 @@ enum TextKey: String {
     case mirrorActionHint       = "mirrorActionHint"       // 镜像按钮悬停提示：镜像到 @（纯图标按钮的功能说明）
     case extendActionHint       = "extendActionHint"       // 扩展按钮悬停提示：扩展显示：各屏独立排列
     case autoArrange            = "autoArrange"            // 自动排列按钮
+    case targetDisplay
+    case displayOptions
+    case mainDisplay
+    case currentMainDisplay
+    case extendDisplay
+    case layoutPresets
+    case choosePreset
+    case managePresets
+    case applyingDisplaySettings
+    case mirrorShort
+    case extendShort
 
     // 亮度与按键（v2：F1/F2 调鼠标所在屏亮度，设置页新 tab）
     case tabBrightness          = "tabBrightness"          // 设置边栏：亮度与按键
@@ -167,6 +168,17 @@ final class L10n: ObservableObject {
 
     /// 翻译表。
     private let table: [TextKey: [Language: String]] = [
+        .targetDisplay: [.zh: "显示器", .en: "Display"],
+        .displayOptions: [.zh: "显示器选项…", .en: "Display Options…"],
+        .mainDisplay: [.zh: "主显示器", .en: "Main"],
+        .currentMainDisplay: [.zh: "当前为主显示器", .en: "Current Main Display"],
+        .extendDisplay: [.zh: "扩展显示", .en: "Extended Display"],
+        .layoutPresets: [.zh: "布局预设", .en: "Presets"],
+        .choosePreset: [.zh: "选择预设…", .en: "Choose Preset…"],
+        .managePresets: [.zh: "管理预设…", .en: "Manage Presets…"],
+        .mirrorShort: [.zh: "镜像", .en: "Mirror"],
+        .extendShort: [.zh: "扩展", .en: "Extend"],
+        .applyingDisplaySettings: [.zh: "正在应用显示器设置", .en: "Applying display settings"],
         .noDisplays:       [.zh: "未检测到显示器",                .en: "No displays detected"],
         .externalSection:  [.zh: "扩展显示器",                    .en: "Extended displays"],
         .positionLabel:    [.zh: "位置",                        .en: "Position"],
@@ -203,16 +215,6 @@ final class L10n: ObservableObject {
         .notifyOnSwitch:   [.zh: "切换完成后发送通知",            .en: "Notify after switching"],
         .notifyFootnote:   [.zh: "切换成功后弹系统横幅",          .en: "Show a banner after each switch"],
 
-        .groupTheme:       [.zh: "主题色",                        .en: "Theme"],
-        .themeFollowSystem:[.zh: "跟随系统",                      .en: "Follow System"],
-        .themeFootnote:    [.zh: "所选色系会派生为面板的卡底、高亮与实心强调；深色模式自动适配。", .en: "Each theme is derived into the panel background, highlights and solid accents; dark mode adapts automatically."],
-        .themeRose:        [.zh: "玫瑰红",                        .en: "Rose"],
-        .themeSage:        [.zh: "鼠尾草绿",                      .en: "Sage"],
-        .themeOrange:      [.zh: "橙色",                          .en: "Orange"],
-        .themeTan:         [.zh: "棕褐",                          .en: "Tan"],
-        .themeBlue:        [.zh: "蓝色",                          .en: "Blue"],
-        .themeBlueGray:    [.zh: "蓝灰",                          .en: "Blue Gray"],
-        .themeTealGray:    [.zh: "青灰",                          .en: "Teal Gray"],
 
         .notifPrimary:     [.zh: "已切换主屏",                    .en: "Primary display switched"],
         .notifMirror:      [.zh: "已镜像主屏",                    .en: "Mirrored to main display"],

@@ -2,9 +2,9 @@ import AppKit
 import Testing
 @testable import MoniSwitch
 
-/// App 图标主题映射（2026-10-23）：主题 id / 系统强调色序号 → Resources/AppIconThemes
-/// 里的资源名。资源本身由 Support/render-theme-icons.sh 从 SVG 渲染；这里锁映射，
-/// 并检查资源文件真的齐全（防「改了主题列表忘了接图标」）。
+/// App 图标映射（2026-10-23；2026-11-14 面板主题移除后只剩强调色）：系统强调色序号 →
+/// Resources/AppIconThemes 里的资源名。资源由 Support/render-theme-icons.sh 从 SVG 渲染；
+/// 这里锁映射，并检查资源文件真的齐全。
 @Suite("App 图标主题映射")
 struct AppIconThemeTests {
 
@@ -17,16 +17,6 @@ struct AppIconThemeTests {
             .appendingPathComponent("Resources/AppIconThemes")
     }
 
-    @Test("7 个内置主题各自映射到 theme-<id>")
-    func themeMapping() {
-        #expect(PanelTheme.all.count == 7)
-        let names = Set(PanelTheme.all.map {
-            AppIconTheme.resourceName(themeID: $0.id, accentIndex: 4)
-        })
-        #expect(names == Set(PanelTheme.all.map { "theme-\($0.id)" }))
-        #expect(names.count == 7)
-    }
-
     @Test("跟随系统按 AppleAccentColor 序号映射到 8 档强调色")
     func accentMapping() {
         let cases: [(Int?, String)] = [
@@ -36,15 +26,8 @@ struct AppIconThemeTests {
         ]
         for (index, slug) in cases {
             #expect(AppIconTheme.accentSlug(index) == slug, "accentIndex=\(String(describing: index))")
-            #expect(AppIconTheme.resourceName(themeID: PanelTheme.systemID, accentIndex: index)
-                    == "system-\(slug)")
+            #expect(AppIconTheme.resourceName(accentIndex: index) == "system-\(slug)")
         }
-    }
-
-    @Test("未知主题 id 回落跟随系统")
-    func unknownThemeFallsBack() {
-        #expect(AppIconTheme.resourceName(themeID: "no-such-theme", accentIndex: 4) == "system-blue")
-        #expect(AppIconTheme.resourceName(themeID: "", accentIndex: nil) == "system-blue")
     }
 
     @Test("8 档强调色 slug 与渲染脚本的产出同序")
@@ -62,10 +45,10 @@ struct AppIconThemeTests {
         }
     }
 
-    @Test("控制器把主题图设成 applicationIconImage（关于页/Dock 取的就是它）")
+    @Test("控制器把强调色图标设成 applicationIconImage（关于页/Dock 取的就是它）")
     @MainActor
     func controllerAppliesIcon() throws {
-        let ok = AppIconController.shared.apply(themeID: "rose", accentIndex: 4)
+        let ok = AppIconController.shared.apply(accentIndex: 0)
         #expect(ok)
         let image = try #require(AppIconController.shared.currentImage)
         #expect(image.size == NSSize(width: 512, height: 512))
@@ -73,14 +56,13 @@ struct AppIconThemeTests {
         #expect(NSApplication.shared.applicationIconImage?.size == NSSize(width: 512, height: 512))
     }
 
-    @Test("资源文件齐全：7 主题 + 8 强调色都是 512×512 PNG")
+    @Test("资源文件齐全：8 档强调色都是 512×512 PNG")
     func resourceFilesExist() throws {
         let dir = resourcesDir
         try #require(FileManager.default.fileExists(atPath: dir.path),
                      "缺少 Resources/AppIconThemes，请先跑 Support/render-theme-icons.sh")
-        var names = PanelTheme.all.map { "theme-\($0.id)" }
-        names += AppIconTheme.accentSlugs.map { "system-\($0)" }
-        #expect(names.count == 15)
+        let names = AppIconTheme.accentSlugs.map { "system-\($0)" }
+        #expect(names.count == 8)
         for name in names {
             let url = dir.appendingPathComponent("\(name).png")
             #expect(FileManager.default.fileExists(atPath: url.path), "缺少 \(name).png")

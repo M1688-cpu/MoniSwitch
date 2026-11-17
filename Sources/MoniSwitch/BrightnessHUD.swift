@@ -2,10 +2,10 @@ import Foundation
 import AppKit
 import SwiftUI
 
-/// F1/F2 调外接屏亮度时的迷你 HUD 气泡：浮在菜单栏图标下方，与面板同设计语言
-/// （不透明填充圆角气泡 + 悬浮阴影），显示太阳图标 + 进度条 + 百分比，1.2s 无新
-/// 事件后淡出；重复按键自动续期。纯展示：`ignoresMouseEvents` 挡全部命中。
-/// 窗口四周留 `shadowPadding` 透明区承接投影（否则阴影被窗口边界裁出方框）。
+/// F1/F2 调外接屏亮度时的迷你 HUD 气泡：浮在菜单栏图标下方，与面板瓷砖同为
+/// Liquid Glass 胶囊（macOS 26+；14/15 回退系统材质），显示太阳图标 + 进度条 +
+/// 百分比，1.2s 无新事件后淡出；重复按键自动续期。纯展示：`ignoresMouseEvents`
+/// 挡全部命中。窗口四周留 `shadowPadding` 透明区，玻璃自带的边缘阴影不被裁成方框。
 @MainActor
 final class BrightnessHUD {
     static let shared = BrightnessHUD()
@@ -113,21 +113,13 @@ private final class HUDModel: ObservableObject {
     @Published var percent: Double = 0.5
 }
 
-/// 气泡内容：太阳图标 + 圆角进度条 + 百分比。
-/// HUD 宿主是独立 NSPanel（不继承面板的环境）：这里自行解析主题色板并注入
-/// （BubbleBackground/进度条取色来源与面板一致）；观察 AppSettings 使主题切换
-/// 在 HUD 常驻窗口上也实时生效。
+/// 气泡内容：太阳图标 + 圆角进度条 + 百分比，整体是一枚玻璃胶囊。
 private struct BrightnessHUDView: View {
     @ObservedObject var model: HUDModel
-    @ObservedObject private var settings = AppSettings.shared
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var palette: PanelPalette {
-        PanelTheme.palette(id: settings.panelThemeID, dark: colorScheme == .dark)
-    }
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        HStack(spacing: 10) {
+        let content = HStack(spacing: 10) {
             Image(systemName: "sun.max")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -136,7 +128,7 @@ private struct BrightnessHUDView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.primary.opacity(0.12))
                     Capsule()
-                        .fill(palette.solid)
+                        .fill(BrandColor.accent)
                         .frame(width: max(proxy.size.width * model.percent, 4))
                 }
             }
@@ -148,10 +140,13 @@ private struct BrightnessHUDView: View {
         }
         .padding(.horizontal, 14)
         .frame(width: 168, height: 44)
-        // 与面板气泡同设计语言：不透明填充（浅色=派生近白淡染 / 深色=派生深底）
-        // + 悬浮阴影（壁纸承接）。HUD 是独立小窗、不参与面板的右上光源布光。
-        .environment(\.panelPalette, palette)
-        .modifier(BubbleBackground())
-        .bubbleFloatingShadow(lightDirection: false)
+
+        if reduceTransparency {
+            content.background(Color(nsColor: .windowBackgroundColor), in: Capsule())
+        } else if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: Capsule())
+        } else {
+            content.background(.regularMaterial, in: Capsule())
+        }
     }
 }

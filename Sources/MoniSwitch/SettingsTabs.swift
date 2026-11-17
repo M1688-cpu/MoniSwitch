@@ -5,67 +5,6 @@ import AppKit
 // 窗口骨架（边栏 + 悬浮标题 + 毛玻璃）在 SettingsView.swift；
 // 共享卡片/图标组件在 Components.swift。
 
-// MARK: - 主题色卡圆点（设置页专用）
-
-/// 主题选择圆点（2026-10-17 用户二次拍板「色卡只留一档」）：不再画三区圆，
-/// 每个主题只保留最浅一档颜色（原三区圆的右上象限 = 高亮档）做单色圆点；
-/// 「跟随系统」直接画系统强调色（不再拼中性色下半圆）。
-/// 取当前外观下的生效色板（浅色为 L* 派生、深色为原派生），所见即面板所得。
-/// 选中态 = 外圈强调色描边；名称走 .help tooltip 与无障碍标签（与 Chrome 色卡
-/// 同为无文字圆点，7 个名称不占卡面空间）。
-private struct ThemeSwatchButton: View {
-    enum Swatch {
-        case theme(PanelTheme)
-        case followSystem
-    }
-
-    let label: String
-    let isSelected: Bool
-    let swatch: Swatch
-    let action: () -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-    /// 设置窗口的主题色板（2026-10-17）：选中环用实心档；「跟随系统」= 系统强调色。
-    @Environment(\.panelPalette) private var palette
-    @State private var isHovered = false
-
-    private let diameter: CGFloat = 26
-
-    var body: some View {
-        Button(action: action) {
-            swatchCircle
-                .frame(width: diameter, height: diameter)
-                .clipShape(Circle())
-                .overlay(
-                    // 选中环在外、留 3pt 呼吸；未选中给一圈极淡边界（浅色下淡彩
-                    // 圆点在灰卡上几乎无边缘）。纯装饰环摘除命中区（全站范式）。
-                    Circle().stroke(isSelected ? palette.solid : Color.primary.opacity(isHovered ? 0.28 : 0.12),
-                                    lineWidth: isSelected ? 2 : 1)
-                        .padding(-3)
-                        .allowsHitTesting(false)
-                )
-                .scaleEffect(isHovered ? 1.08 : 1)
-                .animation(BubbleMetrics.buttonHoverSpring, value: isHovered)
-                .help(label)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .onHover { isHovered = $0 }
-    }
-
-    @ViewBuilder
-    private var swatchCircle: some View {
-        switch swatch {
-        case .theme(let theme):
-            // 单色圆点 = 该主题在当前外观下最浅的一档（原三区圆的右上象限）。
-            Circle().fill(theme.palette(dark: colorScheme == .dark).highlight)
-        case .followSystem:
-            // 默认项直接用系统强调色（用户截图中第一个圆点的蓝色）。
-            Circle().fill(BrandColor.accent)
-        }
-    }
-}
-
 // MARK: - 通用标签
 
 struct GeneralTab: View {
@@ -95,35 +34,6 @@ struct GeneralTab: View {
                                 .toggleStyle(.switch)
                         }
                     }
-                }
-
-                // —— 主题色（2026-10-17 内置主题：三区圆点选择 + 跟随系统默认项）——
-                SettingsCard(title: l10n.t(.groupTheme)) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 34), spacing: 8)], spacing: 8) {
-                            ThemeSwatchButton(
-                                label: l10n.t(.themeFollowSystem),
-                                isSelected: settings.panelThemeID == PanelTheme.systemID,
-                                swatch: .followSystem
-                            ) {
-                                settings.panelThemeID = PanelTheme.systemID
-                            }
-                            ForEach(PanelTheme.all) { theme in
-                                ThemeSwatchButton(
-                                    label: l10n.t(theme.nameKey),
-                                    isSelected: settings.panelThemeID == theme.id,
-                                    swatch: .theme(theme)
-                                ) {
-                                    settings.panelThemeID = theme.id
-                                }
-                            }
-                        }
-                        Text(l10n.t(.themeFootnote))
-                            .font(.system(size: BubbleMetrics.fontCaption))
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(.vertical, 4)
                 }
 
                 // —— 显示器（三行合并卡，行间 Divider，行下小字说明副文本）——
@@ -323,11 +233,10 @@ struct AboutTab: View {
     /// 内容滚动偏移上报（关于页内容不满屏不可滚，探针仅用于切 tab 时把毛玻璃复位）。
     @Binding var scrollOffset: CGFloat
 
-    /// 关于页图标：优先用当前主题的图标（AppIconController 随设置换好），
+    /// 关于页图标：优先用 AppIconController 按系统强调色换好的图标，
     /// 取不到再回退 bundle 里的静态 icns（dev 模式下没有打包资源）。
     private var currentIcon: NSImage? {
-        _ = settings.panelThemeID   // 建立依赖：换主题后关于页图标同步刷新
-        return AppIconController.shared.currentImage ?? loadAppIcon()
+        AppIconController.shared.currentImage ?? loadAppIcon()
     }
 
     private var version: String {

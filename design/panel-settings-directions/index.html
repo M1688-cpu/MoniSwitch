@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoniSwitch 两套参考</title>
+<style>
+/* 两套参考：每套一张桌面舞台（菜单栏面板 + 亮度气泡 + 设置窗口），设置窗口左栏可点切换标签页。
+   面板部分 A 与当前构建一致，B 是可选的进一步收敛；设置窗口只整理选项布局，框架不变。 */
+:root{
+  --page:#f4f4f5; --fg:#171717; --fg2:#525252; --fg3:#737373; --hair:rgba(23,23,23,.09);
+  --accent:#0a7aff; --accent-ink:#0062d6; --ok:#16a34a; --warn:#c2410c;
+  --win:#ffffff; --card:#f4f4f5; --raised:#e9e9eb; --side:rgba(236,236,238,.92); --field:#ffffff;
+  --glass:rgba(255,255,255,.34); --glass-edge:rgba(255,255,255,.55); --glass-ink:#141416; --glass-ink2:rgba(20,20,22,.62);
+  --glass-well:rgba(20,20,22,.10); --track:rgba(20,20,22,.16);
+  --wall:url("../../screenshots/backgrounds/wallhaven-4k_26311.jpg") center 40%/cover, linear-gradient(170deg,#b9c3cf,#d9c7b4 70%,#e6d2bb);
+  --bar:rgba(255,255,255,.45); --bar-ink:#1b1b1d;
+  --ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --page:#141415; --fg:#ededed; --fg2:#a1a1a6; --fg3:#85858b; --hair:rgba(237,237,237,.09);
+  --accent:#0a84ff; --accent-ink:#4aa3ff; --ok:#4cc38a; --warn:#f0883e;
+  --win:#1e1e20; --card:#2a2a2d; --raised:#343437; --side:rgba(38,38,41,.92); --field:#2a2a2d;
+  --glass:rgba(30,30,34,.40); --glass-edge:rgba(255,255,255,.14); --glass-ink:#f3f3f4; --glass-ink2:rgba(243,243,244,.62);
+  --glass-well:rgba(255,255,255,.10); --track:rgba(255,255,255,.18);
+  --wall:url("../../screenshots/backgrounds/hero.jpg") center 52%/cover, linear-gradient(170deg,#1b2233,#3a2f2a 70%,#4a3a2c);
+  --bar:rgba(20,20,24,.45); --bar-ink:#f3f3f4;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#141415; --fg:#ededed; --fg2:#a1a1a6; --fg3:#85858b; --hair:rgba(237,237,237,.09);
+  --accent:#0a84ff; --accent-ink:#4aa3ff; --ok:#4cc38a; --warn:#f0883e;
+  --win:#1e1e20; --card:#2a2a2d; --raised:#343437; --side:rgba(38,38,41,.92); --field:#2a2a2d;
+  --glass:rgba(30,30,34,.40); --glass-edge:rgba(255,255,255,.14); --glass-ink:#f3f3f4; --glass-ink2:rgba(243,243,244,.62);
+  --glass-well:rgba(255,255,255,.10); --track:rgba(255,255,255,.18);
+  --wall:url("../../screenshots/backgrounds/hero.jpg") center 52%/cover, linear-gradient(170deg,#1b2233,#3a2f2a 70%,#4a3a2c);
+  --bar:rgba(20,20,24,.45); --bar-ink:#f3f3f4;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--fg);font:13px/1.45 var(--ui);-webkit-font-smoothing:antialiased;padding:32px 16px 48px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:48px}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+h1{font-size:22px;font-weight:600;margin:0}
+.lede{color:var(--fg2);margin:4px 0 0;max-width:46rem}
+.theme-btn{border:1px solid var(--hair);background:var(--win);border-radius:8px;padding:6px 12px;color:var(--fg2)}
+
+.dir{display:flex;flex-direction:column;gap:16px}
+.dir-head h2{font-size:17px;font-weight:600;margin:0}
+.dir-head p{margin:4px 0 0;color:var(--fg2);max-width:52rem}
+.notes{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px 24px;color:var(--fg2)}
+.notes li{padding-left:14px;position:relative}
+.notes li::before{content:"";position:absolute;left:0;top:8px;width:6px;height:1px;background:var(--fg3)}
+
+/* —— 桌面舞台 —— */
+.stage{border-radius:16px;overflow:hidden;background:var(--wall);color:var(--glass-ink)}
+.menubar{height:28px;display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:0 16px;background:var(--bar);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--bar-ink);font-size:12px}
+.menubar .ms{width:16px;height:12px;border:1.5px solid currentColor;border-radius:3px;position:relative}
+.menubar .ms::after{content:"";position:absolute;left:4px;right:4px;bottom:-4px;height:1.5px;background:currentColor}
+.menubar .ms.on{box-shadow:0 0 0 4px rgba(127,127,127,.28);border-radius:3px}
+.stage-body{display:flex;flex-wrap:wrap;gap:24px 32px;padding:8px 24px 32px;align-items:flex-start}
+.left-col{display:flex;flex-direction:column;gap:24px;width:380px;max-width:100%}
+.cap{font-size:11px;color:var(--glass-ink2);margin:0 0 8px 4px}
+
+/* —— 玻璃瓷砖 —— */
+.g{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 rgba(255,255,255,.22);border-radius:22px}
+.panel{display:flex;flex-direction:column;gap:10px}
+.tile{padding:14px}
+.lab{font-size:11px;font-weight:600;color:var(--glass-ink2);margin-bottom:10px}
+.bright-row{display:flex;align-items:center;gap:10px}
+.bright-row .pct{width:36px;text-align:right;font-variant-numeric:tabular-nums;color:var(--glass-ink2);font-size:12px}
+.bright-row svg.i{width:18px;height:18px;color:var(--glass-ink2);stroke-width:1.3}
+.scr-name{font-size:12px;margin:0 0 4px}
+.bright-row+.scr-name{margin-top:10px}
+
+/* 原生滑杆（macOS 26 观感）：细轨 + 白色胶囊拇指；按住时拇指放大、半透明 = 液态玻璃 */
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:24px;margin:0;background:transparent;--p:42%}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--accent) var(--p),var(--track) var(--p))}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--track)}
+input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--accent)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:16px;margin-top:-5px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.28),0 0 0 .5px rgba(0,0,0,.08);transition:transform .15s ease-out,background-color .15s ease-out}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.5,1.6);background:rgba(255,255,255,.42);box-shadow:inset 0 0 0 1px rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:26px;height:16px;border:0;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+
+/* 显示器瓷砖（A） */
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dtile{appearance:none;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;padding:13px;display:flex;flex-direction:column;gap:3px;position:relative}
+.dtile .ico{height:34px;display:flex;align-items:flex-end;margin-bottom:6px}
+.dtile .ico svg.i{width:32px;height:32px;stroke-width:1.1}
+.dtile b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtile small{font-size:11px;color:var(--glass-ink2);font-variant-numeric:tabular-nums}
+.dtile .star{position:absolute;top:13px;right:13px;width:12px;height:12px;fill:var(--accent);stroke:none}
+.dtile[aria-pressed="true"]{box-shadow:inset 0 0 0 1.5px var(--accent)}
+.dtile[aria-pressed="true"] .ico{color:var(--accent)}
+
+/* 参数行 */
+.prow{display:flex;align-items:center;gap:10px;min-height:28px}
+.prow+.prow{margin-top:8px}
+.prow>span{width:64px;color:var(--glass-ink2)}
+.pop{flex:1;display:flex;align-items:center;justify-content:space-between;height:24px;padding:0 6px 0 10px;border-radius:7px;background:var(--glass-well);font-size:12px;font-variant-numeric:tabular-nums}
+.pop svg.i{width:12px;height:12px;color:var(--glass-ink2)}
+
+/* 动作圆键 */
+.acts{display:grid;grid-template-columns:repeat(3,1fr);padding:12px 10px}
+.act{all:unset;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;color:var(--glass-ink2)}
+.act i{width:40px;height:40px;border-radius:20px;background:var(--glass-well);display:grid;place-items:center;color:var(--glass-ink)}
+.act.on i{background:var(--accent);color:#fff}
+.act[aria-disabled="true"]{opacity:.45;cursor:default}
+
+/* 底栏：四个独立玻璃图标键 */
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.key{appearance:none;margin:0;padding:0;font:inherit;cursor:pointer;height:40px;border-radius:20px;display:grid;place-items:center;color:var(--glass-ink2);transition:color .15s ease-out,transform .1s ease-out}
+.key:hover{color:var(--glass-ink)}
+.key:active{transform:scale(.96)}
+.key svg.i{width:17px;height:17px}
+
+/* 亮度气泡：玻璃胶囊 */
+.hud{display:inline-flex;align-items:center;gap:10px;height:44px;width:168px;padding:0 14px;border-radius:22px}
+.hud svg.i{color:var(--glass-ink2)}
+.hud .bar{flex:1;height:6px;border-radius:3px;background:var(--track);position:relative;overflow:hidden}
+.hud .bar::after{content:"";position:absolute;inset:0 52% 0 0;background:var(--accent);border-radius:3px}
+.hud b{font-size:12px;font-weight:600;color:var(--glass-ink2);font-variant-numeric:tabular-nums;width:32px;text-align:right}
+
+/* B 面板变体：显示器列表 + 合并参数 */
+.list-row{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;height:36px;padding:0 8px;border-radius:10px;width:100%}
+.list-row:hover{background:var(--glass-well)}
+.list-row svg.i{color:var(--glass-ink2)}
+.list-row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-row .meta{font-size:11px;color:var(--glass-ink2);font-variant-numeric:tabular-nums}
+.list-row .ck{width:14px;color:var(--accent)}
+.list-row .ck svg.i{width:14px;height:14px;stroke-width:2}
+.list-row .mainmark{font-size:10px;color:var(--glass-ink2);border:1px solid var(--glass-edge);border-radius:4px;padding:0 4px;line-height:15px}
+.seg{display:grid;grid-template-columns:1fr 1fr;height:28px;border-radius:8px;background:var(--glass-well);padding:2px;gap:2px;flex:1}
+.seg button{all:unset;cursor:pointer;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--glass-ink2)}
+.seg button[aria-pressed="true"]{background:rgba(255,255,255,.85);color:#111;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg svg.i{width:13px;height:13px}
+.plain-btn{all:unset;cursor:pointer;height:28px;padding:0 12px;border-radius:8px;background:var(--glass-well);font-size:12px;display:flex;align-items:center}
+.preset{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;height:32px;padding:0 8px;border-radius:10px}
+.preset:hover{background:var(--glass-well)}
+.preset span{flex:1}
+kbd{font:500 11px/1 var(--mono);padding:3px 5px;border-radius:5px;border:1px solid var(--hair);background:var(--card);color:var(--fg2);box-shadow:0 1px 0 var(--hair)}
+.g kbd{background:var(--glass-well);border-color:var(--glass-edge);color:var(--glass-ink2);box-shadow:none}
+.link{all:unset;cursor:pointer;color:var(--accent-ink);font-size:12px;padding:4px 8px}
+.keys.round{display:flex;gap:10px}
+.keys.round .key{width:40px;flex:none}
+.keys.round .sp{flex:1}
+
+/* —— 设置窗口（两套共用骨架：左边栏 + 右内容区）—— */
+.win{flex:1 1 560px;max-width:700px;min-width:0;height:540px;display:flex;border-radius:14px;overflow:hidden;background:var(--win);color:var(--fg);box-shadow:0 0 0 .5px rgba(0,0,0,.25),0 18px 48px rgba(0,0,0,.28)}
+.side{width:200px;flex:none;background:var(--side);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-right:1px solid var(--hair);padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+.lights{display:flex;gap:8px;padding:2px 4px 18px}
+.lights i{width:12px;height:12px;border-radius:6px;background:#ff5f57}
+.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.nav{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;border-radius:7px;color:var(--fg)}
+.nav svg.i{color:var(--fg2)}
+.nav:hover{background:var(--hair)}
+.nav[aria-selected="true"]{background:var(--raised);font-weight:500}
+.nav[aria-selected="true"] svg.i{color:var(--accent)}
+.content{flex:1;min-width:0;overflow:auto;padding:20px 24px 24px}
+.pane{display:none}.pane.on{display:block}
+.pane-title{font-size:20px;font-weight:600;margin:4px 0 20px;display:flex;align-items:center;gap:8px}
+.pane-title svg.i{width:20px;height:20px;color:var(--fg2)}
+
+/* A：系统设置式分组（卡内 36pt 行 + 发丝线，说明只放组尾一处） */
+.grp+.grp{margin-top:20px}
+.grp h3{font-size:13px;font-weight:600;margin:0 0 6px 8px}
+.box{background:var(--card);border-radius:10px;padding:0 12px}
+.r{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;padding:6px 0}
+.r+.r{border-top:1px solid var(--hair)}
+.r.sub{padding-left:16px}
+.r .t{display:flex;align-items:center;gap:8px;min-width:0}
+.foot{font-size:11px;color:var(--fg3);margin:6px 8px 0;max-width:34rem}
+.sw{all:unset;cursor:pointer;width:32px;height:18px;border-radius:9px;background:var(--raised);position:relative;flex:none;transition:background-color .15s ease-out}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:7px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s ease-out}
+.sw[aria-checked="true"]{background:var(--accent)}
+.sw[aria-checked="true"]::after{transform:translateX(14px)}
+.menu{display:inline-flex;align-items:center;gap:8px;height:24px;padding:0 6px 0 10px;border-radius:6px;background:var(--raised);font-size:13px;flex:none}
+.menu svg.i{width:11px;height:11px;color:var(--fg2)}
+.btn{all:unset;cursor:pointer;height:24px;padding:0 12px;border-radius:6px;background:var(--raised);font-size:13px;display:inline-flex;align-items:center;flex:none}
+.btn.pri{background:var(--accent);color:#fff}
+.btn.icon{padding:0 6px}
+.dot{width:8px;height:8px;border-radius:4px;background:var(--warn);flex:none}
+.dot.ok{background:var(--ok)}
+.field{height:26px;border-radius:6px;border:1px solid var(--hair);background:var(--field);padding:0 8px;flex:1;min-width:0;color:var(--fg)}
+.field::placeholder{color:var(--fg3)}
+.muted{color:var(--fg3)}
+.keyline{display:inline-flex;align-items:center;gap:4px}
+
+/* B：经典偏好设置式（右对齐标签列 + 复选框，无卡片，发丝线分组） */
+.form{display:grid;grid-template-columns:128px 1fr;column-gap:12px;row-gap:10px;align-items:start}
+.form>.l{text-align:right;color:var(--fg);padding-top:3px}
+.form>.c{display:flex;flex-direction:column;gap:8px;min-width:0}
+.form>hr{grid-column:1/-1;border:0;border-top:1px solid var(--hair);margin:8px 0}
+.chk{display:flex;align-items:center;gap:8px;cursor:pointer}
+.chk input{width:14px;height:14px;margin:0;accent-color:var(--accent)}
+.inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hint{font-size:11px;color:var(--fg3);margin:-4px 0 0 22px;max-width:30rem}
+.hint.flat{margin-left:0}
+.table{border:1px solid var(--hair);border-radius:6px;overflow:hidden;background:var(--field)}
+.th,.tr{display:grid;grid-template-columns:1fr 92px 64px;align-items:center;gap:8px;padding:0 10px;min-height:28px}
+.th{font-size:11px;color:var(--fg3);border-bottom:1px solid var(--hair);background:var(--card)}
+.tr:nth-child(odd){background:color-mix(in srgb,var(--card) 45%,transparent)}
+.tr.sel{background:var(--accent);color:#fff}
+.tr.sel kbd{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.35);color:#fff;box-shadow:none}
+.tr.sel .muted{color:rgba(255,255,255,.75)}
+.tbar{display:flex;gap:0;border:1px solid var(--hair);border-top:0;border-radius:0 0 6px 6px;width:max-content;margin-top:-1px;background:var(--card)}
+.tbar button{all:unset;cursor:pointer;width:24px;height:20px;display:grid;place-items:center;color:var(--fg2)}
+.tbar button+button{border-left:1px solid var(--hair)}
+.tbar svg.i{width:12px;height:12px}
+
+.about{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding-top:24px}
+.about .appicon{width:80px;height:80px;border-radius:18px;background:linear-gradient(#f4f4f6,#dcdde2);display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.about .appicon i{width:46px;height:30px;border-radius:5px;border:3px solid #26272b;background:linear-gradient(135deg,#7ab3ff,#2f6fe0)}
+.about h4{margin:8px 0 0;font-size:18px;font-weight:600}
+.about p{margin:0;color:var(--fg2)}
+
+@media (max-width:640px){
+  .stage-body{padding:8px 12px 24px}
+  .win{height:auto;min-height:520px;flex-direction:column}
+  .side{width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--hair)}
+  .lights{width:100%;padding-bottom:8px}
+  .nav{flex:1 1 40%}
+  .content{padding:16px}
+  .form{grid-template-columns:1fr}
+  .form>.l{text-align:left;font-weight:600;padding-top:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-display" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M9 20.5h6M12 16.5v4"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="10.5" rx="1.5"/><path d="M2 18.5h20"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-arrange" viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="7" rx="1.5"/><rect x="13" y="4" width="8" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+  <symbol id="i-starline" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></symbol>
+  <symbol id="i-mirror" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="10" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></symbol>
+  <symbol id="i-extend" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 16v-4.5M12 8h.01"/></symbol>
+  <symbol id="i-stack" viewBox="0 0 24 24"><rect x="3" y="8" width="13" height="12" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-3"/></symbol>
+  <symbol id="i-updown" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+</svg>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>MoniSwitch 两套参考</h1>
+      <p class="lede">A 的面板就是这次已经改进代码里的样子；B 是面板可以进一步收敛的方向。两套设置窗口都保留「左边栏 + 右内容区」，只重排每页的选项。左栏可以点，切换四个标签页。</p>
+    </div>
+    <button class="theme-btn" id="theme" type="button">切换深浅色</button>
+  </div>
+
+  <!-- ===================== A ===================== -->
+  <section class="dir" aria-labelledby="a-h">
+    <div class="dir-head">
+      <h2 id="a-h">A · 系统设置式分组</h2>
+      <p>选项排成 macOS 系统设置那样的分组列表：每行一个开关或菜单，行内不再挂说明小字，必要的解释只在组尾放一句。预设页把「录制 / 清除 / 删除」收进行尾的「⋯」，每行只留一个「应用」。</p>
+    </div>
+    <div class="stage">
+      <div class="menubar"><span>14:32</span><span class="ms on" aria-label="MoniSwitch"></span></div>
+      <div class="stage-body">
+        <div class="left-col">
+          <div class="panel" aria-label="菜单栏面板 A">
+            <div class="g tile">
+              <div class="lab">亮度</div>
+              <div class="bright-row">
+                <svg class="i"><use href="#i-display"/></svg>
+                <input type="range" min="0" max="100" value="42" aria-label="27 英寸扩展显示器亮度">
+                <span class="pct">42%</span>
+              </div>
+            </div>
+            <div class="dgrid">
+              <button class="g dtile" aria-pressed="false">
+                <span class="ico"><svg class="i"><use href="#i-display"/></svg></span>
+                <svg class="star" aria-label="主屏"><use href="#i-star"/></svg>
+                <b>27 英寸扩展显示器</b><small>2560 × 1440 · 60 Hz</small>
+              </button>
+              <button class="g dtile" aria-pressed="true">
+                <span class="ico"><svg class="i"><use href="#i-laptop"/></svg></span>
+                <b>MacBook 内置屏</b><small>1512 × 982 · 120 Hz</small>
+              </button>
+            </div>
+            <div class="g tile">
+              <div class="prow"><span>分辨率</span><div class="pop">1512 × 982 · HiDPI<svg class="i"><use href="#i-updown"/></svg></div></div>
+              <div class="prow"><span>刷新率</span><div class="pop">120 Hz<svg class="i"><use href="#i-updown"/></svg></div></div>
+              <div class="prow"><span>位置</span><div class="pop">左侧<svg class="i"><use href="#i-updown"/></svg></div></div>
+            </div>
+            <div class="g acts">
+              <button class="act"><i><svg class="i"><use href="#i-starline"/></svg></i>设为主屏</button>
+              <button class="act"><i><svg class="i"><use href="#i-mirror"/></svg></i>镜像</button>
+              <button class="act on"><i><svg class="i"><use href="#i-extend"/></svg></i>扩展</button>
+            </div>
+            <div class="keys">
+              <button class="g key" title="设置" aria-label="设置"><svg class="i"><use href="#i-gear"/></svg></button>
+              <button class="g key" title="自动排列" aria-label="自动排列"><svg class="i"><use href="#i-arrange"/></svg></button>
+              <button class="g key" title="刷新列表" aria-label="刷新列表"><svg class="i"><use href="#i-refresh"/></svg></button>
+              <button class="g key" title="退出 MoniSwitch" aria-label="退出 MoniSwitch"><svg class="i"><use href="#i-power"/></svg></button>
+            </div>
+          </div>
+          <div>
+            <p class="cap">按 F1 / F2 时的亮度气泡</p>
+            <div class="g hud"><svg class="i"><use href="#i-sun"/></svg><span class="bar"></span><b>48%</b></div>
+          </div>
+        </div>
+
+        <div class="win" data-win>
+          <nav class="side" aria-label="设置分区">
+            <div class="lights"><i></i><i></i><i></i></div>
+            <button class="nav" aria-selected="true" data-tab="general"><svg class="i"><use href="#i-gear"/></svg>通用</button>
+            <button class="nav" aria-selected="false" data-tab="bright"><svg class="i"><use href="#i-sun"/></svg>亮度与按键</button>
+            <button class="nav" aria-selected="false" data-tab="presets"><svg class="i"><use href="#i-stack"/></svg>预设</button>
+            <button class="nav" aria-selected="false" data-tab="about"><svg class="i"><use href="#i-info"/></svg>关于</button>
+          </nav>
+          <div class="content">
+            <div class="pane on" data-pane="general">
+              <div class="pane-title">通用</div>
+              <div class="grp">
+                <div class="box">
+                  <div class="r"><span>界面语言</span><span class="menu">简体中文<svg class="i"><use href="#i-updown"/></svg></span></div>
+                  <div class="r"><span>登录时启动 MoniSwitch</span><button class="sw" role="switch" aria-checked="true" aria-label="登录时启动"></button></div>
+                </div>
+              </div>
+              <div class="grp">
+                <h3>显示器</h3>
+                <div class="box">
+                  <div class="r"><span>自动刷新显示器列表</span><button class="sw" role="switch" aria-checked="true" aria-label="自动刷新"></button></div>
+                  <div class="r sub"><span class="muted">刷新间隔</span><span class="menu">10 秒<svg class="i"><use href="#i-updown"/></svg></span></div>
+                  <div class="r"><span>面板里显示刷新率</span><button class="sw" role="switch" aria-checked="false" aria-label="显示刷新率"></button></div>
+                </div>
+                <p class="foot">插拔显示器或唤醒后，列表会按间隔自动同步。</p>
+              </div>
+              <div class="grp">
+                <h3>通知</h3>
+                <div class="box">
+                  <div class="r"><span>切换完成后发送通知</span><button class="sw" role="switch" aria-checked="false" aria-label="切换通知"></button></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pane" data-pane="bright">
+              <div class="pane-title">亮度与按键</div>
+              <div class="grp">
+                <div class="box">
+                  <div class="r"><span class="t">用 <kbd>F1</kbd> <kbd>F2</kbd> 调节鼠标所在屏</span><button class="sw" role="switch" aria-checked="true" aria-label="亮度键"></button></div>
+                  <div class="r"><span class="t"><span class="dot"></span>辅助功能权限未授权</span><button class="btn pri">授权</button></div>
+                </div>
+                <p class="foot">按住 <kbd>⌥</kbd> 再按可同步全部外接屏。内置屏仍由系统调节。</p>
+              </div>
+              <div class="grp">
+                <h3>兼容性</h3>
+                <div class="box">
+                  <div class="r"><span>可调亮度的外接屏</span><span class="muted">1 台</span></div>
+                </div>
+                <p class="foot">经坞站、转换器连接的屏幕和部分电视不支持 DDC，不会出现在亮度列表里。</p>
+              </div>
+            </div>
+
+            <div class="pane" data-pane="presets">
+              <div class="pane-title">预设</div>
+              <div class="grp">
+                <h3>保存当前布局</h3>
+                <div class="box">
+                  <div class="r"><input class="field" placeholder="预设名称" aria-label="预设名称"><button class="btn">保存</button></div>
+                </div>
+              </div>
+              <div class="grp">
+                <h3>已保存</h3>
+                <div class="box">
+                  <div class="r"><span>办公 · 双屏扩展</span><span class="keyline"><kbd>⌃⌥1</kbd><button class="btn">应用</button><button class="btn icon" aria-label="更多"><svg class="i"><use href="#i-more"/></svg></button></span></div>
+                  <div class="r"><span>演示 · 镜像</span><span class="keyline"><span class="muted">无快捷键</span><button class="btn">应用</button><button class="btn icon" aria-label="更多"><svg class="i"><use href="#i-more"/></svg></button></span></div>
+                </div>
+                <p class="foot">「⋯」里可以录制或清除快捷键、删除预设。</p>
+              </div>
+            </div>
+
+            <div class="pane" data-pane="about">
+              <div class="about"><span class="appicon"><i></i></span><h4>MoniSwitch</h4><p>菜单栏里的显示器快捷切换小工具</p><p class="muted">版本 2.1.0</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li>面板：拟物显示器换成线条图标，滑杆用系统原生的，底栏四个独立图标键</li>
+      <li>没有预设时面板里没有预设块（此图就是这个状态）</li>
+      <li>设置：卡片标题只留「显示器 / 通知」这类分组名，第一组不加标题</li>
+      <li>每行去掉了说明小字，整页只剩三句组尾说明</li>
+      <li>边栏去掉预设旁的橙色 Beta 角标</li>
+      <li>权限状态从一张独立卡并进亮度键那组，用小圆点表示</li>
+    </ul>
+  </section>
+
+  <!-- ===================== B ===================== -->
+  <section class="dir" aria-labelledby="b-h">
+    <div class="dir-head">
+      <h2 id="b-h">B · 经典偏好设置式</h2>
+      <p>不再用灰色卡片，改成 Mac 老派偏好设置的写法：左边一列右对齐的标签，右边是复选框和菜单，组与组之间一条细线。预设页是带 +/− 的小表格。面板这边把显示器瓷砖收成一张列表，镜像和扩展变成分段控件。</p>
+    </div>
+    <div class="stage">
+      <div class="menubar"><span>14:32</span><span class="ms on" aria-label="MoniSwitch"></span></div>
+      <div class="stage-body">
+        <div class="left-col">
+          <div class="panel" aria-label="菜单栏面板 B">
+            <div class="g tile">
+              <div class="lab">亮度</div>
+              <p class="scr-name">27 英寸扩展显示器</p>
+              <div class="bright-row">
+                <svg class="i"><use href="#i-sun"/></svg>
+                <input type="range" min="0" max="100" value="42" aria-label="27 英寸扩展显示器亮度">
+                <span class="pct">42%</span>
+              </div>
+            </div>
+            <div class="g tile" style="padding:8px">
+              <button class="list-row"><svg class="i"><use href="#i-display"/></svg><span class="nm">27 英寸扩展显示器</span><span class="mainmark">主屏</span><span class="meta">2560 × 1440</span><span class="ck"></span></button>
+              <button class="list-row" style="background:var(--glass-well)"><svg class="i"><use href="#i-laptop"/></svg><span class="nm">MacBook 内置屏</span><span class="meta">1512 × 982</span><span class="ck"><svg class="i"><use href="#i-check"/></svg></span></button>
+            </div>
+            <div class="g tile">
+              <div class="prow"><span>分辨率</span><div class="pop">1512 × 982 · HiDPI<svg class="i"><use href="#i-updown"/></svg></div></div>
+              <div class="prow"><span>刷新率</span><div class="pop">120 Hz<svg class="i"><use href="#i-updown"/></svg></div></div>
+              <div class="prow"><span>位置</span><div class="pop">左侧<svg class="i"><use href="#i-updown"/></svg></div></div>
+              <div class="prow"><span>显示方式</span>
+                <div class="seg" role="group" aria-label="显示方式">
+                  <button aria-pressed="false"><svg class="i"><use href="#i-mirror"/></svg>镜像</button>
+                  <button aria-pressed="true"><svg class="i"><use href="#i-extend"/></svg>扩展</button>
+                </div>
+              </div>
+              <div class="prow"><span></span><button class="plain-btn">设为主屏</button></div>
+            </div>
+            <div class="g tile" style="padding:10px 8px 6px">
+              <div class="lab" style="margin:0 0 4px 8px">布局预设</div>
+              <button class="preset"><span>办公 · 双屏扩展</span><kbd>⌃⌥1</kbd><svg class="i" style="color:var(--accent);width:14px;height:14px;stroke-width:2"><use href="#i-check"/></svg></button>
+              <button class="preset"><span>演示 · 镜像</span></button>
+            </div>
+            <div class="keys round">
+              <button class="g key" title="设置" aria-label="设置"><svg class="i"><use href="#i-gear"/></svg></button>
+              <button class="g key" title="自动排列" aria-label="自动排列"><svg class="i"><use href="#i-arrange"/></svg></button>
+              <button class="g key" title="刷新列表" aria-label="刷新列表"><svg class="i"><use href="#i-refresh"/></svg></button>
+              <span class="sp"></span>
+              <button class="g key" title="退出 MoniSwitch" aria-label="退出 MoniSwitch"><svg class="i"><use href="#i-power"/></svg></button>
+            </div>
+          </div>
+          <div>
+            <p class="cap">按 F1 / F2 时的亮度气泡</p>
+            <div class="g hud"><svg class="i"><use href="#i-sun"/></svg><span class="bar"></span><b>48%</b></div>
+          </div>
+        </div>
+
+        <div class="win" data-win>
+          <nav class="side" aria-label="设置分区">
+            <div class="lights"><i></i><i></i><i></i></div>
+            <button class="nav" aria-selected="true" data-tab="general"><svg class="i"><use href="#i-gear"/></svg>通用</button>
+            <button class="nav" aria-selected="false" data-tab="bright"><svg class="i"><use href="#i-sun"/></svg>亮度与按键</button>
+            <button class="nav" aria-selected="false" data-tab="presets"><svg class="i"><use href="#i-stack"/></svg>预设</button>
+            <button class="nav" aria-selected="false" data-tab="about"><svg class="i"><use href="#i-info"/></svg>关于</button>
+          </nav>
+          <div class="content">
+            <div class="pane on" data-pane="general">
+              <div class="pane-title">通用</div>
+              <div class="form">
+                <div class="l">界面语言：</div>
+                <div class="c"><span class="menu" style="align-self:flex-start">简体中文<svg class="i"><use href="#i-updown"/></svg></span></div>
+                <div class="l">启动：</div>
+                <div class="c"><label class="chk"><input type="checkbox" checked>登录时打开 MoniSwitch</label></div>
+                <hr>
+                <div class="l">显示器：</div>
+                <div class="c">
+                  <div class="inline"><label class="chk"><input type="checkbox" checked>自动刷新列表，每</label><span class="menu">10 秒<svg class="i"><use href="#i-updown"/></svg></span></div>
+                  <label class="chk"><input type="checkbox">在面板里显示刷新率</label>
+                </div>
+                <hr>
+                <div class="l">通知：</div>
+                <div class="c"><label class="chk"><input type="checkbox">切换完成后发送通知</label></div>
+              </div>
+            </div>
+
+            <div class="pane" data-pane="bright">
+              <div class="pane-title">亮度与按键</div>
+              <div class="form">
+                <div class="l">亮度键：</div>
+                <div class="c">
+                  <label class="chk"><input type="checkbox" checked><span class="keyline"><kbd>F1</kbd><kbd>F2</kbd></span>调节鼠标所在的屏幕</label>
+                  <p class="hint">按住 <kbd>⌥</kbd> 同步全部外接屏，内置屏仍由系统调节</p>
+                </div>
+                <hr>
+                <div class="l">辅助功能：</div>
+                <div class="c"><div class="inline"><span class="dot"></span><span>未授权</span><button class="btn">打开授权…</button></div></div>
+                <hr>
+                <div class="l">兼容性：</div>
+                <div class="c"><p class="hint flat" style="margin-top:3px">经坞站、转换器连接的屏幕和部分电视不支持 DDC，不会出现在亮度列表里。</p></div>
+              </div>
+            </div>
+
+            <div class="pane" data-pane="presets">
+              <div class="pane-title">预设</div>
+              <div class="form">
+                <div class="l">保存当前布局：</div>
+                <div class="c"><div class="inline" style="flex-wrap:nowrap"><input class="field" placeholder="预设名称" aria-label="预设名称"><button class="btn">保存</button></div></div>
+                <hr>
+                <div class="l">已保存：</div>
+                <div class="c">
+                  <div>
+                    <div class="table" role="table">
+                      <div class="th" role="row"><span>名称</span><span>快捷键</span><span></span></div>
+                      <div class="tr sel" role="row"><span>办公 · 双屏扩展</span><span><kbd>⌃⌥1</kbd></span><span>应用</span></div>
+                      <div class="tr" role="row"><span>演示 · 镜像</span><span class="muted">点按录制</span><span class="muted">应用</span></div>
+                    </div>
+                    <div class="tbar"><button aria-label="添加"><svg class="i"><use href="#i-plus"/></svg></button><button aria-label="删除"><svg class="i"><use href="#i-minus"/></svg></button></div>
+                  </div>
+                  <p class="hint flat">双击名称改名，选中后按 − 删除</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pane" data-pane="about">
+              <div class="about"><span class="appicon"><i></i></span><h4>MoniSwitch</h4><p>菜单栏里的显示器快捷切换小工具</p><p class="muted">版本 2.1.0</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li>面板：显示器从两张大瓷砖收成一张列表，主屏用小「主屏」字样标出</li>
+      <li>镜像 / 扩展是一组分段控件，设为主屏是普通按钮，参数和动作并成一块</li>
+      <li>有预设时的预设块，当前布局打勾；退出键单独靠右</li>
+      <li>设置：没有卡片，标签列右对齐，开关全部换成复选框</li>
+      <li>「刷新间隔」并进自动刷新那一行，读起来是一句话</li>
+      <li>预设是带 +/− 的表格，快捷键直接在表里点按录制</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+// 设置窗口左栏切换标签页（每个窗口各自独立）
+document.querySelectorAll('[data-win]').forEach(win => {
+  win.querySelectorAll('.nav').forEach(btn => btn.addEventListener('click', () => {
+    win.querySelectorAll('.nav').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+    win.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === btn.dataset.tab));
+  }));
+});
+// 开关可点
+document.querySelectorAll('.sw').forEach(sw => sw.addEventListener('click', () =>
+  sw.setAttribute('aria-checked', String(sw.getAttribute('aria-checked') !== 'true'))));
+// 滑杆填充跟随数值
+document.querySelectorAll('input[type=range]').forEach(r => {
+  const pct = r.parentElement.querySelector('.pct');
+  const sync = () => { r.style.setProperty('--p', r.value + '%'); if (pct) pct.textContent = r.value + '%'; };
+  r.addEventListener('input', sync); sync();
+});
+// 显示器瓷砖 / 列表行选中
+document.querySelectorAll('.dgrid').forEach(g => g.querySelectorAll('.dtile').forEach(t => t.addEventListener('click', () =>
+  g.querySelectorAll('.dtile').forEach(x => x.setAttribute('aria-pressed', String(x === t))))));
+document.querySelectorAll('.seg').forEach(s => s.querySelectorAll('button').forEach(b => b.addEventListener('click', () =>
+  s.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))))));
+// 深浅色切换：在系统外观与反向之间切
+document.getElementById('theme').addEventListener('click', () => {
+  const root = document.documentElement;
+  const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const cur = root.dataset.theme || (sysDark ? 'dark' : 'light');
+  root.dataset.theme = cur === 'dark' ? 'light' : 'dark';
+});
+</script>
+</body>
+</html>

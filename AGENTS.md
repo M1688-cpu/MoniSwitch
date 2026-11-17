@@ -12,6 +12,47 @@ DDC 亮度引擎 + F1/F2 键监听 + HUD、面板「控制中心式」改版（�
 单一事实源；其后的 NSPopover 时代条目（背板隐藏/常驻模式/尺寸闸门等）均为**历史存档**
 （对应代码已删，只留作战史与教训，勿按其施工）。
 
+## 2026-11-17 v2.2.0 发版 + README 海报 v4
+
+- v2.2.0 = v2.1.0 以来全部面板改版（10-26 玻璃 / 11-09 原生菜单 / 11-11 瓷砖 / 11-14 去主题）。release notes 在 `dist/RELEASE_NOTES-v2.2.0.md`（humanizer 写法，中英双语，格式沿用 v2.1.0）。设置页 A/B 布局仍未实施，留下个版本。
+- README 顶部海报换成 `docs/poster.jpg`（旧 `docs/poster.svg` 保留但不再引用）。生成管线在 `design/poster-v4/`（见其 README）：面板是 5K 主屏真机截图，按矩形羽化贴回截图时的壁纸原位置，玻璃无接缝。**窗口截图（`screencapture -l`）拍不到 Liquid Glass**：玻璃由窗口服务器合成，窗口 alpha 只有文字有值，必须整屏截图再裁。用户拍板：Athelas 衬线、标题第二行沙色 `#D9C8A9` 斜体、布局 L1，只留应用名 / 标题 / 系统支持三行。
+- 截图期间 AX 点击菜单栏图标可开关面板（`click menu bar item 1 of menu bar 2`）；临时改壁纸时注意 WallpaperMachine 会删掉它生成的海报文件，原壁纸无法原样恢复，先提醒用户。
+
+## 2026-11-14 去主题 + 线条图标 + 原生滑杆 + 底栏独立键（现行 UI，覆盖 11-11 条目的对应部分）
+
+- **主题整体删除**：`PanelTheme.swift`（PanelPalette / 7 组主题 / 浅深派生 / PanelThemeMath）、`PanelThemeTests`、`AppSettings.panelThemeID` 与 `.moniswitchPanelThemeChanged`、设置页「主题色」卡、`theme*` 与 `groupTheme` L10n 键、`Resources/AppIconThemes/theme-*.png` 全部移除。强调色一律 `BrandColor.accent`（系统强调色）；启动时清掉旧的 `panelThemeID` 存档。App 图标只按系统强调色选 `system-<accent>.png`（`AppIconTheme.resourceName(accentIndex:)`）。`render-theme-icons.sh` / `generate.py` 仍会产出 `theme-*.png`，运行时不读，生成后可删。
+- **面板**：`SkeuoDisplayIcon` 与自绘 `GlassBrightnessSlider` 删除——显示器瓷砖与亮度行用 SF Symbol 线条图标（`display` / `laptopcomputer`，light 字重；选中瓷砖图标染强调色）；亮度用原生 `Slider`（27 SDK 链接时按住拖动才有 Liquid Glass 拇指，裸 `swift build` 不带 `-platform_version` 看不到）。底栏原「设置」+「更多」菜单拆成四个等宽独立玻璃键 `PanelIconButton`（设置 / 自动排列 / 刷新 / 退出），名称走 `.help`；操作进行中刷新键换小转圈并禁用（原底栏进度指示并入）。没有预设时面板不渲染预设瓷砖（入口在设置 → 预设）。`moreActions` 键删除。
+- `PanelGlassSurface` 不再有主题淡染（`panelGlassTint` 环境键删除），新增 `interactive` 打开系统玻璃按压反馈（仅底栏键用）。
+- **亮度 HUD**：`BubbleBackground` + 投影换成 `glassEffect(.regular, in: Capsule())`（14/15 回退 `.regularMaterial`，减弱透明度走窗口底色），`BubbleBackground` / `bubbleFloatingShadow` / `bubbleDarkFill` 随之删除；`shadowPadding` 保留给玻璃边缘阴影。
+- 设置页两套布局参考稿在 `design/panel-settings-directions/index.html`（A 系统设置式分组 / B 经典偏好设置式），**未实施，等用户选**。
+- 只过了编译与 60 个单测，真机观感（滑杆玻璃拇指、HUD 玻璃、底栏键按压）未验收。
+
+## 2026-11-11 控制中心式玻璃瓷砖面板（现行 UI，覆盖下方旧 UI 条目）
+
+- 用户从两张参考图（`design/panel-directions/index.html`：A 舞台式 / B 控制中心式）选了 B，并明确要**完全无背板**、直接写 SwiftUI。
+- `PanelView` 改为一列玻璃瓷砖直接浮在壁纸上：亮度瓷砖（拟物小显示器 + 粗滑杆）、显示器瓷砖（两列，选中描边，主屏角标星）、参数瓷砖（分辨率 / 刷新率 / 位置，仍是原生 `NSPopUpButton` + `NSMenu`）、动作瓷砖（设为主屏 / 镜像 / 扩展圆键，仅多屏）、预设瓷砖（行内直接应用 + 管理预设）、底栏瓷砖（设置 + 更多）。原「显示器选项…」菜单已拆进参数与动作瓷砖；自动排列仍在「更多」。
+- `PanelGlass.swift`：`PanelGlassSurface` 现在是**单块瓷砖**材质（macOS 26+ `glassEffect(.regular.tint)`，14/15 回退 `.regularMaterial`，减弱透明度走窗口底色），**不加外投影**（阴影落壁纸 2026-09-14 被否决过）；`SkeuoDisplayIcon` 是面板里唯一的拟物元素（用户拍板「只拟物显示器」），屏幕渐变取主题高亮档→实心档；`GlassBrightnessSlider` 自绘粗滑杆，无障碍用 `accessibilityRepresentation` 映射成原生 Slider。
+- 镜像/扩展的主体是非主屏；选中主屏且只有两块屏时作用于另一块，三屏以上选中主屏时两键禁用。
+- 固定窗口安全边界、滚动区限高、外部点击按内容高度命中、菜单生命周期全部沿用下条，未改 `PanelController`。
+- **未做真机观感验收**（只过了编译与单测）：浅色壁纸上的文字可读性、玻璃瓷砖在滚动区内的渲染、粗滑杆拖动手感都待人肉过。
+
+## 2026-11-09 极简原生面板（历史 UI；窗口、菜单与目标选择约束仍有效）
+
+- 用户确认极简方案并要求实现：单一系统材质背板；所有可控外接屏亮度滑杆、名称选择器、分辨率、显示器选项、布局预设、设置与更多。原多层玻璃卡、图标网格、独立参数卡已移除。
+- `ParameterMenu.swift` 使用原生 `NSPopUpButton` 外观和真实 `NSMenu`，支持子菜单、分隔线、禁用、勾选与延后执行。菜单按目标身份、完整配置和递归选项签名失效，名称相同也不能执行旧目标动作。
+- `PanelDisplayContext.swift` 负责目标回退、同名编号与配置指纹。选择目标不改变主屏；默认主屏，断开后回退。详细信息偏好控制摘要，分辨率变体始终保留 HiDPI 标注。
+- 固定窗口与根尺寸的安全边界继续有效；滚动区显式限定高度，按菜单栏所在屏的可见高度封顶；内容测高只用于窗口内部滚动及外部点击命中。设置页可直接跳到预设页。
+- 设置窗口、亮度引擎、F1/F2 与 HUD 保留既有行为。设计与实施记录见 `docs/superpowers/specs/2026-11-09-native-panel-design.md` 和 `docs/superpowers/plans/2026-11-09-native-panel.md`。
+
+## 2026-10-26 面板玻璃改版（历史 UI；窗口与菜单安全约束仍有效）
+
+- 用户确认：保留亮度/显示器/参数/预设/底栏分区，增加整体玻璃背板；内部改为原生 Liquid Glass，主题仅淡染面板玻璃。显示器为等大图标按钮，名称走原生悬停提示；参数行使用独立 NSMenu 浮层；主屏/镜像/扩展为等大的纯图标按钮。
+- `PanelGlass.swift` 统一材质与按钮外形；macOS 26+ 用 `glassEffect(.clear)`，背板/卡片/内部控件分层设置 `GlassEffectContainer`（只合并同层兄弟，避免重叠形状融合吞掉内部轮廓）；背板加中性遮光保可读性，减弱透明度时遵从系统切 regular；14/15 回退系统材质。设置窗口与独立亮度 HUD 保留既有样式。
+- `PanelView` 删除 LayoutDiagram、RevealHeightModifier、参数块测高/常驻挂载、hover 缩放与底栏隆起。参数卡条件挂载，无自定义动画；原 `FloatingTooltip.swift` 已由系统 `.help` 替代，旧定位测试随之删除。
+- `ParameterMenu.swift` 使用真实 NSMenu，系统负责滚动/勾选/键盘导航。跟踪期间暂停面板外部点击收起；菜单结束后才执行显示器操作。禁用、参数更新或视图移除时取消旧菜单，避免预设热键与旧菜单动作并发。
+- 桌面定位修复策略：`PanelWindow` 使用 `.moveToActiveSpace` + `makeKeyAndOrderFront`，允许成为 key 以支持原生控件与键盘导航，仍保持 nonactivating；toggle 同时检查 `isVisible` 与 `isOnActiveSpace`；Space 改变时收起。原 `.canJoinAllSpaces + .stationary` 配置下仍收到错桌面报告，不能把标志位单测视为 WindowServer 实机验证。
+- **固定窗口安全边界不变**：窗口与根视图尺寸恒定，可见期间不写窗口 frame；内容高度只用于外部点击命中。玻璃背板按内容包裹，不能填满透明的固定窗口余量。
+
 ## 会话启动约定
 
 每个新对话开始时，先过一遍本机 skill 清单并按当轮任务加载相关项（不全载）。常用映射：查 bug / 跑实验矩阵 → diagnosing-bugs；改本文档或写交接文档 → writing-for-agents；实现定型 → implement（自查加 code-review）；涉及动鼠标键盘/截图的验证 → knock-first（先探测用户状态、列动作清单征求同意）；会话中断需要交接 → handoff；纯逻辑先行 → tdd。
@@ -49,12 +90,10 @@ Sources/MoniSwitch/
                            #   外部点击收起[按内容矩形]监控；AppState 宿主）
   AppState.swift           # UI 状态对象：显示器列表 + 全部切换操作 + isOperating 进行中状态
   PanelView.swift          # 面板（v2 控制中心式：亮度滑条卡 + 枢纽卡[布局图+参数] + 预设 + 底部栏）
-  FloatingTooltip.swift    # 悬停补充气泡独立浮窗（FloatingTooltipPresenter + 定位纯函数 +
-                           #   屏幕锚点探针；镜像/扩展与底部四按钮共用）
+  PanelGlass.swift         # 玻璃瓷砖材质、底栏图标键、圆形动作键
+  ParameterMenu.swift      # NSMenu 参数选择浮层 + 跟踪/取消生命周期
   Components.swift         # 全站共享视觉组件（BrandColor/BubbleBackground/BubbleCard/
                            #   SettingsCard/RowButton/ActivePill/IndeterminateBar/BubbleHoverLift…）
-  PanelTheme.swift         # 面板内置主题（7 组低饱和三档色系 + 跟随系统、深色自动派生、
-                           #   PanelPalette 三档色板经环境注入面板与 HUD）
   BubbleMetrics.swift      # 设计令牌（圆角/字号/间距/悬浮阴影定档值/面板宽度）
   Models.swift             # 显示器数据模型（DisplayInfo/ResolutionOption/HotkeyBinding/Preset）
   ShellRunner.swift        # displayplacer 调用封装（并发读管道防死锁）

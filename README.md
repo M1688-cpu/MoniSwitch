@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="docs/poster.svg?v=3">
-    <img src="docs/poster.svg?v=3" width="100%" alt="MoniSwitch — Every display. One switch. A dark aurora poster with a monitor, brightness slider and layout cards.">
+  <a href="docs/poster.jpg?v=4">
+    <img src="docs/poster.jpg?v=4" width="100%" alt="MoniSwitch: Every display. One switch. The glass-tile menu-bar panel floating over a night desert sky.">
   </a>
 </p>
 
@@ -31,7 +31,7 @@ Switch the main screen, arrange mirrors, restore whole layouts, and dim external
 
 MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a system menu. Every display is drawn to scale, every switch is one or two clicks away, and the panel resizes itself around what you open — no inner scroll area, no digging through System Settings → Displays.
 
-**v2.0 is a ground-up rewrite of the panel** and adds the other half of owning a monitor: external-display brightness. Each DDC/CI-capable screen gets a slider at the top of the panel, the F1/F2 brightness keys adjust the display under the pointer, and seven low-saturation themes recolor the whole panel in light and dark mode.
+**v2.0 is a ground-up rewrite of the panel** and adds the other half of owning a monitor: external-display brightness. Each DDC/CI-capable screen gets a slider at the top of the panel, and the F1/F2 brightness keys adjust the display under the pointer.
 
 ## What's new in v2.0
 
@@ -39,7 +39,7 @@ MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a s
 - **F1/F2 follows you.** An active `CGEventTap` watches the brightness keys and adjusts the DDC brightness of the display under the pointer; the built-in screen and non-DDC screens keep their native response. Hold `⌥` to adjust every external screen at once, with a small HUD.
 - **A new panel, not a reskin.** The old `NSPopover` is gone. MoniSwitch now owns a borderless `NSPanel`: the panel is anchored under the menu-bar icon, fades and scales in from the top, and dismisses on any outside click.
 - **Control-Center layout.** Brightness is pinned at the top, the to-scale layout preview is the hub, and clicking a display block unfolds that screen's parameters in a second bubble card. Presets and the bottom toolbar follow.
-- **Seven themes + follow system.** Sage, rose, orange, brown, blue, blue-grey and cyan-grey — each derived into a card background, a highlight and a solid accent, with separate light and dark derivations.
+- **Glass tiles since v2.2.** The panel is a column of Liquid Glass tiles floating on the desktop (system material on macOS 14 and 15), and it follows the system accent color. The built-in themes were removed in v2.2.
 - **A rebuilt Settings window.** Native sidebar material, grouped cards, and a new **Brightness & Keys** tab for the F1/F2 listener, its Accessibility permission and DDC compatibility notes.
 
 ## Features
@@ -50,7 +50,7 @@ MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a s
 | **Brightness** | Native DDC/CI sliders for external screens, F1/F2 for the display under the pointer, a compact HUD, and per-display values remembered by EDID identity. |
 | **Presets** | Save the whole layout — main screen, positions, mirroring — and restore it in one click or with a global hotkey. |
 | **Panel** | A borderless floating panel with a to-scale layout map, collapsible parameter groups, spring animations and hover lift. |
-| **Settings** | Bilingual UI (English / 简体中文), launch at login, auto-refresh, notifications, themes, presets and permissions. |
+| **Settings** | Bilingual UI (English / 简体中文), launch at login, auto-refresh, notifications, presets and permissions. |
 
 ### Every display, one click
 
@@ -77,11 +77,11 @@ MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a s
 - **Hover has weight.** Cards lift slightly with a 2D affine scale anchored at the bottom edge, so the pointer can never fall into a hover/reset oscillation. Buttons in the bottom toolbar bulge locally on hover.
 - **Long operations are visible.** A flowing progress bar appears while a switch is in flight, and the panel refuses double-triggers. Failed switches raise a system notification.
 - **The layout map is live.** Displays are drawn to scale; hovering a display row highlights its block, and the selected block carries a check mark.
-- **Bilingual by design.** English and 简体中文 switch in one click, and the choice persists. By default the panel follows the system accent color; seven built-in themes can replace it.
+- **Bilingual by design.** English and 简体中文 switch in one click, and the choice persists. The panel follows the system accent color.
 
 ### Settings without the clutter
 
-- **General** — interface language, launch at login, theme, auto-refresh (with interval), detailed menu tags, and post-switch notifications.
+- **General** — interface language, launch at login, auto-refresh (with interval), detailed menu tags, and post-switch notifications.
 - **Brightness & Keys** — enable or disable the F1/F2 listener, see the Accessibility state, jump to System Settings, and read the DDC compatibility note.
 - **Presets** — save the current layout, apply or delete a preset, record a global hotkey, or clear it.
 - **About** — app icon, version and one-line description.
@@ -105,9 +105,9 @@ MoniSwitch lives in the menu bar and opens a floating bubble-card panel, not a s
   </tr>
   <tr>
     <td width="50%" align="center" valign="top">
-      <img src="screenshots/en/settings-general.png" width="400" alt="MoniSwitch Settings, General tab: language, launch at login, themes, auto-refresh and notifications">
+      <img src="screenshots/en/settings-general.png" width="400" alt="MoniSwitch Settings, General tab: language, launch at login, auto-refresh and notifications">
       <br><b>Settings · General</b>
-      <br><sub>Language, launch at login, seven themes, refreshing and notifications in the native settings layout.</sub>
+      <br><sub>Language, launch at login, refreshing and notifications in the native settings layout.</sub>
     </td>
     <td width="50%" align="center" valign="top">
       <img src="screenshots/en/settings-presets.png" width="400" alt="MoniSwitch Settings, Presets tab: save a layout, apply or delete presets and record a global hotkey">
@@ -227,7 +227,7 @@ The panel itself is a borderless `NSPanel` with `sizingOptions = []`, a SwiftUI 
 - **Language:** Swift 6 (language mode v5), SwiftUI + AppKit
 - **Minimum OS:** macOS 14
 - **Build:** Swift Package Manager, plain `Package.swift`, no Xcode project
-- **Tests:** Swift Testing (DDC protocol vectors, displayplacer parser fixtures, preset drift remapping, panel theme derivation)
+- **Tests:** Swift Testing (DDC protocol vectors, displayplacer parser fixtures, preset drift remapping, panel display context)
 - **Distribution:** non-sandboxed, local ad-hoc signing, direct DMG
 - **Brightness:** private `IOAVService` via `dlopen`/`dlsym`, Apple Silicon; F1/F2 via an active `CGEventTap` (Accessibility)
 - **Icons:** SVG source in `design/icon-web/`, exported to `Resources/AppIcon-source.png` and `AppIcon.icns`
@@ -242,13 +242,13 @@ MoniSwitch/
 │   ├── PanelController.swift      # NSStatusItem + borderless NSPanel shell
 │   ├── AppState.swift             # Display list + switching operations
 │   ├── PanelView.swift            # Bubble-card panel (brightness, layout hub, presets, toolbar)
-│   ├── PanelTheme.swift           # Seven three-tone themes + light/dark derivation
+│   ├── PanelGlass.swift           # Glass tile surface and toolbar buttons
 │   ├── Components.swift           # Shared cards, buttons, pills, hover/lighting modifiers
 │   ├── BubbleMetrics.swift        # Design tokens (radii, fonts, spacing, shadows)
 │   ├── Models.swift               # Display, resolution, hotkey and preset models
 │   ├── ShellRunner.swift          # displayplacer invocation wrapper
 │   ├── DisplayManager.swift       # Parsing, switching, mirror groups, auto-arrange, drift remap
-│   ├── AppSettings.swift          # Preferences (launch at login, refresh, notifications, themes)
+│   ├── AppSettings.swift          # Preferences (launch at login, refresh, notifications)
 │   ├── PresetManager.swift        # Layout presets (save / apply / delete / hotkey)
 │   ├── HotkeyManager.swift        # Carbon RegisterEventHotKey
 │   ├── DockPolicyManager.swift    # Settings window host
@@ -266,7 +266,7 @@ MoniSwitch/
 ├── Resources/                     # Bundled displayplacer, AppIcon.icns, icon source
 ├── Support/                       # Info.plist, build-app.sh, run-tests.sh
 ├── design/icon-web/               # Icon SVG, preview page and PNG exports
-├── docs/poster.svg                # README hero poster (SVG source)
+├── docs/poster.jpg                # README hero poster (built by design/poster-v4)
 ├── screenshots/                   # README screenshots (en/zh pairs, same filenames)
 ├── README.md                      # This file (English)
 ├── README.zh-CN.md                # Simplified Chinese README
@@ -288,7 +288,7 @@ MoniSwitch/
 - [x] Preset ID-drift remapping and **Current** badge
 - [x] Borderless floating panel with spring reveal and outside-click dismissal
 - [x] **v2:** native DDC/CI external brightness, F1/F2 listener and HUD
-- [x] **v2:** seven themes with light/dark derivation
+- [x] **v2.2:** glass-tile panel that follows the system accent color
 - [x] **v2:** rebuilt Settings window with a Brightness & Keys tab
 - [ ] Intel support
 - [ ] More than two displays — polish and testing
@@ -356,4 +356,4 @@ The bundled [displayplacer](https://github.com/jakehilborn/displayplacer) is © 
 
 - [displayplacer](https://github.com/jakehilborn/displayplacer) — the display-configuration engine behind the arrangement features.
 - [MonitorControl](https://github.com/MonitorControl/MonitorControl) and [m1ddc](https://github.com/waydabber/m1ddc) — both MIT; their DDC/CI constants, checksums and display→service mapping informed the brightness engine. MoniSwitch is an independent implementation, not a fork.
-- The icon's aurora palette and the panel's three-tone themes were designed in-house; the SVG sources live in [`design/icon-web/`](design/icon-web/) and [`docs/poster.svg`](docs/poster.svg).
+- The app icon and the README poster were designed in-house; the icon's SVG sources live in [`design/icon-web/`](design/icon-web/).

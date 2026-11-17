@@ -1,35 +1,42 @@
 import AppKit
-import SwiftUI
 import Testing
 @testable import MoniSwitch
 
 struct PanelPresentationTests {
     @Test @MainActor
-    func openingKeepsHostingTopFixed() throws {
-        let hosting = NSHostingView(rootView: Color.clear.frame(width: 404, height: 1000))
-        hosting.sizingOptions = []
-        hosting.safeAreaRegions = []
-        hosting.wantsLayer = true
-        hosting.frame = NSRect(x: 0, y: 0, width: 404, height: 1000)
-        PanelController.configurePresentationAnchor(for: hosting)
-        let layer = try #require(hosting.layer)
-
-        // 真实 NSHostingView 的翻转坐标曾让 (0.5,1) 错锚到底部。
-        for scale in [0.96, 0.98, 1.0] {
-            layer.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
-            #expect(abs(layer.frame.minY) < 0.001)
-            #expect(abs(layer.frame.midX - 202) < 0.001)
-        }
+    func nativeGlassKeepsActiveAppearanceWithoutKeyboardFocus() throws {
+        _ = NSApplication.shared
+        let panel = PanelWindow(contentRect: NSRect(x: 0, y: 0, width: 404, height: 1000))
+        // Liquid Glass 从 AppKit 窗口读取此状态，独立于 SwiftUI.appearsActive。
+        // 不把窗口显示为 key：背景/原生菜单跟踪导致的焦点变化也应保持玻璃。
+        #expect(!panel.isKeyWindow)
+        #expect(!panel.isMainWindow)
+        let selector = NSSelectorFromString("_hasActiveAppearance")
+        #expect(panel.responds(to: selector))
+        let implementation = try #require(panel.method(for: selector))
+        let hasActiveAppearance = unsafeBitCast(
+            implementation, to: (@convention(c) (AnyObject, Selector) -> Bool).self
+        )
+        #expect(hasActiveAppearance(panel, selector))
     }
 
     @Test @MainActor
-    func unflippedHostKeepsVisualTopFixed() throws {
-        let hosting = NSView(frame: NSRect(x: 0, y: 0, width: 404, height: 1000))
-        hosting.wantsLayer = true
-        PanelController.configurePresentationAnchor(for: hosting)
-        let layer = try #require(hosting.layer)
-        layer.setAffineTransform(CGAffineTransform(scaleX: 0.96, y: 0.96))
-        #expect(abs(layer.frame.maxY - 1000) < 0.001)
-        #expect(abs(layer.frame.midX - 202) < 0.001)
+    func panelMovesToTheDesktopWhereItIsOpened() {
+        let panel = PanelWindow(contentRect: NSRect(x: 0, y: 0, width: 404, height: 1000))
+        #expect(panel.collectionBehavior.contains(.moveToActiveSpace))
+        #expect(!panel.collectionBehavior.contains(.canJoinAllSpaces))
+        #expect(panel.collectionBehavior.contains(.fullScreenAuxiliary))
+        #expect(panel.styleMask.contains(.nonactivatingPanel))
+        #expect(panel.canBecomeKey)
+        #expect(!panel.canBecomeMain)
+        #expect(panel.animationBehavior == .none)
+    }
+
+    @Test
+    func clickOnAnotherDesktopOpensInsteadOfClosingTheOldPanel() {
+        #expect(!PanelWindow.shouldCloseOnToggle(isVisible: true, isOnActiveSpace: false))
+        #expect(!PanelWindow.shouldCloseOnToggle(isVisible: false, isOnActiveSpace: false))
+        #expect(!PanelWindow.shouldCloseOnToggle(isVisible: false, isOnActiveSpace: true))
+        #expect(PanelWindow.shouldCloseOnToggle(isVisible: true, isOnActiveSpace: true))
     }
 }
